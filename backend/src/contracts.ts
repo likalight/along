@@ -1,5 +1,6 @@
-/** Public integration contract v1. Money is integer SGD cents; null means UNKNOWN. */
+/** Public integration contract v1. Money is integer minor units with explicit currency; null means UNKNOWN. */
 export type Money = number;
+export type Currency = "SGD" | "USD";
 export type Evidence = {
   id: string;
   subjectType: "product" | "seller";
@@ -9,13 +10,33 @@ export type Evidence = {
   classification: "proxy" | "snapshot" | "real";
   capturedAt: string | null;
   claim: string;
-  rating: { value: number; count: number } | null;
+  rating: { value: number | null; count: number | null } | null;
+  sourceUrl?: string | null;
 };
 export type Product = {
   id: string;
   category: string;
   name: string;
   variant: string;
+  brand?: string;
+  description?: string;
+  buyerSignals?: {
+    averageRating: number | null;
+    ratingCount: number | null;
+    writtenReviewCount: number | null;
+    purchaseCount: number | null;
+    purchasePeriod: string | null;
+    reviewSummary: string | null;
+  };
+  videos?: {
+    id: string;
+    url: string;
+    creator: string;
+    platform: string;
+    publishedAt: string | null;
+    topic: string;
+    classification: "proxy" | "snapshot" | "real";
+  }[];
   specifications: Record<string, string | number | boolean | null>;
   strengths: string[];
   limitations: string[];
@@ -31,7 +52,7 @@ export type Offer = {
   productId: string;
   sellerId: string;
   sellerName: string;
-  currency: "SGD";
+  currency: Currency;
   unitPrice: Money;
   shipping: Money | null;
   otherFees: Money | null;
@@ -46,10 +67,30 @@ export type Offer = {
   classification: "proxy" | "snapshot" | "real";
 };
 export type Constraints = {
+  currency?: Currency;
   budgetMinor?: number;
   deliveryWithinDays?: number;
   category?: string;
   requiredSpecifications?: Record<string, string | number | boolean>;
+};
+export type ShoppingView = {
+  stage: "solution-types" | "priorities" | "shortlist" | "evidence" | "offers";
+  focusProductId: string | null;
+  cards: {
+    productId: string;
+    role:
+      | "best-value"
+      | "best-quality"
+      | "lowest-cost-suitable"
+      | "close-match"
+      | "discovery";
+    rank: 1 | 2 | 3 | null;
+    reason: string;
+    compromise: string;
+    evidenceIds: string[];
+  }[];
+  evidenceIds: string[];
+  activeVideoId: string | null;
 };
 export type Selection = { offerId: string; quantity: number };
 export type Proposal = {
@@ -62,6 +103,8 @@ export type Proposal = {
   shortlist?: string[];
   selection?: Selection | null;
   evidenceIds?: string[];
+  destination?: string;
+  view?: ShoppingView;
 };
 export type Conflict = {
   code: string;
@@ -70,10 +113,11 @@ export type Conflict = {
   field?: string;
 };
 export type Quote = {
+  destination: string;
   product: Product;
   offer: Offer;
   quantity: number;
-  currency: "SGD";
+  currency: Currency;
   subtotal: number;
   shipping: number | null;
   otherFees: number | null;
@@ -114,6 +158,8 @@ export type Session = {
   scenarioId: string | null;
   createdAt: string;
   expiresAt: string;
+  destination: string;
+  view: ShoppingView | null;
   needs: string[];
   constraints: Constraints;
   preferences: string[];
@@ -147,3 +193,24 @@ export type Scenario = {
   expectedOutcome: string;
 };
 export type SessionEvent = { type: "session.snapshot"; session: Session };
+
+export type CatalogData = {
+  version: string;
+  currency: Currency;
+  notice: string;
+  products: Product[];
+  offers: Offer[];
+  evidence: Evidence[];
+};
+export type CatalogProfile = {
+  catalog: CatalogData;
+  scenarios: Scenario[];
+  preparedImages: {
+    id: string;
+    url: string;
+    classification: string;
+    description: string;
+    correctionExample: string;
+  }[];
+  destination: string;
+};

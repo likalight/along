@@ -1,3 +1,4 @@
+import type { CatalogProfile, ShoppingView } from "./contracts.ts";
 import {
   randomUUID,
   randomBytes,
@@ -5,7 +6,7 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { catalog, scenarios, quoteOffer, eligibleOffers } from "./catalog.ts";
+import { nonTechProfile, quoteOffer, eligibleOffers } from "./catalog.ts";
 import {
   requireThat,
   object,
@@ -30,12 +31,18 @@ export function safeEqual(a: string, b: string) {
     y = Buffer.from(b);
   return x.length === y.length && timingSafeEqual(x, y);
 }
-const money = (n: number) => `SGD ${(n / 100).toFixed(2)}`;
+const money = (n: number, currency: string) =>
+  `${currency} ${(n / 100).toFixed(2)}`;
 export class SessionStore {
   private records = new Map<string, { state: Session; tokenHash: string }>();
   readonly events = new EventEmitter();
   readonly ttlMs: number;
-  constructor(ttlMs = 2 * 60 * 60 * 1000) {
+  readonly profile: CatalogProfile;
+  constructor(
+    ttlMs = 2 * 60 * 60 * 1000,
+    profile: CatalogProfile = nonTechProfile,
+  ) {
+    this.profile = profile;
     this.ttlMs = ttlMs;
     this.events.setMaxListeners(100);
   }
@@ -48,7 +55,7 @@ export class SessionStore {
       503,
     );
     const scenario = scenarioId
-      ? scenarios.find((s) => s.id === scenarioId)
+      ? this.profile.scenarios.find((s) => s.id === scenarioId)
       : null;
     requireThat(
       !scenarioId || scenario,
@@ -65,8 +72,13 @@ export class SessionStore {
       scenarioId: scenario?.id ?? null,
       createdAt: now.toISOString(),
       expiresAt: new Date(now.getTime() + this.ttlMs).toISOString(),
+      destination: this.profile.destination,
+      view: null,
       needs: [],
-      constraints: clone(scenario?.constraints ?? {}),
+      constraints: clone({
+        currency: this.profile.catalog.currency,
+        ...scenario?.constraints,
+      }),
       preferences: [],
       excludedProductIds: [],
       shortlist: [],
@@ -171,11 +183,16 @@ export class SessionStore {
   reset(id: string, expected: number) {
     const s = this.get(id);
     this.revision(s, expected);
-    const scenario = scenarios.find((x) => x.id === s.scenarioId);
+    const scenario = this.profile.scenarios.find((x) => x.id === s.scenarioId);
     Object.assign(s, {
       epoch: s.epoch + 1,
+      destination: this.profile.destination,
+      view: null,
       needs: [],
-      constraints: clone(scenario?.constraints ?? {}),
+      constraints: clone({
+        currency: this.profile.catalog.currency,
+        ...scenario?.constraints,
+      }),
       preferences: [],
       excludedProductIds: [],
       shortlist: [],
@@ -187,6 +204,107 @@ export class SessionStore {
       lastOutcome: null,
     });
     return this.commit(s);
+  }
+  private validateView(value: unknown) {
+    object(value);
+    keys(value, [
+      "stage",
+      "focusProductId",
+      "cards",
+      "evidenceIds",
+      "activeVideoId",
+    ]);
+    requireThat(
+      [
+        "solution-types",
+        "priorities",
+        "shortlist",
+        "evidence",
+        "offers",
+      ].includes(value.stage as string),
+      "INVALID_VIEW",
+      "Unknown shopping stage.",
+    );
+    requireThat(
+      value.focusProductId === null ||
+        this.profile.catalog.products.some(
+          (p) => p.id === value.focusProductId,
+        ),
+      "UNKNOWN_PRODUCT",
+      "Unknown focused product.",
+    );
+    requireThat(
+      Array.isArray(value.cards) && value.cards.length <= 8,
+      "INVALID_VIEW",
+      "At most eight product cards.",
+    );
+    const knownEvidence = (ids: unknown) =>
+      strings(ids, 30) &&
+      ids.every((id) => this.profile.catalog.evidence.some((e) => e.id === id));
+    requireThat(
+      knownEvidence(value.evidenceIds),
+      "UNKNOWN_EVIDENCE",
+      "Unknown panel evidence.",
+    );
+    requireThat(
+      value.activeVideoId === null ||
+        this.profile.catalog.products.some((p) =>
+          p.videos?.some((v) => v.id === value.activeVideoId),
+        ),
+      "UNKNOWN_VIDEO",
+      "Video must come from curated catalog evidence.",
+    );
+    for (const card of value.cards) {
+      object(card);
+      keys(card, [
+        "productId",
+        "role",
+        "rank",
+        "reason",
+        "compromise",
+        "evidenceIds",
+      ]);
+      requireThat(
+        this.profile.catalog.products.some((p) => p.id === card.productId),
+        "UNKNOWN_PRODUCT",
+        "Unknown card product.",
+      );
+      requireThat(
+        [
+          "best-value",
+          "best-quality",
+          "lowest-cost-suitable",
+          "close-match",
+          "discovery",
+        ].includes(card.role as string),
+        "INVALID_VIEW",
+        "Unknown buying role.",
+      );
+      requireThat(
+        card.rank === null || [1, 2, 3].includes(card.rank as number),
+        "INVALID_VIEW",
+        "Rank must be 1, 2, 3 or null.",
+      );
+      for (const field of ["reason", "compromise"])
+        requireThat(
+          typeof card[field] === "string" &&
+            (card[field] as string).length > 0 &&
+            (card[field] as string).length <= 1000,
+          "INVALID_VIEW",
+          "Cards need bounded reasons and compromises.",
+        );
+      requireThat(
+        knownEvidence(card.evidenceIds) && (card.evidenceIds as string[]).every(id =>
+          this.profile.catalog.evidence.some(e => e.id === id && e.subjectType === "product" && e.subjectId === card.productId)),
+        "UNKNOWN_EVIDENCE",
+        "Card evidence must belong to that product; seller evidence belongs in the offers panel.",
+      );
+    }
+    requireThat(
+      new Set(value.cards.map((c) => c.productId)).size === value.cards.length,
+      "INVALID_VIEW",
+      "Duplicate product card.",
+    );
   }
   propose(id: string, raw: unknown) {
     object(raw);
@@ -200,6 +318,8 @@ export class SessionStore {
       "shortlist",
       "selection",
       "evidenceIds",
+      "destination",
+      "view",
     ]);
     const s = this.get(id);
     this.revision(s, raw.expectedRevision);
@@ -229,27 +349,37 @@ export class SessionStore {
         "Selection needs an offer ID and integer quantity 1–99.",
       );
     }
+    if (raw.destination !== undefined)
+      requireThat(
+        typeof raw.destination === "string" &&
+          raw.destination.trim().length > 0 &&
+          raw.destination.length <= 200,
+        "INVALID_DESTINATION",
+        "Provide a short demo destination.",
+      );
+    if (raw.view !== undefined) this.validateView(raw.view);
     const p = raw as unknown as Proposal;
     for (const key of ["excludedProductIds", "shortlist"] as const)
       for (const productId of p[key] ?? [])
         requireThat(
-          catalog.products.some((x) => x.id === productId),
+          this.profile.catalog.products.some((x) => x.id === productId),
           "UNKNOWN_PRODUCT",
           `Unknown product: ${productId}`,
         );
     for (const evidenceId of p.evidenceIds ?? [])
       requireThat(
-        catalog.evidence.some((x) => x.id === evidenceId),
+        this.profile.catalog.evidence.some((x) => x.id === evidenceId),
         "UNKNOWN_EVIDENCE",
         `Unknown evidence: ${evidenceId}`,
       );
     if (p.selection)
       requireThat(
-        catalog.offers.some((x) => x.id === p.selection!.offerId),
+        this.profile.catalog.offers.some((x) => x.id === p.selection!.offerId),
         "UNKNOWN_OFFER",
         "Unknown seller offer.",
       );
     const before = JSON.stringify({
+      destination: s.destination,
       constraints: s.constraints,
       excluded: s.excludedProductIds,
       selection: s.selection,
@@ -262,8 +392,20 @@ export class SessionStore {
       "shortlist",
       "selection",
       "evidenceIds",
+      "destination",
+      "view",
     ] as const)
       if (p[key] !== undefined) Object.assign(s, { [key]: clone(p[key]) });
+    if (p.view?.cards.length) {
+      const visibleIds = p.view.cards.map((c) => c.productId);
+      requireThat(
+        !p.shortlist ||
+          JSON.stringify(p.shortlist) === JSON.stringify(visibleIds),
+        "VIEW_ORDER_CONFLICT",
+        "Shortlist must follow the visible product card order.",
+      );
+      s.shortlist = visibleIds;
+    }
     requireThat(
       s.shortlist.every((x) => !s.excludedProductIds.includes(x)),
       "EXCLUDED_SHORTLIST",
@@ -275,6 +417,8 @@ export class SessionStore {
         s.selection.quantity,
         s.constraints,
         s.excludedProductIds,
+        this.profile.catalog,
+        s.destination,
       );
       // A changed constraint may invalidate an existing choice; retain the constraint, clear the choice.
       if (!q.eligible) {
@@ -291,6 +435,7 @@ export class SessionStore {
     if (
       before !==
       JSON.stringify({
+        destination: s.destination,
         constraints: s.constraints,
         excluded: s.excludedProductIds,
         selection: s.selection,
@@ -304,6 +449,8 @@ export class SessionStore {
         s.constraints,
         s.selection?.quantity ?? 1,
         s.excludedProductIds,
+        this.profile.catalog,
+        s.destination,
       ),
     };
   }
@@ -318,6 +465,8 @@ export class SessionStore {
       s.selection.quantity,
       s.constraints,
       s.excludedProductIds,
+      this.profile.catalog,
+      s.destination,
     );
     requireThat(
       q.eligible && q.total !== null,
@@ -326,7 +475,7 @@ export class SessionStore {
       422,
       q.conflicts,
     );
-    const spokenText = `This is a simulated purchase only. ${q.quantity} of ${q.product.name}, variant ${q.product.variant}, sold by ${q.offer.sellerName}. Items ${money(q.subtotal)}, shipping ${money(q.shipping!)}, other fees ${money(q.otherFees!)}; total ${money(q.total!)}. Delivery: ${q.offer.deliveryConditions} Returns: ${q.offer.returnConditions} Conditions: ${q.offer.conditions.join(" ")} Material uncertainties: ${q.offer.uncertainties.length ? q.offer.uncertainties.join("; ") : "none recorded in this proxy fixture"}. All offer details are synthetic demo data. To approve, say “Confirm this simulated purchase.” You can also change it or cancel.`;
+    const spokenText = `This is a simulated purchase only. ${q.quantity} of ${q.product.name}, variant ${q.product.variant}, sold by ${q.offer.sellerName}. Items ${money(q.subtotal, q.currency)}, shipping ${money(q.shipping!, q.currency)}, other fees ${money(q.otherFees!, q.currency)}; total ${money(q.total!, q.currency)}. Destination: ${q.destination}. Delivery: ${q.offer.deliveryConditions} Returns: ${q.offer.returnConditions} Conditions: ${q.offer.conditions.join(" ")} Material uncertainties: ${q.offer.uncertainties.length ? q.offer.uncertainties.join("; ") : "none recorded in this proxy fixture"}. All offer details are synthetic demo data. To approve, say “Confirm this simulated purchase.” You can also change it or cancel.`;
     s.summary = {
       id: randomUUID(),
       revision: s.revision + 1,
@@ -475,6 +624,8 @@ export class SessionStore {
       m.quote.quantity,
       s.constraints,
       s.excludedProductIds,
+      this.profile.catalog,
+      s.destination,
     );
     requireThat(
       q.eligible && JSON.stringify(q) === JSON.stringify(m.quote),

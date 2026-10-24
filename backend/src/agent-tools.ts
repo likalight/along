@@ -13,10 +13,12 @@ const constraintsSchema = {
   type: "object",
   additionalProperties: false,
   properties: {
+    currency: { type: "string", enum: ["USD", "SGD"] },
     budgetMinor: {
       type: "integer",
       minimum: 0,
-      description: "Total budget in SGD cents, including shipping and fees.",
+      description:
+        "Total budget in the accepted currency, in cents, including shipping and fees.",
     },
     deliveryWithinDays: { type: "integer", minimum: 0, maximum: 365 },
     category: { type: "string" },
@@ -53,6 +55,29 @@ export const shoppingToolDefinitions = [
         excludedProductIds: stringList,
         shortlist: stringList,
         evidenceIds: stringList,
+        destination: { type: "string", maxLength: 200 },
+        view: {
+          type: "object", additionalProperties: false,
+          required: ["stage", "focusProductId", "cards", "evidenceIds", "activeVideoId"],
+          properties: {
+            stage: { type: "string", enum: ["solution-types", "priorities", "shortlist", "evidence", "offers"] },
+            focusProductId: { type: ["string", "null"] },
+            activeVideoId: { type: ["string", "null"] },
+            evidenceIds: stringList,
+            cards: { type: "array", maxItems: 8, items: {
+              type: "object", additionalProperties: false,
+              required: ["productId", "role", "rank", "reason", "compromise", "evidenceIds"],
+              properties: {
+                productId: { type: "string" },
+                role: { type: "string", enum: ["best-value", "best-quality", "lowest-cost-suitable", "close-match", "discovery"] },
+                rank: { type: ["integer", "null"], enum: [1, 2, 3, null] },
+                reason: { type: "string", minLength: 1, maxLength: 1000 },
+                compromise: { type: "string", minLength: 1, maxLength: 1000 },
+                evidenceIds: stringList,
+              },
+            } },
+          },
+        },
         selection: {
           anyOf: [
             { type: "null" },
@@ -152,6 +177,8 @@ export function createShoppingTools(client: ConciergeClient, initial: Session) {
             "shortlist",
             "selection",
             "evidenceIds",
+            "destination",
+            "view",
           ]);
           const result = await client.propose({
             ...argumentsValue,

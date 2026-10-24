@@ -5,12 +5,9 @@ import {
   type ServerResponse,
 } from "node:http";
 import { pathToFileURL } from "node:url";
-import {
-  catalog,
-  scenarios,
-  eligibleOffers,
-  preparedImages,
-} from "./catalog.ts";
+import { eligibleOffers } from "./catalog.ts";
+import { voiceProfile } from "./voice-catalog.ts";
+import type { CatalogProfile } from "./contracts.ts";
 import { SessionStore, safeEqual } from "./store.ts";
 import {
   ApiError,
@@ -26,8 +23,11 @@ export function createApp(options: {
   agentToken: string;
   origins?: string[];
   store?: SessionStore;
+  profile?: CatalogProfile;
 }) {
-  const store = options.store ?? new SessionStore();
+  const profile = options.profile ?? options.store?.profile ?? voiceProfile;
+  const { catalog, scenarios, preparedImages } = profile;
+  const store = options.store ?? new SessionStore(undefined, profile);
   const origins = new Set(
     options.origins ?? [
       "http://localhost:5173",
@@ -110,7 +110,7 @@ export function createApp(options: {
       }
       if (
         req.method === "GET" &&
-        ["reference/bag-style.svg", "reference/bedding-style.svg"].includes(
+        ["reference/bag-style.svg", "reference/bedding-style.svg", "reference/lamp-blue.svg", "reference/lamp-ivory.svg", "reference/lamp-sage.svg", "reference/lamp-terracotta.svg", "reference/lamp-white.svg", "reference/microphone-style.svg"].includes(
           path.join("/"),
         )
       ) {
@@ -158,6 +158,8 @@ export function createApp(options: {
           (b.constraints ?? {}) as Constraints,
           (b.quantity ?? 1) as number,
           (b.excludedProductIds ?? []) as string[],
+          catalog,
+          profile.destination,
         );
         json(res, 200, {
           eligible: results.filter((x) => x.eligible),

@@ -1,0 +1,2159 @@
+{
+  "kind": "reference-research-not-purchase-catalog",
+  "source": "Team-supplied microphone-demo-data.md",
+  "sourceSha256": "de782b5b28616e121bf0a902c22d6587ab5df383c0e2a9ffa82b7fb755b1e4ae",
+  "independentlyReverifiedByBackend": false,
+  "notice": "USD research/reference amounts exclude shipping, tax, imports and required extra hardware. These records are not eligible purchase offers. Customer ratings and authored fit hypotheses are distinct. No SGD conversion is implied.",
+  "records": [
+    {
+      "id": "MIC-001",
+      "brand": "Apple",
+      "name": "EarPods (USB-C)",
+      "category": "Wired earbuds",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 1900,
+        "kind": "search_snapshot",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "in_stock",
+      "sellerOrSource": "Apple / Target",
+      "productSource": "https://www.apple.com/shop/product/myqy3am/a/earpods-usb-c",
+      "technical": {
+        "capsule / mic system": "Unspecified",
+        "polar_pattern": "Unspecified",
+        "connection": "USB-C",
+        "power": "USB bus",
+        "additional_hardware": "None with compatible USB-C host",
+        "noise_strategy": "Inline microphone; no dedicated mic noise suppression verified"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 2,
+        "office": 3,
+        "assessment": "Low-cost baseline for a laptop bag; keep the inline mic clear of clothing. Nearby speech can still interfere.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": 4.35,
+        "count": 1038,
+        "scope": "Target product aggregate; price / inventory may differ from Apple",
+        "feedback": "Not captured.",
+        "source": "https://www.target.com/p/-/A-89827259"
+      },
+      "variantNotes": "Price from Apple search result; stock and customer rating from Target, not Apple. Target lists a different price. Apple lists macOS Monterey 12.6+, iPadOS 16.4+, and iOS 17+ for the relevant USB-C devices.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-002",
+      "brand": "Apple",
+      "name": "EarPods (3.5mm Headphone Plug)",
+      "category": "Wired earbuds",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 1900,
+        "kind": "search_snapshot",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "unknown",
+      "sellerOrSource": "Apple",
+      "productSource": "https://www.apple.com/shop/product/mwu53am/a/earpods-35mm-headphone-plug",
+      "technical": {
+        "capsule / mic system": "Unspecified",
+        "polar_pattern": "Unspecified",
+        "connection": "3.5mm TRRS",
+        "power": "Host mic input",
+        "additional_hardware": "CTIA-compatible microphone input or USB audio adapter with mic support",
+        "noise_strategy": "Inline microphone; no dedicated mic noise suppression verified"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 2,
+        "office": 3,
+        "assessment": "Cheap analog baseline; a headphone-only socket will not capture the microphone.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": null,
+        "count": null,
+        "scope": "Not captured",
+        "feedback": "Not captured.",
+        "source": null
+      },
+      "variantNotes": "Price from Apple search result; destination-specific inventory was not exposed.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-003",
+      "brand": "Logitech",
+      "name": "H390 (USB-A)",
+      "category": "Wired office headset",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 2199,
+        "kind": "search_snapshot",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "unknown",
+      "sellerOrSource": "Logitech",
+      "productSource": "https://www.logitech.com/en-us/shop/p/h390-usb-headset",
+      "technical": {
+        "capsule / mic system": "Unspecified headset mic",
+        "polar_pattern": "Unspecified",
+        "connection": "USB-A",
+        "power": "USB bus",
+        "additional_hardware": "USB-C adapter if required",
+        "noise_strategy": "Noise-canceling boom microphone"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 4,
+        "office": 4,
+        "assessment": "Useful budget starting point: the boom keeps speech close while leaving both hands free.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": null,
+        "count": null,
+        "scope": "Not captured",
+        "feedback": "Not captured.",
+        "source": null
+      },
+      "variantNotes": "Current search result shows a sale price of $21.99 versus $24.99; page extraction returned a server error. USB-C is a separate selectable variant.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-004",
+      "brand": "Logitech",
+      "name": "H540",
+      "category": "Wired office headset",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 3999,
+        "kind": "observed_page",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "low_stock",
+      "sellerOrSource": "Logitech",
+      "productSource": "https://www.logitech.com/en-us/shop/p/h540-usb-computer-noise-cancelling",
+      "technical": {
+        "capsule / mic system": "Unspecified headset mic",
+        "polar_pattern": "Unspecified",
+        "connection": "USB-A",
+        "power": "USB bus",
+        "additional_hardware": "USB-C adapter if required",
+        "noise_strategy": "Noise-canceling boom microphone"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 4,
+        "office": 4,
+        "assessment": "Straightforward desk headset with mute controls; useful for repeated prompt dictation.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": null,
+        "count": null,
+        "scope": "Not captured",
+        "feedback": "Not captured.",
+        "source": null
+      },
+      "variantNotes": "Page explicitly said low stock; delivery destination was not selected.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-005",
+      "brand": "Logitech",
+      "name": "Zone Wired (Teams, Graphite)",
+      "category": "Wired office headset",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 9999,
+        "kind": "search_range_floor",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "unknown",
+      "sellerOrSource": "Best Buy",
+      "productSource": "https://www.bestbuy.com/product/logitech-zone-wired-noise-cancelling-on-ear-headset-for-microsoft-teams-graphite/J7H7ZY3CHS",
+      "technical": {
+        "capsule / mic system": "Dual microphone system",
+        "polar_pattern": "Unspecified",
+        "connection": "USB-C; USB-A adapter",
+        "power": "USB bus",
+        "additional_hardware": "Confirm USB adapter in chosen seller package",
+        "noise_strategy": "Dual-mic background-noise reduction"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 4,
+        "office": 5,
+        "assessment": "A work-focused option for an open office; verify the exact connector and Teams SKU.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": null,
+        "count": null,
+        "scope": "Not captured",
+        "feedback": "Not captured.",
+        "source": null
+      },
+      "variantNotes": "Search result displayed new offers from $99.99 to $127.44. Recorded price is the range floor, not a verified single-seller offer. Manufacturer source: [Additional source](https://www.logitech.com/content/dam/logitech/en_us/video-collaboration/pdf/zone-wired-uc-datasheet.pdf)",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-006",
+      "brand": "Logitech",
+      "name": "Zone Vibe 100 (Graphite)",
+      "category": "Wireless office headset",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 7999,
+        "kind": "observed_page",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "in_stock",
+      "sellerOrSource": "Logitech",
+      "productSource": "https://www.logitech.com/en-us/shop/p/zone-vibe-100-wireless",
+      "technical": {
+        "capsule / mic system": "Dual microphone system",
+        "polar_pattern": "Unspecified",
+        "connection": "Bluetooth",
+        "power": "Rechargeable battery",
+        "additional_hardware": "Bluetooth-capable host",
+        "noise_strategy": "Beamforming / noise-canceling microphone system"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 3,
+        "office": 4,
+        "assessment": "Comfortable wireless concept for moving around an office; test the Bluetooth recording path in the dictation app.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": null,
+        "count": null,
+        "scope": "Not captured",
+        "feedback": "Not captured.",
+        "source": null
+      },
+      "variantNotes": "Listed sale price $79.99 versus $99.99; no USB receiver assumed.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-007",
+      "brand": "Jabra",
+      "name": "Evolve 20 UC Stereo (4999-829-289-01)",
+      "category": "Wired office headset",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 4500,
+        "kind": "observed_page",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "in_stock_search",
+      "sellerOrSource": "CDW",
+      "productSource": "https://www.cdw.com/product/jabra-evolve-20-uc-stereo-headset-usb-c-usb-a/8404753",
+      "technical": {
+        "capsule / mic system": "Unspecified headset mic",
+        "polar_pattern": "Unspecified",
+        "connection": "USB-C / USB-A",
+        "power": "USB bus",
+        "additional_hardware": "None for matching USB host",
+        "noise_strategy": "Noise-canceling boom microphone"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 4,
+        "office": 4,
+        "assessment": "Entry-level business headset for long dictation sessions without holding a mic.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": null,
+        "count": null,
+        "scope": "Not captured",
+        "feedback": "Not captured.",
+        "source": null
+      },
+      "variantNotes": "Price fetched from page; in-stock wording was visible in search results only. Do not confuse with older USB-A-only Evolve 20 SKUs.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-008",
+      "brand": "Jabra",
+      "name": "Evolve2 40 SE UC Stereo",
+      "category": "Wired office headset",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 16000,
+        "kind": "observed_page",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "unknown",
+      "sellerOrSource": "Headsets Direct",
+      "productSource": "https://www.headsetsdirect.com/product/jabra-evolve2-40-uc-stereo-usb-headset/",
+      "technical": {
+        "capsule / mic system": "3-microphone system",
+        "polar_pattern": "Unspecified",
+        "connection": "USB-C; USB-A adapter",
+        "power": "USB bus",
+        "additional_hardware": "None for matching USB host",
+        "noise_strategy": "3-microphone call-noise reduction"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 4,
+        "office": 5,
+        "assessment": "Good candidate for a fixed office setup where microphone position and all-day comfort matter.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": 4.67,
+        "count": 3,
+        "scope": "Retailer product aggregate",
+        "feedback": "Not captured.",
+        "source": "https://www.headsetsdirect.com/product/jabra-evolve2-40-uc-stereo-usb-headset/"
+      },
+      "variantNotes": "Retailer page offers UC and Teams versions. The page says same-day shipping on in-stock items; that conditional wording does not prove this SKU is in stock.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-009",
+      "brand": "Jabra",
+      "name": "Evolve2 65 Flex Link380a UC Stereo",
+      "category": "Wireless office headset",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 27700,
+        "kind": "search_snapshot",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "unknown",
+      "sellerOrSource": "Lenovo US",
+      "productSource": "https://www.lenovo.com/us/en/p/accessories-and-software/audio/headsets/78806811",
+      "technical": {
+        "capsule / mic system": "Multi-microphone system",
+        "polar_pattern": "Beamforming / unspecified physical pattern",
+        "connection": "Bluetooth; Link380a USB-A receiver",
+        "power": "Rechargeable battery",
+        "additional_hardware": "USB-C adapter for receiver if needed",
+        "noise_strategy": "ClearVoice microphone processing; headphone ANC is separate"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 5,
+        "office": 5,
+        "assessment": "Portable premium headset candidate for café prompting; keep the boom correctly positioned.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": null,
+        "count": null,
+        "scope": "Not captured",
+        "feedback": "Not captured.",
+        "source": null
+      },
+      "variantNotes": "Search result shows $277 versus $378. Fetched Lenovo page did not expose price or stock. Manufacturer specifications: [Additional source](https://www.jabra.com/_/media/Jabra_VXi_Product-Documentation/Jabra-Evolve2-65-Flex/Technical-specifications/RevA/EN-Jabra-Evolve2-65-Flex-Tech-Spec-24042023.pdf)",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-010",
+      "brand": "HP Poly",
+      "name": "Blackwire 3220 (8X228AA)",
+      "category": "Wired office headset",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 4399,
+        "kind": "observed_page",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "unknown",
+      "sellerOrSource": "CDW",
+      "productSource": "https://www.cdw.com/product/poly-blackwire-3220-stereo-usb-c-headset-usb-c-a-adapter/7775308",
+      "technical": {
+        "capsule / mic system": "Unspecified headset mic",
+        "polar_pattern": "Unresolved: retailer lists omnidirectional",
+        "connection": "USB-C; USB-A adapter",
+        "power": "USB bus",
+        "additional_hardware": "None for matching USB host",
+        "noise_strategy": "Boom placement; manufacturer markets noise-canceling mic"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 4,
+        "office": 4,
+        "assessment": "Affordable hands-free dictation candidate; verify the mic specification for the exact HP SKU.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": null,
+        "count": null,
+        "scope": "Not captured",
+        "feedback": "Not captured.",
+        "source": null
+      },
+      "variantNotes": "CDW quick specifications say omnidirectional, while the product family is marketed for noise-canceling voice capture. Pattern is left unresolved rather than relabeled cardioid. HP source: [Additional source](https://www.hp.com/us-en/shop/pdp/poly-blackwire-3220-stereo-usb-c-headset-usb-c-a-adapter)",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-011",
+      "brand": "HP Poly",
+      "name": "Blackwire 5220 (8X231AA)",
+      "category": "Wired office headset",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 10399,
+        "kind": "observed_page",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "unknown",
+      "sellerOrSource": "CDW",
+      "productSource": "https://www.cdw.com/product/poly-blackwire-5220-stereo-usb-c-headset-3.5mm-plug-usb-c-a-adapter/7775314",
+      "technical": {
+        "capsule / mic system": "Unspecified headset mic",
+        "polar_pattern": "Unresolved: retailer lists omnidirectional",
+        "connection": "USB-C; USB-A adapter; 3.5mm",
+        "power": "USB bus / analog host",
+        "additional_hardware": "Compatible mic input for analog mode",
+        "noise_strategy": "Boom placement; manufacturer noise-canceling mic"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 4,
+        "office": 5,
+        "assessment": "Flexible wired option when moving between USB laptops and devices with a headset jack.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": null,
+        "count": null,
+        "scope": "Not captured",
+        "feedback": "Not captured.",
+        "source": null
+      },
+      "variantNotes": "CDW pattern field is unresolved against manufacturer noise-canceling claims. Manufacturer source: [Additional source](https://www.hp.com/us-en/poly/headsets/usb-headsets/blackwire-5200.html)",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-012",
+      "brand": "HP Poly",
+      "name": "Voyager Focus 2 UC (9T9J3AA#AC3)",
+      "category": "Wireless office headset",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 22999,
+        "kind": "observed_page",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "unknown",
+      "sellerOrSource": "CDW",
+      "productSource": "https://www.cdw.com/product/poly-voyager-focus-2-binaural-wireless-headset-usb-c-a-adapter-uc/7906770",
+      "technical": {
+        "capsule / mic system": "Multi-microphone system",
+        "polar_pattern": "Unspecified",
+        "connection": "Bluetooth; USB-C receiver + USB-A adapter",
+        "power": "Rechargeable battery",
+        "additional_hardware": "Included receiver; confirm package",
+        "noise_strategy": "Acoustic Fence microphone processing; separate headphone ANC"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 5,
+        "office": 5,
+        "assessment": "Strong premium candidate for noisy-office dictation; compare processed audio with recognition accuracy.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": null,
+        "count": null,
+        "scope": "Not captured",
+        "feedback": "Not captured.",
+        "source": null
+      },
+      "variantNotes": "Price applies to the listed UC adapter package; a charging stand is not assumed. Manufacturer source: [Additional source](https://www.hp.com/us-en/poly/headsets/bluetooth-headsets-and-earbuds/voyager-focus-2.html)",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-013",
+      "brand": "HP Poly",
+      "name": "Voyager 5200 UC USB-A + BT700",
+      "category": "Wireless mono headset",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 26495,
+        "kind": "search_snapshot",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "unknown",
+      "sellerOrSource": "First Source Wireless",
+      "productSource": "https://firstsourcewireless.com/products/poly-voyager-5200-uc-usb-a-bluetooth-headset-bt700-adapter",
+      "technical": {
+        "capsule / mic system": "Multi-microphone system",
+        "polar_pattern": "Unspecified",
+        "connection": "Bluetooth; BT700 USB-A receiver",
+        "power": "Rechargeable battery",
+        "additional_hardware": "USB-C adapter for receiver if needed",
+        "noise_strategy": "Multi-microphone noise reduction; WindSmart"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 4,
+        "office": 4,
+        "assessment": "Compact single-ear option for café work; ear-hook comfort is worth trying before long sessions.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": null,
+        "count": null,
+        "scope": "Not captured",
+        "feedback": "Not captured.",
+        "source": null
+      },
+      "variantNotes": "Search result price applies to the UC kit with BT700, not the cheaper standalone mobile headset; extracted page did not expose price or inventory.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-014",
+      "brand": "Shure",
+      "name": "WH20XLR",
+      "category": "Professional headworn mic",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 9900,
+        "kind": "search_snapshot",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "in_stock_search",
+      "sellerOrSource": "B&H",
+      "productSource": "https://www.bhphotovideo.com/c/product/162051-REG/Shure_WH20XLR_WH20XLR_Headworn_Dynamic.html",
+      "technical": {
+        "capsule / mic system": "Dynamic",
+        "polar_pattern": "Cardioid",
+        "connection": "3-pin XLR",
+        "power": "No phantom power required",
+        "additional_hardware": "XLR audio interface + cable; no headphones included",
+        "noise_strategy": "Close boom position and directional pickup"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 4,
+        "office": 5,
+        "assessment": "A headworn microphone-only option for keeping the capsule near the mouth while typing.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": null,
+        "count": null,
+        "scope": "Not captured",
+        "feedback": "Not captured.",
+        "source": null
+      },
+      "variantNotes": "B&H search result reports $99 and in stock. This is the XLR version, not TA4F for a wireless bodypack. Manufacturer guide: [Additional source](https://www.shure.com/en-US/docs/guide/WH20)",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-015",
+      "brand": "Shure",
+      "name": "MV6 Gen 2 (Black)",
+      "category": "USB dynamic mic",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 16900,
+        "kind": "observed_page",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "in_stock",
+      "sellerOrSource": "Sweetwater",
+      "productSource": "https://www.sweetwater.com/store/detail/MV6G2K--shure-mv6-gen-2-usb-gaming-microphone-black",
+      "technical": {
+        "capsule / mic system": "Dynamic",
+        "polar_pattern": "Cardioid",
+        "connection": "USB-C",
+        "power": "USB bus",
+        "additional_hardware": "Included desk stand; optional boom arm",
+        "noise_strategy": "Directional pickup; denoiser; auto level; pop suppression"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 4,
+        "office": 5,
+        "assessment": "Easy USB desk candidate for prompting; place it close enough that the voice dominates the café.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": null,
+        "count": null,
+        "scope": "Not captured",
+        "feedback": "Not captured.",
+        "source": null
+      },
+      "variantNotes": "Original MV6 URL redirected to Gen 2. Recorded model and price follow the final page; no original-MV6 reviews transferred.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-016",
+      "brand": "Shure",
+      "name": "MV7+ (Black)",
+      "category": "USB/XLR dynamic mic",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 29900,
+        "kind": "observed_page",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "in_stock",
+      "sellerOrSource": "Sweetwater",
+      "productSource": "https://www.sweetwater.com/store/detail/MV7pBK--shure-mv7-hybrid-podcast-microphone-black",
+      "technical": {
+        "capsule / mic system": "Dynamic",
+        "polar_pattern": "Cardioid",
+        "connection": "USB-C; XLR",
+        "power": "USB bus; interface in XLR mode",
+        "additional_hardware": "Stand / boom arm; interface only for XLR",
+        "noise_strategy": "Directional close capture; DSP denoising and level control"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 4,
+        "office": 5,
+        "assessment": "Flexible desk microphone for dictation plus content work; a substantial setup for carrying to cafés.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": 4.2,
+        "count": 6,
+        "scope": "Rendered customer reviews",
+        "feedback": "Visible reviews praise sound and setup; one reports microphone failure and another warns about USB-port durability.",
+        "source": "https://www.sweetwater.com/store/detail/MV7pBK--shure-mv7-hybrid-podcast-microphone-black/reviews"
+      },
+      "variantNotes": "New standalone mic price; open-box units and bundles excluded. USB processing is not assumed on the analog XLR path.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-017",
+      "brand": "RØDE",
+      "name": "PodMic USB",
+      "category": "USB/XLR dynamic mic",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 20900,
+        "kind": "observed_page",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "in_stock",
+      "sellerOrSource": "Sweetwater",
+      "productSource": "https://www.sweetwater.com/store/detail/PodMicUSB--rode-podmic-usb-dynamic-broadcast-microphone",
+      "technical": {
+        "capsule / mic system": "Dynamic",
+        "polar_pattern": "Cardioid",
+        "connection": "USB-C; XLR",
+        "power": "USB bus; interface in XLR mode",
+        "additional_hardware": "Stand / boom arm; interface only for XLR",
+        "noise_strategy": "Close directional capture; APHEX DSP via USB"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 4,
+        "office": 5,
+        "assessment": "Useful fixed-desk candidate for spoken prompts; heavy compared with a clip-on or headset.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": 3.7,
+        "count": 6,
+        "scope": "Rendered customer reviews",
+        "feedback": "Visible reviews praise plug-and-play voice sound; negative reviews report failures in onboard electronics.",
+        "source": "https://www.sweetwater.com/store/detail/PodMicUSB--rode-podmic-usb-dynamic-broadcast-microphone/reviews"
+      },
+      "variantNotes": "Page price supersedes an older indexed $190 result. No desktop stand bundle assumed.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-018",
+      "brand": "Audio-Technica",
+      "name": "ATR2100x-USB",
+      "category": "USB/XLR dynamic mic",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 9999,
+        "kind": "demo_estimate",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "discontinued",
+      "sellerOrSource": "Audio-Technica",
+      "productSource": "https://www.audio-technica.com/en-us/atr2100x-usb",
+      "technical": {
+        "capsule / mic system": "Dynamic",
+        "polar_pattern": "Cardioid",
+        "connection": "USB-C; XLR",
+        "power": "USB bus; interface in XLR mode",
+        "additional_hardware": "Stand / boom arm; interface only for XLR",
+        "noise_strategy": "Directional close capture; no dedicated denoiser verified"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 4,
+        "office": 4,
+        "assessment": "Practical legacy USB/XLR example; remaining retail stock and cable package need checking.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": null,
+        "count": null,
+        "scope": "Not captured",
+        "feedback": "Not captured.",
+        "source": null
+      },
+      "variantNotes": "Manufacturer explicitly marks discontinued. $99.99 is a synthetic demo reference, not a retrieved offer.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-019",
+      "brand": "Samson",
+      "name": "Q2U Recording and Podcasting Pack",
+      "category": "USB/XLR dynamic mic",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 9999,
+        "kind": "observed_page",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "in_stock",
+      "sellerOrSource": "Sweetwater",
+      "productSource": "https://www.sweetwater.com/store/detail/Q2UPack--samson-q2u-recording-and-podcasting-pack-usb-xlr-dynamic-microphone-with-accessories",
+      "technical": {
+        "capsule / mic system": "Dynamic",
+        "polar_pattern": "Cardioid",
+        "connection": "USB mini-B; XLR",
+        "power": "USB bus; interface in XLR mode",
+        "additional_hardware": "Included desk stand / windscreen / cables; optional boom",
+        "noise_strategy": "Directional close capture; no dedicated denoiser verified"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 4,
+        "office": 4,
+        "assessment": "Complete starter package for a desk demo; the older USB connector requires the correct cable.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": 4.5,
+        "count": 13,
+        "scope": "Rendered customer reviews",
+        "feedback": "Visible reviews praise easy computer recognition and included accessories; one reports a nonfunctional unit on arrival.",
+        "source": "https://www.sweetwater.com/store/detail/Q2UPack--samson-q2u-recording-and-podcasting-pack-usb-xlr-dynamic-microphone-with-accessories/reviews"
+      },
+      "variantNotes": "Price is for the listed accessories pack. USB mini-B should not be confused with USB-C on competing models; manufacturer source: [Additional source](https://samsontech.com/products/microphones/usb-microphones/q2u/)",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-020",
+      "brand": "FIFINE",
+      "name": "AmpliGame AM8 (base stand + USB cable)",
+      "category": "USB/XLR dynamic mic",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 5799,
+        "kind": "observed_page",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "unknown",
+      "sellerOrSource": "FIFINE",
+      "productSource": "https://fifinemicrophone.com/collections/microphones/products/fifine-ampligame-am8-microphone",
+      "technical": {
+        "capsule / mic system": "Dynamic",
+        "polar_pattern": "Cardioid",
+        "connection": "USB-C; XLR",
+        "power": "USB bus; interface in XLR mode",
+        "additional_hardware": "Included base stand; interface only for XLR",
+        "noise_strategy": "Directional close capture; no dedicated denoiser verified"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 4,
+        "office": 4,
+        "assessment": "Low-cost dynamic desk option; keep it near the mouth and check stand height.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": 4.8,
+        "count": 184,
+        "scope": "Brand-store aggregate; variant grouping not independently established",
+        "feedback": "Not captured.",
+        "source": "https://fifinemicrophone.com/collections/microphones/products/fifine-ampligame-am8-microphone"
+      },
+      "variantNotes": "Price is AM8 base package, not AM8T boom kit or AM8PLUS. A generic back-in-stock widget does not establish current stock.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-021",
+      "brand": "MAONO",
+      "name": "PD200X + BA20 boom arm",
+      "category": "USB/XLR dynamic mic",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 8999,
+        "kind": "observed_page",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "unknown",
+      "sellerOrSource": "MAONO",
+      "productSource": "https://www.maono.com/products/maono-pd200x-dynamic-usb-and-xlr-internet-microphone",
+      "technical": {
+        "capsule / mic system": "Dynamic",
+        "polar_pattern": "Cardioid",
+        "connection": "USB-C; XLR",
+        "power": "USB bus; interface in XLR mode",
+        "additional_hardware": "BA20 boom arm in selected variant; XLR interface optional",
+        "noise_strategy": "Close directional capture; Maono Link processing via USB"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 4,
+        "office": 4,
+        "assessment": "Budget boom-arm setup for keeping mouth-to-mic distance steady during prompting.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": null,
+        "count": null,
+        "scope": "Not captured",
+        "feedback": "Not captured.",
+        "source": null
+      },
+      "variantNotes": "Fetched variant reads PD200X [BA20 Boom Arm]. Do not transfer the price or wireless capability from adjacent PD200W variants.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-022",
+      "brand": "RØDE",
+      "name": "NT-USB Mini",
+      "category": "USB condenser mic",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 10900,
+        "kind": "observed_page",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "in_stock",
+      "sellerOrSource": "Sweetwater",
+      "productSource": "https://www.sweetwater.com/store/detail/NTUSBMini--rode-nt-usb-mini-usb-condenser-microphone",
+      "technical": {
+        "capsule / mic system": "Condenser",
+        "polar_pattern": "Cardioid",
+        "connection": "USB-C",
+        "power": "USB bus",
+        "additional_hardware": "Included magnetic desk stand; optional boom",
+        "noise_strategy": "Directional pickup; integrated pop filter"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 2,
+        "office": 4,
+        "assessment": "Compact and simple for a quieter desk; head movement and distant placement can admit more room sound.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": 4.7,
+        "count": 22,
+        "scope": "Rendered customer reviews",
+        "feedback": "Visible reviews praise clear sound, compact design, and the magnetic stand; some users report less satisfactory sound or gain.",
+        "source": "https://www.sweetwater.com/store/detail/NTUSBMini--rode-nt-usb-mini-usb-condenser-microphone/reviews"
+      },
+      "variantNotes": "Live page reports $109 in stock, superseding an indexed backorder result.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-023",
+      "brand": "RØDE",
+      "name": "NT-USB+",
+      "category": "USB condenser mic",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 17900,
+        "kind": "search_snapshot",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "unknown",
+      "sellerOrSource": "Sweetwater",
+      "productSource": "https://www.sweetwater.com/store/detail/NTUSBp--rode-nt-usb-usb-condenser-microphone",
+      "technical": {
+        "capsule / mic system": "Condenser",
+        "polar_pattern": "Cardioid",
+        "connection": "USB-C",
+        "power": "USB bus",
+        "additional_hardware": "Included tripod / pop filter; optional boom",
+        "noise_strategy": "Directional pickup; APHEX processing"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 2,
+        "office": 4,
+        "assessment": "Useful voice-recording option at a desk; position close and check whether processing helps the dictation model.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": 4.7,
+        "count": 8,
+        "scope": "Rendered customer reviews",
+        "feedback": "Visible reviews praise easy setup and voice recording; one user describes the tone as muddy.",
+        "source": "https://www.sweetwater.com/store/detail/NTUSBp--rode-nt-usb-usb-condenser-microphone/reviews"
+      },
+      "variantNotes": "Product search result shows $179; another review-page result showed $169. Product fetch exposed financing text only, so price is a search snapshot with unresolved freshness.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-024",
+      "brand": "Logitech / Blue",
+      "name": "Yeti (Blackout)",
+      "category": "USB condenser mic",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 10999,
+        "kind": "observed_page",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "in_stock",
+      "sellerOrSource": "Logitech G",
+      "productSource": "https://www.logitechg.com/en-us/shop/p/yeti-premium-usb-microphone",
+      "technical": {
+        "capsule / mic system": "Condenser",
+        "polar_pattern": "Selectable cardioid / omni / bidirectional / stereo",
+        "connection": "USB mini-B",
+        "power": "USB bus",
+        "additional_hardware": "Included desk stand; optional boom",
+        "noise_strategy": "Use cardioid mode; Blue VO!CE software filters"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 2,
+        "office": 4,
+        "assessment": "Familiar consumer desk option; select cardioid and avoid leaving it at the far edge of the desk.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": null,
+        "count": null,
+        "scope": "Not captured",
+        "feedback": "Not captured.",
+        "source": null
+      },
+      "variantNotes": "Sale price $109.99 versus $139.99; this is the Yeti, not Yeti 2 or Yeti Nano.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-025",
+      "brand": "Logitech / Blue",
+      "name": "Snowball iCE (Black)",
+      "category": "USB condenser mic",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 4999,
+        "kind": "observed_page",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "unavailable",
+      "sellerOrSource": "Logitech G",
+      "productSource": "https://www.logitechg.com/en-us/shop/p/snowball-ice-usb-microphone",
+      "technical": {
+        "capsule / mic system": "Condenser",
+        "polar_pattern": "Cardioid",
+        "connection": "USB mini-B",
+        "power": "USB bus",
+        "additional_hardware": "Included desk tripod; optional boom",
+        "noise_strategy": "Directional pickup; no dedicated denoiser verified"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 2,
+        "office": 3,
+        "assessment": "Low-cost legacy consumer example for the catalog; modest positioning flexibility on the stock tripod.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": null,
+        "count": null,
+        "scope": "Not captured",
+        "feedback": "Not captured.",
+        "source": null
+      },
+      "variantNotes": "Official page lists $49.99 and Not available; this is the iCE, not the multipattern Snowball.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-026",
+      "brand": "Elgato",
+      "name": "Wave:3 MK.2",
+      "category": "USB condenser mic",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 16999,
+        "kind": "observed_page",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "unknown",
+      "sellerOrSource": "Elgato",
+      "productSource": "https://www.elgato.com/us/en/p/wave-3",
+      "technical": {
+        "capsule / mic system": "Condenser",
+        "polar_pattern": "Cardioid",
+        "connection": "USB-C",
+        "power": "USB bus",
+        "additional_hardware": "Desk mount / optional boom; confirm selected package",
+        "noise_strategy": "Wave FX DSP; Clipguard; auto gain"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 3,
+        "office": 4,
+        "assessment": "Feature-rich desk setup for prompts and streaming; compare clean and processed input in your app.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": 4.8,
+        "count": 187,
+        "scope": "Family aggregate includes both Wave:3 generations; not MK.2-only",
+        "feedback": "Not captured.",
+        "source": "https://www.elgato.com/us/en/p/wave-3"
+      },
+      "variantNotes": "URL now shows MK.2. Displayed rating includes reviews from both Wave:3 generations and is not a MK.2-only score.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-027",
+      "brand": "HyperX",
+      "name": "SoloCast 2",
+      "category": "USB condenser mic",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 4499,
+        "kind": "observed_page",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "in_stock",
+      "sellerOrSource": "HyperX US",
+      "productSource": "https://hyperx.com/products/hyperx-solocast-2-gaming-usb-condenser-microphone",
+      "technical": {
+        "capsule / mic system": "Condenser",
+        "polar_pattern": "Cardioid",
+        "connection": "USB-C",
+        "power": "USB bus",
+        "additional_hardware": "Included adjustable stand; optional boom",
+        "noise_strategy": "Built-in pop filter / shock mount; software audio filters"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 2,
+        "office": 4,
+        "assessment": "Affordable consumer USB baseline with tap-to-mute; a busy café still calls for close placement.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": null,
+        "count": null,
+        "scope": "Not captured",
+        "feedback": "Not captured.",
+        "source": null
+      },
+      "variantNotes": "Displayed sale price $44.99 versus $59.99; additional coupon excluded. Current model is SoloCast 2, not original SoloCast.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-028",
+      "brand": "HyperX",
+      "name": "QuadCast S (Black)",
+      "category": "USB condenser mic",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 9999,
+        "kind": "observed_page",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "in_stock",
+      "sellerOrSource": "HyperX US",
+      "productSource": "https://hyperx.com/products/hyperx-quadcast-s-usb-microphone",
+      "technical": {
+        "capsule / mic system": "Condenser",
+        "polar_pattern": "Selectable cardioid / omni / bidirectional / stereo",
+        "connection": "USB-C",
+        "power": "USB bus",
+        "additional_hardware": "Included stand / shock mount; optional boom",
+        "noise_strategy": "Use cardioid; vibration isolation; no dedicated denoiser verified"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 2,
+        "office": 4,
+        "assessment": "A visually recognizable demo product; use cardioid for one speaker and keep keyboard vibration low.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": null,
+        "count": null,
+        "scope": "Not captured",
+        "feedback": "Not captured.",
+        "source": null
+      },
+      "variantNotes": "Displayed sale price $99.99 versus $119.99; QuadCast 2 S is a different model.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-029",
+      "brand": "Razer",
+      "name": "Seiren V3 Mini (Black)",
+      "category": "USB condenser mic",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 5999,
+        "kind": "from_price",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "unknown",
+      "sellerOrSource": "Razer US",
+      "productSource": "https://www.razer.com/streaming-microphones/razer-seiren-v3-mini",
+      "technical": {
+        "capsule / mic system": "Condenser",
+        "polar_pattern": "Supercardioid",
+        "connection": "USB",
+        "power": "USB bus",
+        "additional_hardware": "Included desk stand; optional boom",
+        "noise_strategy": "Directional pickup; tap-to-mute"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 3,
+        "office": 4,
+        "assessment": "Small directional desk microphone for a portable kit; noise directly behind the mic can still matter.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": null,
+        "count": null,
+        "scope": "Not captured",
+        "feedback": "Not captured.",
+        "source": null
+      },
+      "variantNotes": "Manufacturer says starting from US$59.99; selected-color checkout price and inventory not verified.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-030",
+      "brand": "Shure",
+      "name": "SM58",
+      "category": "Professional XLR dynamic mic",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 10900,
+        "kind": "observed_page",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "in_stock",
+      "sellerOrSource": "Sweetwater",
+      "productSource": "https://www.sweetwater.com/store/detail/SM58--shure-sm58-cardioid-dynamic-vocal-microphone",
+      "technical": {
+        "capsule / mic system": "Dynamic",
+        "polar_pattern": "Cardioid",
+        "connection": "XLR",
+        "power": "No phantom power required",
+        "additional_hardware": "XLR interface + cable + stand",
+        "noise_strategy": "Close directional pickup; built-in pop filtering"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 4,
+        "office": 5,
+        "assessment": "Rugged close-talk option if an audio interface is already part of the desk setup.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": 4.7,
+        "count": 370,
+        "scope": "Rendered customer reviews",
+        "feedback": "Visible reviews repeatedly praise dependable vocal sound and rugged construction; they mainly concern music / live use.",
+        "source": "https://www.sweetwater.com/store/detail/SM58--shure-sm58-cardioid-dynamic-vocal-microphone/reviews"
+      },
+      "variantNotes": "Mic-only SM58; SM58S switch version and cable bundles cost differently.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-031",
+      "brand": "Shure",
+      "name": "SM7B",
+      "category": "Professional XLR dynamic mic",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 43900,
+        "kind": "observed_page",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "in_stock",
+      "sellerOrSource": "Sweetwater",
+      "productSource": "https://www.sweetwater.com/store/detail/SM7B--shure-sm7b-cardioid-dynamic-vocal-microphone",
+      "technical": {
+        "capsule / mic system": "Dynamic",
+        "polar_pattern": "Cardioid",
+        "connection": "XLR",
+        "power": "No phantom power for mic itself",
+        "additional_hardware": "High-gain low-noise XLR interface + cable + boom; booster only if needed",
+        "noise_strategy": "Close directional capture; windscreen; analog tone switches"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 4,
+        "office": 5,
+        "assessment": "Premium fixed-desk example with substantial mounting and gain requirements.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": 4.8,
+        "count": 259,
+        "scope": "Rendered customer reviews",
+        "feedback": "Visible reviews praise voice tone and versatility; users discuss sufficient preamp gain and optional boosters.",
+        "source": "https://www.sweetwater.com/store/detail/SM7B--shure-sm7b-cardioid-dynamic-vocal-microphone/reviews"
+      },
+      "variantNotes": "Mic-only price; total working setup costs more. An inline booster is not universally necessary and may itself need phantom power.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-032",
+      "brand": "RØDE",
+      "name": "PodMic (XLR, Black)",
+      "category": "Professional XLR dynamic mic",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 9900,
+        "kind": "observed_page",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "in_stock",
+      "sellerOrSource": "Sweetwater",
+      "productSource": "https://www.sweetwater.com/store/detail/PodMic--rode-podmic-dynamic-broadcast-microphone",
+      "technical": {
+        "capsule / mic system": "Dynamic",
+        "polar_pattern": "Cardioid",
+        "connection": "XLR",
+        "power": "No phantom power required",
+        "additional_hardware": "XLR interface + cable + sturdy stand / boom",
+        "noise_strategy": "Close directional pickup; integrated pop shield"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 4,
+        "office": 5,
+        "assessment": "Budget professional desk mic when an interface is available; its weight favors a sturdy mount.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": 4.7,
+        "count": 64,
+        "scope": "Rendered customer reviews",
+        "feedback": "Visible reviews praise solid construction and voice sound; several discuss high gain requirements.",
+        "source": "https://www.sweetwater.com/store/detail/PodMic--rode-podmic-dynamic-broadcast-microphone/reviews"
+      },
+      "variantNotes": "This XLR-only model does not provide PodMic USB features or USB DSP.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-033",
+      "brand": "Audio-Technica",
+      "name": "AT2020 (XLR)",
+      "category": "Professional XLR condenser mic",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 11900,
+        "kind": "observed_page",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "in_stock",
+      "sellerOrSource": "Sweetwater",
+      "productSource": "https://www.sweetwater.com/store/detail/AT2020--audio-technica-at2020-cardioid-condenser-microphone",
+      "technical": {
+        "capsule / mic system": "Condenser",
+        "polar_pattern": "Cardioid",
+        "connection": "XLR",
+        "power": "48V phantom power",
+        "additional_hardware": "Phantom-powered XLR interface + cable + stand + pop filter",
+        "noise_strategy": "Directional capture; no dedicated denoiser verified"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 2,
+        "office": 4,
+        "assessment": "Useful studio comparison product; a noisy café is a difficult setting if the mic sits far away.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": 4.6,
+        "count": 109,
+        "scope": "Rendered customer reviews",
+        "feedback": "Visible reviews praise value and recording sound; some describe capturing a whole choir, illustrating that source distance matters.",
+        "source": "https://www.sweetwater.com/store/detail/AT2020--audio-technica-at2020-cardioid-condenser-microphone/reviews"
+      },
+      "variantNotes": "XLR AT2020, not AT2020USB-X; interface and pop filter are excluded from the listed price.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-034",
+      "brand": "Sennheiser",
+      "name": "e 835",
+      "category": "Professional XLR dynamic mic",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 9995,
+        "kind": "observed_page",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "in_stock",
+      "sellerOrSource": "Sweetwater",
+      "productSource": "https://www.sweetwater.com/store/detail/E835--sennheiser-e-835-cardioid-dynamic-vocal-microphone",
+      "technical": {
+        "capsule / mic system": "Dynamic",
+        "polar_pattern": "Cardioid",
+        "connection": "XLR",
+        "power": "No phantom power required",
+        "additional_hardware": "XLR interface + cable + stand",
+        "noise_strategy": "Close directional capture"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 4,
+        "office": 5,
+        "assessment": "An alternative handheld vocal mic for a fixed dictation rig; maintain a steady working distance.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": 4.7,
+        "count": 195,
+        "scope": "Rendered customer reviews",
+        "feedback": "Visible reviews praise vocal clarity; some users describe a brighter tone than their familiar handheld alternatives.",
+        "source": "https://www.sweetwater.com/store/detail/E835--sennheiser-e-835-cardioid-dynamic-vocal-microphone/reviews"
+      },
+      "variantNotes": "Single e 835 without switch; e 835-S and multipacks are separate offers.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-035",
+      "brand": "BOYA",
+      "name": "BY-M1 Classic",
+      "category": "Wired lavalier",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 3299,
+        "kind": "observed_page",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "in_stock",
+      "sellerOrSource": "BOYA",
+      "productSource": "https://store.boyamic.com/products/by-m1",
+      "technical": {
+        "capsule / mic system": "Condenser",
+        "polar_pattern": "Omnidirectional",
+        "connection": "3.5mm TRRS with camera / phone mode",
+        "power": "LR44 in applicable camera mode",
+        "additional_hardware": "Mic-capable USB / TRRS adapter if required",
+        "noise_strategy": "Close clothing placement; no verified active cancellation for Classic"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 2,
+        "office": 3,
+        "assessment": "Low-cost clip-on with a long cable; isolate it from fabric rubbing and nearby conversations.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": null,
+        "count": null,
+        "scope": "Not captured",
+        "feedback": "Not captured.",
+        "source": null
+      },
+      "variantNotes": "Classic variant is $32.99; the page mixes BY-M1S / Pro II / adapters and some feature claims. Do not assign Pro II monitoring features to Classic. Stock claim comes from the product page.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-036",
+      "brand": "RØDE",
+      "name": "smartLav+",
+      "category": "Wired lavalier",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 7999,
+        "kind": "demo_estimate",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "unknown",
+      "sellerOrSource": "RØDE",
+      "productSource": "https://rode.com/en-us/products/smartlav-plus",
+      "technical": {
+        "capsule / mic system": "Condenser",
+        "polar_pattern": "Omnidirectional",
+        "connection": "3.5mm TRRS",
+        "power": "Plug-in power from compatible host",
+        "additional_hardware": "Mic-capable USB audio adapter; TRRS-to-TRS adapter for TRS inputs",
+        "noise_strategy": "Close clothing placement; pop filter"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 2,
+        "office": 3,
+        "assessment": "Simple phone-oriented lavalier for dictation; adapter compatibility is the main setup detail.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": null,
+        "count": 240,
+        "scope": "Review count from indexed B&H product page; aggregate score not captured",
+        "feedback": "Not captured.",
+        "source": "https://www.bhphotovideo.com/c/product/1059342-REG/rode_smartlav_smart_lav_lav_mic_for.html"
+      },
+      "variantNotes": "Synthetic $79.99 demo reference; manufacturer page exposed no price. B&H search result lists 240 reviews, but no aggregate star rating was captured.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-037",
+      "brand": "RØDE",
+      "name": "Lavalier GO (Black)",
+      "category": "Wired lavalier",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 8900,
+        "kind": "observed_page",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "in_stock",
+      "sellerOrSource": "Sweetwater",
+      "productSource": "https://www.sweetwater.com/store/detail/LavalierGO--rode-lavalier-go-professional-wearable-microphone",
+      "technical": {
+        "capsule / mic system": "Condenser",
+        "polar_pattern": "Omnidirectional",
+        "connection": "3.5mm TRS",
+        "power": "Plug-in power from compatible mic input",
+        "additional_hardware": "Compatible TRS mic input / wireless bodypack; adapter for TRRS or USB",
+        "noise_strategy": "Close clothing placement; pop shield"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 2,
+        "office": 3,
+        "assessment": "Discrete wired lavalier; the laptop must have a suitable powered mic input or adapter.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": 5,
+        "count": 7,
+        "scope": "Rendered customer reviews",
+        "feedback": "Visible reviews praise small size and voice sound; one notes self-noise and another warns about laptop combo-port compatibility.",
+        "source": "https://www.sweetwater.com/store/detail/LavalierGO--rode-lavalier-go-professional-wearable-microphone/reviews"
+      },
+      "variantNotes": "Mic-only accessory. It is not itself wireless, and its TRS plug is not the same as smartLav+ TRRS.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-038",
+      "brand": "DJI",
+      "name": "Mic Mini (1 TX + 1 RX)",
+      "category": "Wireless clip-on kit",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 5900,
+        "kind": "search_snapshot",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "out_of_stock",
+      "sellerOrSource": "DJI Store",
+      "productSource": "https://store.dji.com/product/dji-mic-mini",
+      "technical": {
+        "capsule / mic system": "Condenser",
+        "polar_pattern": "Omnidirectional",
+        "connection": "2.4GHz TX-to-RX; USB-C / 3.5mm RX; Bluetooth to supported hosts",
+        "power": "Rechargeable TX / RX",
+        "additional_hardware": "USB data cable for computer; Lightning adapter if required",
+        "noise_strategy": "Two-level active noise cancellation"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 3,
+        "office": 4,
+        "assessment": "Tiny portable clip-on candidate; compare receiver audio with direct Bluetooth before using it for prompts.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": null,
+        "count": null,
+        "scope": "Not captured",
+        "feedback": "Not captured.",
+        "source": null
+      },
+      "variantNotes": "Search result explicitly maps $59 to 1 TX + 1 RX. Fetched page defaults to $99 two-TX kit; all options were marked out of stock. No charging case assumed in the $59 kit.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-039",
+      "brand": "DJI",
+      "name": "Mic 2 (1 TX + 1 RX)",
+      "category": "Wireless clip-on kit",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 12900,
+        "kind": "observed_page",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "out_of_stock",
+      "sellerOrSource": "DJI Store",
+      "productSource": "https://store.dji.com/product/dji-mic-2-tx-rx",
+      "technical": {
+        "capsule / mic system": "Condenser",
+        "polar_pattern": "Omnidirectional",
+        "connection": "2.4GHz TX-to-RX; USB-C / 3.5mm RX; Bluetooth to supported hosts",
+        "power": "Rechargeable TX / RX",
+        "additional_hardware": "USB data cable for computer; matching phone adapter",
+        "noise_strategy": "Intelligent noise cancellation"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 3,
+        "office": 4,
+        "assessment": "Portable kit with monitoring and recording features; verify real-time USB input in the dictation app.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": null,
+        "count": null,
+        "scope": "Not captured",
+        "feedback": "Not captured.",
+        "source": null
+      },
+      "variantNotes": "Single-transmitter kit at $129; charging case not assumed. 32-bit float internal recording is not a promise about the live dictation audio path.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-040",
+      "brand": "RØDE",
+      "name": "Wireless ME (single TX kit)",
+      "category": "Wireless clip-on kit",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 14900,
+        "kind": "observed_page",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "in_stock",
+      "sellerOrSource": "Sweetwater",
+      "productSource": "https://www.sweetwater.com/store/detail/WirelessME--rode-wireless-me-clip-on-wireless-microphone-system",
+      "technical": {
+        "capsule / mic system": "Condenser",
+        "polar_pattern": "Omnidirectional",
+        "connection": "2.4GHz TX-to-RX; USB-C / 3.5mm RX",
+        "power": "Rechargeable TX / RX",
+        "additional_hardware": "Included cables; confirm host cable",
+        "noise_strategy": "Close clip-on capture; GainAssist level control"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 3,
+        "office": 4,
+        "assessment": "Easy portable option; disable or exclude receiver-side ME Mic when only the wearer should be transcribed.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": 4.8,
+        "count": 4,
+        "scope": "Rendered customer reviews",
+        "feedback": "Visible reviews praise simple mobile setup; one reports relatively fast battery discharge.",
+        "source": "https://www.sweetwater.com/store/detail/WirelessME--rode-wireless-me-clip-on-wireless-microphone-system/reviews"
+      },
+      "variantNotes": "One transmitter plus receiver; receiver also has a mic. GainAssist is automatic level control, not equivalent to background-noise cancellation.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-041",
+      "brand": "RØDE",
+      "name": "Wireless GO II Single",
+      "category": "Wireless clip-on kit",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 19900,
+        "kind": "demo_estimate",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "discontinued_at_seller",
+      "sellerOrSource": "Sweetwater",
+      "productSource": "https://www.sweetwater.com/store/detail/WirelessGO2Sg--rode-wireless-go-ii-single-channel-wireless-microphone-system",
+      "technical": {
+        "capsule / mic system": "Condenser",
+        "polar_pattern": "Omnidirectional",
+        "connection": "2.4GHz TX-to-RX; USB-C / 3.5mm RX",
+        "power": "Rechargeable TX / RX",
+        "additional_hardware": "USB data cable; optional external lav",
+        "noise_strategy": "Close clip-on capture; no dedicated denoiser verified"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 3,
+        "office": 4,
+        "assessment": "Legacy wireless example for the demo; check remaining sellers for the exact single-TX kit.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": null,
+        "count": null,
+        "scope": "Not captured",
+        "feedback": "Not captured.",
+        "source": null
+      },
+      "variantNotes": "Sweetwater says no longer available. $199 is a synthetic demo reference, not a current offer. Do not confuse with dual-transmitter GO II or later Wireless GO generations.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-042",
+      "brand": "Hollyland",
+      "name": "LARK M2 Combo (Black)",
+      "category": "Wireless clip-on kit",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 9900,
+        "kind": "observed_page",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "unknown",
+      "sellerOrSource": "Hollyland",
+      "productSource": "https://store.hollyland.com/products/lark-m2",
+      "technical": {
+        "capsule / mic system": "Condenser",
+        "polar_pattern": "Omnidirectional",
+        "connection": "2.4GHz; USB-C / Lightning receiver options",
+        "power": "Rechargeable TX / RX / case",
+        "additional_hardware": "Use matching included receiver; confirm exact Combo contents",
+        "noise_strategy": "Environmental noise cancellation"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 3,
+        "office": 4,
+        "assessment": "Small wearable option for mobile prompting; clothing placement still affects consistency.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": null,
+        "count": null,
+        "scope": "Not captured",
+        "feedback": "Not captured.",
+        "source": null
+      },
+      "variantNotes": "Combo option shows $99 versus $183. Page default is a different $79.20 Mini Combo. Combo description says USB-C RX + Lightning RX + charging case; do not infer camera receiver inclusion from the family name.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-043",
+      "brand": "Saramonic",
+      "name": "Blink 500 B2+ (2-person kit)",
+      "category": "Wireless clip-on kit",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 12900,
+        "kind": "demo_estimate",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "unknown",
+      "sellerOrSource": "Saramonic USA",
+      "productSource": "https://saramonicusa.com/blink-500-b2-micro-2-person-digital-wireless-microphone-system-for-cameras-smartphones-computers/",
+      "technical": {
+        "capsule / mic system": "Condenser",
+        "polar_pattern": "Omnidirectional",
+        "connection": "2.4GHz TX-to-RX; USB-C / Lightning / 3.5mm RX",
+        "power": "Rechargeable TX / RX / case",
+        "additional_hardware": "Use matching output cable / adapter",
+        "noise_strategy": "Two-stage noise cancellation; low-cut filters"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 3,
+        "office": 4,
+        "assessment": "Versatile two-person kit; route a single speaker channel to avoid accidentally transcribing a second wearer.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": null,
+        "count": null,
+        "scope": "Not captured",
+        "feedback": "Not captured.",
+        "source": null
+      },
+      "variantNotes": "Product identity and specifications verified; $129 is a synthetic demo price because the fetched official listing exposed no price. BLINK500B2+ is distinct from ProX and older B2.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-044",
+      "brand": "RØDE",
+      "name": "VideoMic GO II with Helix mount",
+      "category": "Directional / shotgun mic",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 10900,
+        "kind": "observed_page",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "in_stock",
+      "sellerOrSource": "Sweetwater",
+      "productSource": "https://www.sweetwater.com/store/detail/VideoMicGo2H--rode-videomic-go-ii-camera-mounted-shotgun-microphone",
+      "technical": {
+        "capsule / mic system": "Condenser",
+        "polar_pattern": "Supercardioid shotgun",
+        "connection": "USB-C; 3.5mm TRS",
+        "power": "USB bus or plug-in power",
+        "additional_hardware": "USB data cable + desk / boom mount for computer use",
+        "noise_strategy": "Directional pickup; isolation mount"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 3,
+        "office": 4,
+        "assessment": "Lightweight directional option; bring it close to the speaker instead of treating it as an across-room mic.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": 5,
+        "count": 2,
+        "scope": "Rendered customer reviews",
+        "feedback": "Two visible reviews praise audio and mounting; one explicitly says machinery noise was still captured.",
+        "source": "https://www.sweetwater.com/store/detail/VideoMicGo2H--rode-videomic-go-ii-camera-mounted-shotgun-microphone/reviews"
+      },
+      "variantNotes": "Price is the listed Helix-mount package; USB cable / desktop mount requirements depend on package.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-045",
+      "brand": "RØDE",
+      "name": "VideoMic NTG",
+      "category": "Directional / shotgun mic",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 25900,
+        "kind": "observed_page",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "in_stock",
+      "sellerOrSource": "Sweetwater",
+      "productSource": "https://www.sweetwater.com/store/detail/VideoMicNTG--rode-videomic-ntg-camera-mount-shotgun-microphone",
+      "technical": {
+        "capsule / mic system": "Condenser",
+        "polar_pattern": "Supercardioid shotgun",
+        "connection": "USB-C; 3.5mm auto-sensing output",
+        "power": "Internal rechargeable battery / USB",
+        "additional_hardware": "USB data cable + suitable desk / boom mount",
+        "noise_strategy": "Directional pickup; high-pass filter; gain controls"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 3,
+        "office": 4,
+        "assessment": "Flexible camera-and-computer mic; a close boom position is more useful than pointing from far away.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": 4.8,
+        "count": 11,
+        "scope": "Rendered customer reviews",
+        "feedback": "Visible reviews praise camera / computer versatility, battery operation, and spoken audio.",
+        "source": "https://www.sweetwater.com/store/detail/VideoMicNTG--rode-videomic-ntg-camera-mount-shotgun-microphone/reviews"
+      },
+      "variantNotes": "New standalone price; open-box units excluded. A shotgun does not eliminate reflections or off-axis café speech.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-046",
+      "brand": "Sennheiser",
+      "name": "MKE 400 (2nd generation)",
+      "category": "Directional / shotgun mic",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 21900,
+        "kind": "observed_page",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "in_stock",
+      "sellerOrSource": "Sweetwater",
+      "productSource": "https://www.sweetwater.com/store/detail/MKE400v2--sennheiser-mke400-supercardioid-condenser-on-camera-shotgun-microphone",
+      "technical": {
+        "capsule / mic system": "Condenser",
+        "polar_pattern": "Supercardioid shotgun",
+        "connection": "3.5mm TRS / TRRS via supplied cables",
+        "power": "2 AAA batteries",
+        "additional_hardware": "USB audio interface with mic input for USB-only laptops; mount",
+        "noise_strategy": "Directional pickup; low-cut filter; wind protection"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 3,
+        "office": 4,
+        "assessment": "Compact directional alternative; computer use needs an appropriate analog mic-input path.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": 4.3,
+        "count": 2,
+        "scope": "Rendered customer reviews",
+        "feedback": "Two visible reviews praise voice presence, wind handling, and reduced room sound versus a camera mic.",
+        "source": "https://www.sweetwater.com/store/detail/MKE400v2--sennheiser-mke400-supercardioid-condenser-on-camera-shotgun-microphone/reviews"
+      },
+      "variantNotes": "This model has no direct USB audio output; USB-only laptops require an adapter or interface.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-047",
+      "brand": "Deity",
+      "name": "V-Mic D4 Mini",
+      "category": "Directional / shotgun mic",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 4995,
+        "kind": "observed_page",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "in_stock",
+      "sellerOrSource": "Deity",
+      "productSource": "https://shop.deitymic.com/products/d4-mini",
+      "technical": {
+        "capsule / mic system": "Condenser",
+        "polar_pattern": "Supercardioid",
+        "connection": "3.5mm TRS; supplied TRRS host cable",
+        "power": "1–5V plug-in power",
+        "additional_hardware": "Mic-capable USB adapter for USB-only hosts; mount",
+        "noise_strategy": "Directional pickup; included windscreen"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 3,
+        "office": 4,
+        "assessment": "Low-cost directional demo option; ensure the adapter supplies microphone plug-in power.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": null,
+        "count": 43,
+        "scope": "Shop review count; aggregate score not exposed",
+        "feedback": "Not captured.",
+        "source": "https://shop.deitymic.com/products/d4-mini"
+      },
+      "variantNotes": "Official shop lists $49.95 in stock and 43 reviews. No aggregate star rating was exposed; a histogram was not converted into an official score.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-048",
+      "brand": "Philips",
+      "name": "SpeechMike Premium LFH3500",
+      "category": "Professional handheld dictation",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 39900,
+        "kind": "manufacturer_rrp",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "unknown",
+      "sellerOrSource": "Philips Speech Processing",
+      "productSource": "https://www.speechmike.com/us/products/desktop-dictation/speechmike-premium-dictation-microphone-lfh3500/",
+      "technical": {
+        "capsule / mic system": "Electret condenser",
+        "polar_pattern": "Unidirectional",
+        "connection": "USB-A",
+        "power": "USB bus",
+        "additional_hardware": "None for USB-A; USB-C adapter if required",
+        "noise_strategy": "Decoupled mic; pop filtering; speech-focused close capture"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 4,
+        "office": 5,
+        "assessment": "Purpose-built handheld dictation with programmable controls; less hands-free than a headset.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": null,
+        "count": null,
+        "scope": "Not captured",
+        "feedback": "Not captured.",
+        "source": null
+      },
+      "variantNotes": "Exact LFH3500 push-button RRP is $399. LFH3510 slide-switch RRP is $409. RRP is not a current retailer offer; button integrations may be limited on macOS or unsupported apps.",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-049",
+      "brand": "Philips",
+      "name": "SpeechOne PSM6300 kit (PSM6000 family)",
+      "category": "Professional wireless dictation",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 49200,
+        "kind": "historical_page",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "discontinued",
+      "sellerOrSource": "StartStop / HTH Engineering",
+      "productSource": "https://www.startstop.com/philips-speechone-wireless-dictation-headset/",
+      "technical": {
+        "capsule / mic system": "Electret condenser",
+        "polar_pattern": "Unidirectional",
+        "connection": "Wireless headset to USB docking station",
+        "power": "Rechargeable battery",
+        "additional_hardware": "USB docking station; optional AirBridge sold separately",
+        "noise_strategy": "Triple-layer noise-reduction filter; close boom"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 5,
+        "office": 5,
+        "assessment": "Professional hands-free dictation example; treat the listing as a legacy product rather than fresh purchasable stock.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": null,
+        "count": null,
+        "scope": "Not captured",
+        "feedback": "Not captured.",
+        "source": null
+      },
+      "variantNotes": "Page explicitly names PSM6300 and says discontinued June 26, 2026. It contains $492 and $429 legacy amounts; $492 is the headline reference only, not a live quote. Manufacturer also says no longer available: [Additional source](https://www.dictation.philips.com/us/products/desktop-dictation/speechone-wireless-dictation-headset-psm6000/)",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    },
+    {
+      "id": "MIC-050",
+      "brand": "OM SYSTEM / Olympus",
+      "name": "RecMic II RM-4010P",
+      "category": "Professional handheld dictation",
+      "referencePrice": {
+        "currency": "USD",
+        "amountMinor": 34999,
+        "kind": "observed_page",
+        "payableTotalMinor": null,
+        "shippingMinor": null,
+        "taxMinor": null,
+        "extraHardwareIncluded": false
+      },
+      "availability": "unknown",
+      "sellerOrSource": "TVPS / Executive Communication Systems",
+      "productSource": "https://www.tvps.com/olympus-recmic-ii-rm-4010p-noise-canceling-push-button-dictation-microphone/ol-rm-4010p/",
+      "technical": {
+        "capsule / mic system": "Dual microphone system",
+        "polar_pattern": "Directional modes / beamforming",
+        "connection": "USB",
+        "power": "USB bus",
+        "additional_hardware": "USB-C adapter if required; configuration software for controls",
+        "noise_strategy": "Dual-mic noise cancellation; dictation mode selection"
+      },
+      "authoredFit": {
+        "classification": "proxy",
+        "cafe": 4,
+        "office": 5,
+        "assessment": "Specialist handheld option for controlled dictation workflows; check button mapping with the chosen prompting app.",
+        "measuredDictationBenchmark": false
+      },
+      "customerReviews": {
+        "value": null,
+        "count": 1,
+        "scope": "Retailer review count; aggregate score not exposed",
+        "feedback": "Not captured.",
+        "source": "https://www.tvps.com/olympus-recmic-ii-rm-4010p-noise-canceling-push-button-dictation-microphone/ol-rm-4010p/"
+      },
+      "variantNotes": "Retailer shows $349.99 and one review; stock is not exposed. Manufacturer support: [Additional source](https://audiosupport.omsystem.com/en/product/rm-4010p/)",
+      "checkedOn": "2026-10-24",
+      "selectable": false
+    }
+  ]
+}

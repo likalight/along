@@ -1,3 +1,4 @@
+import { nonTechProfile } from "../src/catalog.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { once } from "node:events";
@@ -9,7 +10,7 @@ import type { Session, VoiceObservation } from "../src/contracts.ts";
 
 async function harness(t: any) {
   const agentToken = randomBytes(32).toString("hex");
-  const { server, store } = createApp({ agentToken });
+  const { server, store } = createApp({ agentToken, profile: nonTechProfile });
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
   const address = server.address() as { port: number };
@@ -284,4 +285,129 @@ test("AI adapter uses accepted constraints and cannot expose approval capabiliti
   const readyState = await ready(c);
   const view = modelSessionView(readyState);
   assert(!JSON.stringify(view).includes(readyState.summary!.approvalNonce!));
+});
+
+test("new voice brief: lighting cards preserve visible order; USD audio offers and destination survive into receipt", async (t) => {
+  const { voiceProfile } = await import("../src/voice-catalog.ts");
+  const agentToken = randomBytes(32).toString("hex");
+  const { server } = createApp({ agentToken, profile: voiceProfile });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  t.after(() => {
+    server.closeAllConnections();
+    server.close();
+  });
+  const c = new ConciergeClient(
+    `http://127.0.0.1:${(server.address() as { port: number }).port}`,
+    { agentToken },
+  );
+  const { createShoppingTools } = await import("../src/agent-tools.ts");
+  for (const url of new Set(voiceProfile.catalog.products.flatMap(p => p.media.map(m => m.url)))) {
+    const response = await fetch(c.baseUrl + url);
+    assert.equal(response.status, 200, `Catalog media must load: ${url}`);
+    assert.match(response.headers.get("content-type")!, /image\/svg\+xml/);
+  }
+  let s = await c.create("inspired-lighting");
+  s = await c.turn(s.revision);
+  s = (
+    await c.propose({
+      expectedRevision: s.revision,
+      turnId: s.turn!.id,
+      view: {
+        stage: "shortlist",
+        focusProductId: "LAMP-001",
+        cards: [
+          {
+            productId: "LAMP-001",
+            role: "close-match",
+            rank: 1,
+            reason: "Rounded blue silhouette matches the stated preference.",
+            compromise: "Synthetic fixture; real finish is unknown.",
+            evidenceIds: ["ev-LAMP-001-spec"],
+          },
+        ],
+        evidenceIds: [],
+        activeVideoId: null,
+      },
+    })
+  ).session;
+  assert.deepEqual(s.shortlist, ["LAMP-001"]);
+  const adapter = createShoppingTools(c, s);
+  const adapterResult: any = await adapter.execute("propose_shopping_state", {
+    view: s.view, destination: "Demo destination, Singapore",
+  });
+  s = adapterResult.session;
+  await rejects(c.propose({expectedRevision: s.revision, turnId: s.turn!.id,
+    view: {...s.view!, cards: [{...s.view!.cards[0], evidenceIds: ["ev-MIC-019-spec"]}]} }), "UNKNOWN_EVIDENCE");
+  await rejects(
+    c.propose({
+      expectedRevision: s.revision,
+      turnId: s.turn!.id,
+      view: { ...s.view!, activeVideoId: "invented-video" },
+    }),
+    "UNKNOWN_VIDEO",
+  );
+  s = await c.create("cafe-dictation");
+  s = await c.turn(s.revision);
+  s = (
+    await c.propose({
+      expectedRevision: s.revision,
+      turnId: s.turn!.id,
+      constraints: {
+        category: "audio-accessories",
+        currency: "USD",
+        budgetMinor: 12000,
+        deliveryWithinDays: 1,
+      },
+      selection: { offerId: "MIC-019-express", quantity: 1 },
+    })
+  ).session;
+  s = await c.summarize(s.revision, s.turn!.id);
+  assert.equal(s.summary!.quote.total, 11999);
+  assert.match(s.summary!.spokenText, /USD 119.99/);
+  assert.match(
+    s.summary!.spokenText,
+    /Destination: Demo destination, Singapore/,
+  );
+  for (const event of [
+    "displayed",
+    "playback_started",
+    "playback_completed",
+  ] as const)
+    s = await c.presentation(s.summary!, event);
+  s = await c.turn(s.revision);
+  const previous = approval(s);
+  s = (
+    await c.propose({
+      expectedRevision: s.revision,
+      turnId: s.turn!.id,
+      destination: "Demo destination, Jurong, Singapore",
+    })
+  ).session;
+  assert.equal(s.summary, null);
+  await rejects(c.approve(previous), "STALE_REVISION");
+  s = await c.summarize(s.revision, s.turn!.id);
+  for (const event of [
+    "displayed",
+    "playback_started",
+    "playback_completed",
+  ] as const)
+    s = await c.presentation(s.summary!, event);
+  s = await c.turn(s.revision);
+  const result = await c.approve(approval(s));
+  assert.equal(
+    result.receipt.quote.destination,
+    "Demo destination, Jurong, Singapore",
+  );
+  const catalog = await c.catalog();
+  assert.equal(catalog.products.length, 18);
+  assert.deepEqual(
+    [...new Set(catalog.products.map((p: any) => p.category))].sort(),
+    ["audio-accessories", "home-lighting"],
+  );
+  const mic = catalog.products.find((p: any) => p.id === "MIC-019");
+  assert.equal(mic.buyerSignals.averageRating, 4.5);
+  assert.equal(mic.buyerSignals.purchaseCount, null);
+  const mismatch = await c.search({ currency: "SGD" });
+  assert.equal(mismatch.eligible.length, 0);
 });

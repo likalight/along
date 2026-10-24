@@ -15,11 +15,11 @@ if (!base) {
 }
 try {
   const c = new ConciergeClient(base, { agentToken });
-  let s = await c.create("urgent-bag");
-  console.log("1. Created urgent-bag session", s.id);
-  const offers = await c.search(s.constraints);
+  let s = await c.create("cafe-dictation");
+  console.log("1. Created cafe-dictation session", s.id);
+  const offers = await c.search({...s.constraints, budgetMinor: 12000, deliveryWithinDays: 1});
   for (const q of [...offers.eligible, ...offers.ineligible].filter(
-    (q: any) => q.product.id === "commuter-tote",
+    (q: any) => q.product.id === "MIC-019",
   ))
     console.log(
       "2. Seller comparison",
@@ -32,9 +32,10 @@ try {
     await c.propose({
       expectedRevision: s.revision,
       turnId: s.turn!.id,
-      needs: ["Bag for tomorrow"],
-      shortlist: ["commuter-tote"],
-      selection: { offerId: "commuter-tote-express", quantity: 1 },
+      needs: ["Microphone for cafe dictation"],
+      constraints: {category: "audio-accessories", currency: "USD", budgetMinor: 12000, deliveryWithinDays: 1},
+      shortlist: ["MIC-019"],
+      selection: { offerId: "MIC-019-express", quantity: 1 },
     })
   ).session;
   s = await c.summarize(s.revision, s.turn!.id);

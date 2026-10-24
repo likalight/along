@@ -1,3 +1,4 @@
+import type { CatalogData, CatalogProfile } from "./contracts.ts";
 import type {
   Product,
   Offer,
@@ -166,7 +167,7 @@ evidence.splice(
 products.find((p) => p.id === "cotton-basic")!.evidenceIds = [
   "ev-cotton-basic-spec",
 ];
-export const catalog = {
+export const catalog: CatalogData = {
   version: "1",
   currency: "SGD",
   notice:
@@ -235,7 +236,10 @@ export function quoteOffer(
   quantity: number,
   constraints: Constraints = {},
   excluded: string[] = [],
+  data: CatalogData = catalog,
+  destination = "Demo destination, Singapore",
 ): Quote {
+  const { products, offers } = data;
   const offer = offers.find((o) => o.id === offerId);
   if (!offer) throw new Error("UNKNOWN_OFFER");
   const product = products.find((p) => p.id === offer.productId)!;
@@ -255,6 +259,12 @@ export function quoteOffer(
     );
   if (!offer.available || quantity > offer.stock)
     conflict("UNAVAILABLE", "Requested quantity is unavailable.", "quantity");
+  if ((constraints.currency ?? data.currency) !== offer.currency)
+    conflict(
+      "CURRENCY_CONFLICT",
+      "Offer currency differs from the budget currency.",
+      "currency",
+    );
   if (total === null)
     conflict(
       "UNKNOWN_TOTAL",
@@ -302,7 +312,8 @@ export function quoteOffer(
     product,
     offer,
     quantity,
-    currency: "SGD",
+    currency: offer.currency,
+    destination,
     subtotal,
     shipping: offer.shipping,
     otherFees: offer.otherFees,
@@ -315,10 +326,15 @@ export function eligibleOffers(
   constraints: Constraints = {},
   quantity = 1,
   excluded: string[] = [],
+  data: CatalogData = catalog,
+  destination = "Demo destination, Singapore",
 ) {
-  return offers.map((o) => quoteOffer(o.id, quantity, constraints, excluded));
+  return data.offers.map((o) =>
+    quoteOffer(o.id, quantity, constraints, excluded, data, destination),
+  );
 }
-export function validateCatalog() {
+export function validateCatalog(data: CatalogData = catalog) {
+  const { products, offers, evidence } = data;
   const unique = (items: { id: string }[]) => {
     if (new Set(items.map((x) => x.id)).size !== items.length)
       throw new Error("Duplicate catalog ID");
@@ -337,6 +353,10 @@ export function validateCatalog() {
       )
         throw new Error("Invalid product evidence");
   for (const o of offers) {
+    if (o.currency !== data.currency)
+      throw new Error(
+        "Mixed currencies in purchase catalog; do not silently convert budgets",
+      );
     if (!products.some((p) => p.id === o.productId))
       throw new Error("Invalid offer product");
     for (const amount of [o.unitPrice, o.shipping, o.otherFees])
@@ -355,3 +375,10 @@ export function validateCatalog() {
   }
 }
 validateCatalog();
+
+export const nonTechProfile: CatalogProfile = {
+  catalog,
+  scenarios,
+  preparedImages,
+  destination: "Demo destination, Singapore",
+};

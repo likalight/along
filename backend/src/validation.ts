@@ -53,11 +53,18 @@ export function strings(x: unknown, max = 20): x is string[] {
 export function validateConstraints(x: unknown) {
   object(x);
   keys(x, [
+    "currency",
     "budgetMinor",
     "deliveryWithinDays",
     "category",
     "requiredSpecifications",
   ]);
+  if (x.currency !== undefined)
+    requireThat(
+      ["SGD", "USD"].includes(x.currency as string),
+      "INVALID_CURRENCY",
+      "Supported currencies: SGD, USD.",
+    );
   if (x.budgetMinor !== undefined)
     requireThat(
       integer(x.budgetMinor, 0, 100000000),

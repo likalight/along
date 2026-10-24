@@ -27,16 +27,25 @@ npm run demo
 - [API.md](./API.md): routes, call sequence, examples, trust boundaries and errors.
 - [src/contracts.ts](./src/contracts.ts): frontend/AI shared types.
 - [src/client.ts](./src/client.ts): framework-neutral fetch client and streaming snapshots.
-- [src/catalog.ts](./src/catalog.ts): replaceable prepared catalog; 12 proxy products, 24 proxy offers, separate product/seller evidence, missing-review and unknown-fee cases.
+- [src/voice-catalog.ts](./src/voice-catalog.ts): current lighting/audio profile; 18 products, 36 synthetic offers, source-linked microphone evidence and unknown-fee cases.
+- [data/microphones-reference.json](./data/microphones-reference.json): 50 non-purchasable source research records with provenance.
+- [src/catalog.ts](./src/catalog.ts): pure quote/eligibility functions and isolated legacy SGD regression profile.
 - [src/store.ts](./src/store.ts): authoritative state, revisions, turn cancellation, exact summaries and approval.
 
-The categories follow Kalai's *proposed* non-tech handoff, not a finalized team agreement. All current prices, ratings, reviews and fulfillment claims are explicitly proxy fixtures. Tech entries and verified catalog assets can be added without changing HTTP contracts. The two prepared SVGs are labelled style illustrations, not product photos. The API returns relative media URLs; frontend resolves them against backend base URL.
+The current default follows the 22:23 voice build brief (lighting + audio). The later combined data file proposes bags + bedding + microphones, so category agreement remains pending. Profiles isolate this choice from the HTTP contract. Microphone identities/specs/reviews preserve team-supplied source snapshots; the backend has not independently reverified them. All seller prices, stock, taxes and delivery promises are synthetic, labelled demo offers. No reference price is represented as a verified payable price. Synthetic SVGs are style/category illustrations, not product photographs. Resolve relative media URLs against the backend URL.
+
+To regenerate the 50-record reference data from the supplied attachment:
+
+```sh
+node --experimental-strip-types scripts/import-microphones.ts /absolute/path/microphone-demo-data.md
+```
+
 
 ## Verified locally
 
-The HTTP checks exercise complete purchase + concurrent retry; budget changes; stale, cancelled and reset turns; ambiguous/uncertain/echo/background approval; interrupted summary; unknown prices and invalid identifiers; role separation and CORS; and live snapshot streaming/reconnect. Amounts are integer SGD cents, shipping/other fees charged once per order, item subtotal multiplied by quantity. `null` mandatory fees block approval.
+The HTTP checks exercise complete purchase + concurrent retry; budget changes; stale, cancelled and reset turns; ambiguous/uncertain/echo/background approval; interrupted summary; unknown prices and invalid identifiers; role separation and CORS; and live snapshot streaming/reconnect. Amounts are integer cents with explicit USD/SGD currency, shipping/other fees charged once per order, item subtotal multiplied by quantity. `null` mandatory fees block approval.
 
-Frontend/voice integration is still required. In particular, the voice team must attest final shopper recognition and echo status, while the UI must report actual rendered summary and audio **playback end**, not audio generation completion. The backend cannot independently prove a human heard audio or that an upstream speech classification is truthful. Provider credentials stay in the voice server.
+Ordered product cards, honest missing reviews/videos, destination changes and USD totals are also checked. Frontend/voice integration is still required. In particular, the voice team must attest final shopper recognition and echo status, while the UI must report actual rendered summary and audio **playback end**, not audio generation completion. The backend cannot independently prove a human heard audio or that an upstream speech classification is truthful. Provider credentials stay in the voice server.
 
 ## Scope limits
 

@@ -1,6 +1,6 @@
 # API v1 — frontend and AI handoff
 
-Base `http://127.0.0.1:4318`. JSON UTF-8, request limit 32 KiB. All prices are integer SGD cents. All current catalog data is explicitly synthetic/proxy. The shared TypeScript definitions are `src/contracts.ts`; `src/client.ts` works from a frontend or trusted server without any framework dependency.
+Base `http://127.0.0.1:4318`. JSON UTF-8, request limit 32 KiB. All money is integer minor units with explicit currency (USD in the default profile; no conversion). Product evidence distinguishes team-supplied research snapshots from synthetic fixtures. Every checkout offer is synthetic. The shared TypeScript definitions are `src/contracts.ts`; `src/client.ts` works from a frontend or trusted server without any framework dependency.
 
 ## Roles and ownership
 
@@ -18,10 +18,10 @@ All session routes need `Authorization: Bearer <accessToken>`. `/proposals`, `/s
 |---|---|
 | GET `/health` | Service, contract version, purchase mode and storage mode |
 | GET `/v1/catalog` | `products`, `offers`, `evidence`, currency, proxy notice |
-| GET `/v1/scenarios` | Three candidate non-tech scenario fixtures |
-| GET `/v1/prepared-images` | Two proxy style-reference assets and correction examples |
+| GET `/v1/scenarios` | Scenario fixtures for the configured catalog profile |
+| GET `/v1/prepared-images` | Labelled synthetic style-reference assets |
 | POST `/v1/catalog/search` | `{constraints, quantity?:1, excludedProductIds?:[]}` → eligible/ineligible quotes with explicit reasons |
-| POST `/v1/sessions` | `{scenarioId?:"urgent-bag"}` → `{session, accessToken}` |
+| POST `/v1/sessions` | `{scenarioId?:"cafe-dictation"}` → `{session, accessToken}` |
 | GET `/v1/sessions/:id` | `{session}`; reconnect baseline |
 | GET `/v1/sessions/:id/events` | SSE `data: {type:"session.snapshot", session}`; immediate full snapshot, then updates. Expiration emits `session.expired` and closes. |
 | POST `.../turns` | `{expectedRevision}` → `{session}` with server-issued `turn.id` |
@@ -42,17 +42,17 @@ All session routes need `Authorization: Bearer <accessToken>`. `/proposals`, `/s
 {
   "expectedRevision": 1,
   "turnId": "<server-issued turn>",
-  "needs": ["Bag for tomorrow"],
-  "constraints": {"category":"bags","budgetMinor":10000,"deliveryWithinDays":1},
-  "shortlist": ["commuter-tote"],
-  "selection": {"offerId":"commuter-tote-express","quantity":1},
-  "evidenceIds": ["ev-commuter-tote-spec","ev-seller-express"]
+  "needs": ["Microphone for cafe dictation"],
+  "constraints": {"category":"audio-accessories","currency":"USD","budgetMinor":12000,"deliveryWithinDays":1},
+  "shortlist": ["MIC-019"],
+  "selection": {"offerId":"MIC-019-express","quantity":1},
+  "evidenceIds": ["ev-MIC-019-spec","ev-demo-seller-express"]
 }
 ```
 
 Proposal fields are optional, but supplied arrays/constraints are **whole replacements**. Merge retained preferences and constraints from the accepted snapshot before proposing changes. Empty arrays clear a list; `selection:null` clears a choice. Null does not mean zero/unknown for other fields. Unknown request fields are rejected. No arbitrary model-supplied money, review or summary payload is accepted.
 
-4. Frontend renders the returned snapshot. Preserve `shortlist` order. AI resolves “second one” from this accepted array at that revision, then sends a concrete product/offer ID; never resolve against an older streamed draft.
+4. Frontend renders the returned snapshot. Preserve `view.cards` and `shortlist` order. When a proposal includes `view`, its ordered cards become the shortlist; contradictory arrays are rejected. AI resolves “second one” from this accepted array at that revision, then sends a concrete product/offer ID; never resolve against an older streamed draft.
 5. AI requests `/summaries`. Backend computes total and creates `summary.id`, `summary.revision`, `spokenText`, and `textHash`. **Speak this exact text**; don't paraphrase or omit conditions. The frontend displays the same summary and quote.
 6. Browser sends `displayed` after render, `playback_started` at audible playback start, `playback_completed` only after actual audio finishes. Include summary ID, its `responseTurnId`, and textHash in every event. These events are scoped to the immutable summary rather than a global revision so render/audio acknowledgments can arrive independently. Interruption sends `playback_interrupted` or `/cancel`; an interrupted summary must be regenerated and fully replayed.
 7. Only after both display and complete playback does the backend produce `summary.approvalNonce`. At the **next shopper speech start**, `/turns` creates a fresh turn with `approvalWindow`. This prevents speech that started during the summary from approving it.
@@ -82,7 +82,7 @@ Use actual final recognition confidence; if the provider doesn't supply a calibr
 - Apply snapshots only if their revision is newer for that session. Cancel and reset invalidate queued old work; no silent replay.
 - On 409 `STALE_REVISION`, refetch the snapshot and reevaluate the current shopper request. **Never automatically replay a purchase or an old proposal.**
 - A changed budget/deadline can make a previous selection invalid: new constraints are retained, selection and approval are cleared. An explicitly proposed invalid selection is rejected atomically without modifying accepted state.
-- `requiredSpecifications` uses exact equality. Unknown specifications fail hard constraints. Category constraints are exact slugs (`bags`, `bedding`).
+- `requiredSpecifications` uses exact equality. Unknown specifications fail hard constraints. Category constraints are exact slugs in the selected profile (`home-lighting`, `audio-accessories` in the current default).
 - Shipping and other fees are per order; price is per item. All material fees must be known. Search results include rejected offers so AI can explain the cheapest-versus-eligible tradeoff, bounded to this catalog.
 - Money, offer, variant, quantity, delivery/conditions and uncertainties come only from catalog-backed summaries. Product evidence and seller evidence retain separate associations and proxy labels.
 - Raw audio/images/transcripts are not stored by this service. The upstream voice layer must follow the same retention rule.
@@ -107,3 +107,17 @@ const result = await tools.execute(toolCall.name, parsedArguments);
 ```
 
 Available tools: `get_shopping_state`, `search_current_offers`, `propose_shopping_state`, `prepare_purchase_summary`. Schemas are ordinary provider-neutral JSON Schema; adapt to your SDK's schema subset. Do not blindly retry stale mutation tools; read current state and reconsider the shopper's request. Create a fresh adapter for every new shopper turn. Do not register `client.approve` as a tool. The trusted voice ingestion path alone receives the approval capability after display/playback completion.
+
+## Guided narrowing and evidence UI
+
+`Proposal.view` is a complete replacement `ShoppingView`: stage, focusProductId, ordered cards, evidenceIds and activeVideoId. Cards contain productId, role, optional rank expressed as null or 1–3, reason, compromise and evidence IDs belonging to that product. Stages are solution-types, priorities, shortlist, evidence and offers. Roles are best-value, best-quality, lowest-cost-suitable, close-match and discovery. These labels are contextual recommendations, never verified awards. Frontend keeps its own responsive grid layout, but preserves the accepted order so “second one” remains meaningful. The model must ask about ambiguous positional references rather than guess the physical layout.
+
+`Product.buyerSignals` distinguishes ratingCount, writtenReviewCount and purchaseCount. Unknown values are null, never zero or fabricated. `videos` contains only curated IDs/URLs; the current catalog has none, so hide that affordance or state it is unavailable. Pause assistant audio and ignore video audio as shopper approval. Never invent a video ID.
+
+`Proposal.destination` changes the session's displayed destination and invalidates any previous purchase summary. It is included in exact spoken summary and receipt. Current offers apply only to the fictional demo service area; changing this label does not verify real address serviceability. Do not collect a real home address for this simulation.
+
+## Catalog profiles and pending team decision
+
+Default `voiceProfile` implements the 22:23 voice build brief: six synthetic lighting products plus twelve microphone configurations selected from the team's 50-record research file, all in USD. IDs MIC-xxx retain source IDs. All 36 seller offers are explicitly synthetic; a research reference price is never treated as a verified payable total. Audio specs/reviews retain source URLs and unknown values. Ratings were supplied by the team and have not been independently reverified by this backend. Illustrations are not product photographs.
+
+`nonTechProfile` remains an isolated legacy SGD regression fixture. Inject a `CatalogProfile` into `createApp({profile})` to change product data without changing the HTTP session contract. The later combined handoff proposes bags + bedding + microphones; the team must resolve this against the lighting/audio brief before we call any category lineup final. It is not silently merged into the default catalog.
