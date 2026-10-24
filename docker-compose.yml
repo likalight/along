@@ -1,0 +1,14 @@
+services:
+  along-shopper:
+    container_name: along-shopper
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${ALONG_PORT:-3000}:3000"
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+    restart: unless-stopped
