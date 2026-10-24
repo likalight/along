@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360" viewBox="0 0 480 360" role="img" aria-labelledby="title desc">
+<title id="title">Generic microphone solution</title><desc id="desc">Original synthetic illustration for the shopping demo. Not a product photograph or proof of any product specification.</desc>
+<rect width="480" height="360" fill="#f3f4f6"/>
+<ellipse cx="240" cy="281" rx="76" ry="10" fill="#dce2e8"/>
+<rect x="205" y="63" width="70" height="130" rx="34" fill="#466384"/>
+<path d="M190 150v20c0 65 100 65 100 0v-20" stroke="#263c56" stroke-width="10" fill="none" stroke-linecap="round"/>
+<path d="M240 216v45M204 272h72" stroke="#263c56" stroke-width="12" stroke-linecap="round"/>
+<path d="M220 91h40M220 107h40M220 123h40M220 139h40" stroke="#bac7d8" stroke-width="4"/>
+<text x="240" y="328" text-anchor="middle" font-family="sans-serif" font-size="16" letter-spacing="2" fill="#475569">DEMO ILLUSTRATION</text>
+</svg>
