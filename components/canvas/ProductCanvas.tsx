@@ -27,7 +27,7 @@ export type PlaybackRequest = Pick<
   "sessionId" | "epoch" | "turnId" | "revision"
 > & {
   evidenceId: string;
-  phase: "preparing" | "failed";
+  phase: "preparing" | "failed" | "cancelled";
 };
 export type ProductCanvasProps = {
   snapshot: Snapshot;
@@ -195,6 +195,15 @@ export function ProductCanvas({
     videoElement.current?.pause();
     setVideoId(null);
     const ev = data.evidence.find((e) => e.id === videoId);
+    if (!played && ev?.media?.url)
+      onPlaybackRequest?.({
+        sessionId: s.sessionId,
+        epoch: s.epoch,
+        turnId,
+        revision: s.revision,
+        evidenceId: ev.id,
+        phase: "cancelled",
+      });
     if (played && reason !== "failed" && ev?.media)
       setTakeaway(ev.media.takeaway);
   };

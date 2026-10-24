@@ -350,3 +350,32 @@ test("switching categories during video cannot carry old playback status", async
     "Say it in the voice shell, or type it here.",
   );
 });
+
+test("stopping a still-loading video clears preparation without inventing playback", async ({
+  page,
+}) => {
+  await start(page);
+  await say(page, "Explore options");
+  await say(page, "Choose headset");
+  await say(page, "Choose value");
+  await say(page, "Reviews for the first");
+  let release: (() => void) | undefined;
+  await page.route("**/placement.webm", async (route) => {
+    await new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await route.abort().catch(() => {});
+  });
+  await say(page, "Play the first video");
+  await expect(
+    page.getByText("Preparing curated video…", { exact: true }),
+  ).toBeVisible();
+  await expect.poll(() => !!release).toBe(true);
+  await page.getByRole("button", { name: "Stop video" }).click();
+  release!();
+  await expect(page.locator("video")).toHaveCount(0);
+  await expect(page.locator("footer").getByRole("status")).not.toContainText(
+    "Preparing",
+  );
+  await expect(page.getByText("The takeaway", { exact: true })).toHaveCount(0);
+});

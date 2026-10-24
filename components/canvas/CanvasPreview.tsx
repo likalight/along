@@ -231,7 +231,11 @@ export function CanvasPreview() {
       request.turnId !== currentTurn.current
     )
       return;
-    if (request.phase === "failed") {
+    if (request.phase === "cancelled") {
+      requestedMedia.current = null;
+      activeMedia.current = null;
+      setMediaStatus("Video stopped. Ready for your next turn.");
+    } else if (request.phase === "failed") {
       requestedMedia.current = null;
       activeMedia.current = null;
       setMediaStatus("Media unavailable. You can continue exploring.");
