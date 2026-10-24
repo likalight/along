@@ -1,3 +1,4 @@
+import { requestMicrophone } from "./microphone";
 import type { SpeechAdapter, SpeechCallbacks, VoiceChoice } from "./adapter";
 import { audioRms, LivePlaybackGate } from "./live-playback-gate";
 
@@ -362,13 +363,7 @@ export class GptLiveAdapter implements SpeechAdapter {
       throw new Error(
         "Live voice requires microphone support. Open this demo in Chrome or continue by typing.",
       );
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-      },
-    });
+    const stream = await requestMicrophone(abort.signal);
     if (abort.signal.aborted || this.disposed) {
       stream.getTracks().forEach((track) => track.stop());
       return;

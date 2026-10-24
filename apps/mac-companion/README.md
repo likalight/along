@@ -1,3 +1,7 @@
+# Automatic preference learning
+
+The companion now syncs supported shopping preferences without exports. See [the current setup guide](../../docs/mac-context/AUTOMATIC.md). The original capture-foundation notes below are retained for history.
+
 # Along Context — local Mac companion (v0.1)
 
 This is a native AppKit prototype, not an integration with OpenAI's private Computer History service. It starts paused on every launch and has no network client, login item, hidden daemon, or automatic permission grant.

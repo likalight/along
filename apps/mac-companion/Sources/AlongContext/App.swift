@@ -11,6 +11,7 @@ final class CompanionDelegate: NSObject, NSApplicationDelegate, NSTableViewDataS
     private var pendingAllow = false
     private var statusItem: NSStatusItem!
     private var history: LocalHistory!
+    private var learning: PreferenceLearning!
     private var retentionTimer: Timer?
     private let capture = ActivityCapture()
     private let status = NSTextField(wrappingLabelWithString: "Paused. Nothing is being recorded.")
@@ -33,16 +34,22 @@ final class CompanionDelegate: NSObject, NSApplicationDelegate, NSTableViewDataS
             NSApp.terminate(nil)
             return
         }
+        learning = PreferenceLearning(directory: history.directory)
+        learning.onStatus = { [weak self] text in self?.homeStatus.stringValue = text }
         capture.allowedApps = Set(UserDefaults.standard.stringArray(forKey: "allowedApps") ?? [])
         capture.allApps = UserDefaults.standard.bool(forKey: "allApps")
         capture.excludedApps = Set(UserDefaults.standard.stringArray(forKey: "excludedApps") ?? [])
         capture.includeText = UserDefaults.standard.bool(forKey: "includeText")
         capture.onActivity = { [weak self] activity in
             guard let self else { return }
-            do { try self.history.append(activity); self.table.reloadData() }
+            do { try self.history.append(activity); self.table.reloadData(); self.learning.observe(activity) }
             catch { self.capture.stop(); self.setStatus("Paused: unable to save local history.") }
         }
-        capture.onStatus = { [weak self] in self?.setStatus($0) }
+        capture.onStatus = { [weak self] text in
+            guard let self else { return }
+            if !self.capture.running { self.learning.setRecording(false) }
+            self.setStatus(text)
+        }
         buildWindow()
         buildHome()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -125,7 +132,7 @@ final class CompanionDelegate: NSObject, NSApplicationDelegate, NSTableViewDataS
             root.bottomAnchor.constraint(equalTo: window.contentView!.bottomAnchor, constant: -20)
         ])
         root.addArrangedSubview(label("Your context. Under your control.", size: 27))
-        root.addArrangedSubview(label("Records activity only in selected apps. Counts interactions, never raw keystrokes. No screenshots, microphone, clipboard or automatic uploads. Browser text and titles are excluded in this version. This is an Along prototype, not ChatGPT Computer History."))
+        root.addArrangedSubview(label("Records activity only in selected apps. Counts interactions, never raw keystrokes. No screenshots, microphone or clipboard. While learning is on, redacted supported text is sent to OpenAI through your local Along server. Browser text and titles are excluded in this version. This is an Along prototype, not ChatGPT Computer History."))
         status.textColor = .secondaryLabelColor
         root.addArrangedSubview(status)
         startButton.target = self; startButton.action = #selector(toggle)
@@ -142,7 +149,7 @@ final class CompanionDelegate: NSObject, NSApplicationDelegate, NSTableViewDataS
         textToggle.target = self; textToggle.action = #selector(changeText)
         textToggle.state = capture.includeText ? .on : .off
         root.addArrangedSubview(textToggle)
-        root.addArrangedSubview(label("Text: TextEdit document content and accessible static text in Mail, Outlook and Notes. No full inbox sync. Only enable communications with the other participants’ consent. Redaction is best effort; review before sharing. Activity: 24 hours / 1,000 records. Reviewed preferences: 90 days. Files are local, not encrypted by this app.", size: 11))
+        root.addArrangedSubview(label("Text: TextEdit document content and accessible static text in Mail, Outlook and Notes. No full inbox sync. Only enable communications with the other participants’ consent. Redaction is best effort. Pause before opening private material. Activity: 24 hours / 1,000 records. Reviewed preferences: 90 days. Files are local, not encrypted by this app.", size: 11))
 
         for (id, title, width) in [("time", "Time", 85.0), ("app", "App", 150.0), ("activity", "Observed activity", 650.0)] {
             let col = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id))
@@ -165,17 +172,17 @@ final class CompanionDelegate: NSObject, NSApplicationDelegate, NSTableViewDataS
         root.addArrangedSubview(detailScroll)
         detailScroll.widthAnchor.constraint(equalTo: root.widthAnchor).isActive = true
         detailScroll.heightAnchor.constraint(equalToConstant: 100).isActive = true
-        root.addArrangedSubview(label("Turn a reviewed observation into a shopping preference", size: 16))
+        root.addArrangedSubview(label("Shopping preferences sync automatically", size: 16))
         keyMenu.addItems(withTitles: ["color", "shape"])
         keyMenu.target = self; keyMenu.action = #selector(changeKey)
         changeKey()
-        root.addArrangedSubview(stack([keyMenu, valueMenu, button("Confirm preference from selected activity", #selector(remember))]))
+
         root.addArrangedSubview(memoryLabel)
-        root.addArrangedSubview(stack([button("Export reviewed preferences…", #selector(export)), button("Open Along import", #selector(openAlong)), button("Delete all history & preferences…", #selector(clear))]))
+        root.addArrangedSubview(stack([button("Open Along preferences", #selector(openAlong)), button("Delete all history & preferences…", #selector(clear))]))
     }
 
     private func buildHome() {
-        homeWindow = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 510, height: 390),
+        homeWindow = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 510, height: 440),
                               styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
         homeWindow.title = "Along"
         homeWindow.center()
@@ -192,7 +199,7 @@ final class CompanionDelegate: NSObject, NSApplicationDelegate, NSTableViewDataS
         title.font = .systemFont(ofSize: 28, weight: .semibold)
         root.addArrangedSubview(title)
         root.addArrangedSubview(label("Let Along use your Mac activity to learn what matters to you.", size: 16))
-        let note = label("Access: app usage and readable text in TextEdit, Notes, Mail and Outlook. Browser content, password fields, screenshots and audio are excluded. Activity stays on this Mac; only preferences you approve go to Along.", size: 12)
+        let note = label("Access: app usage and readable text in TextEdit, Notes, Mail and Outlook. Browser content, password fields, screenshots and audio are excluded. When allowed, redacted text goes to OpenAI to learn shopping preferences automatically. Preferences stay on this Mac and personalize your paired Along browser. Pause or forget anytime.", size: 12)
         note.textColor = .secondaryLabelColor
         root.addArrangedSubview(note)
         allowButton.target = self
@@ -209,6 +216,7 @@ final class CompanionDelegate: NSObject, NSApplicationDelegate, NSTableViewDataS
         settings.isBordered = false
         settings.font = .systemFont(ofSize: 12)
         root.addArrangedSubview(settings)
+        root.addArrangedSubview(button("Open Along", #selector(openAlong)))
         if UserDefaults.standard.bool(forKey: "contextAllowed") { allowButton.title = "Resume"; homeStatus.stringValue = "Paused. Resume when you're ready." }
     }
 
@@ -233,7 +241,7 @@ final class CompanionDelegate: NSObject, NSApplicationDelegate, NSTableViewDataS
             refreshApps()
         }
         table.deselectAll(nil)
-        _ = capture.start()
+        if capture.start() { learning.setRecording(true) }
     }
 
     private func setStatus(_ text: String) {
@@ -245,13 +253,13 @@ final class CompanionDelegate: NSObject, NSApplicationDelegate, NSTableViewDataS
     }
     @objc func show() { homeWindow.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true) }
     @objc func showSettings() { refreshApps(); window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true) }
-    @objc func pause() { pendingAllow = false; capture.stop(); setStatus("Paused. No new activity is being collected.") }
-    @objc func quit() { capture.stop(); NSApp.terminate(nil) }
+    @objc func pause() { pendingAllow = false; capture.stop(); learning.setRecording(false); setStatus("Paused. No new activity is being collected.") }
+    @objc func quit() { pause(); NSApp.terminate(nil) }
     @objc func toggle() {
         if capture.running { pause() } else {
             table.deselectAll(nil)
             detail.string = "Select an activity to review it. Recording pauses while you review."
-            _ = capture.start()
+            if capture.start() { learning.setRecording(true) }
         }
     }
     @objc func permission() {
@@ -306,7 +314,7 @@ final class CompanionDelegate: NSObject, NSApplicationDelegate, NSTableViewDataS
         catch { setStatus("Could not save preference.") }
     }
     private func refreshMemories() {
-        memoryLabel.stringValue = history.memories.isEmpty ? "No reviewed preferences yet. No automatic inference is running." : history.memories.map { "\($0.key): \($0.value) (reviewed, source: \($0.sourceApp))" }.joined(separator: " · ")
+        memoryLabel.stringValue = "Open Along to see, correct or forget learned preferences. No export needed."
     }
     @objc func export() {
         guard !history.memories.isEmpty else { setStatus("Confirm a preference before exporting."); return }
@@ -321,16 +329,17 @@ final class CompanionDelegate: NSObject, NSApplicationDelegate, NSTableViewDataS
         } catch { setStatus("Could not export preferences.") }
     }
     @objc func openAlong() {
-        NSWorkspace.shared.open(URL(string: "http://127.0.0.1:4331/context")!)
+        if let url = learning.pairedURL { NSWorkspace.shared.open(url) }
+        else { setStatus("Start the local Along launcher first, then reopen this companion.") }
     }
     @objc func clear() {
         let alert = NSAlert()
         alert.messageText = "Delete all local history and reviewed preferences?"
-        alert.informativeText = "Recording will pause. Exported files and preferences already imported into Along must be deleted separately."
+        alert.informativeText = "Recording will pause. Local capture and automatic learning will pause. Learned preferences in Along will also be forgotten. Existing conversations retain their context until you start a new one."
         alert.addButton(withTitle: "Delete"); alert.addButton(withTitle: "Cancel")
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         pause()
-        do { try history.clear(); table.reloadData(); refreshMemories(); detail.string = "Local history and preferences deleted." }
+        do { try history.clear(); learning.forget(); table.reloadData(); refreshMemories(); detail.string = "Local history and preferences deleted." }
         catch { setStatus("Unable to delete local files. Open local files to inspect permissions.") }
     }
     func numberOfRows(in tableView: NSTableView) -> Int { history.activities.count }

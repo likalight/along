@@ -20,6 +20,7 @@ import {
   takeCheckoutIntent,
 } from "@/lib/checkout/resolve-intent";
 import type { CheckoutIntentDecision } from "@/lib/checkout/intent";
+import { preferencesFor } from "@/lib/context/automatic";
 import { parsePreferences } from "@/lib/context/memory";
 export const runtime = "nodejs";
 const playbacks = new Map<
@@ -62,10 +63,12 @@ export async function POST(request: Request) {
     if (b.action === "connect" && !id) {
       const context = parsePreferences(b.reviewedContext ?? []);
       const s = orch.createSession();
-      store.initializeReviewedPreferences(
-        s.sessionId,
-        context.map(({ key, value }) => ({ key, value })),
-      );
+      const learned = preferencesFor(request);
+      const combined = new Map(learned.map((p) => [p.key, p]));
+      for (const { key, value } of context) combined.set(key, { key, value });
+      store.core.initializeInferredPreferences(s.sessionId, [
+        ...combined.values(),
+      ]);
       const res = NextResponse.json(project(s.sessionId));
       res.cookies.set(
         `along-session-${s.sessionId}`,
