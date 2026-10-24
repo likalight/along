@@ -7,7 +7,7 @@ function shopper() {
   const { sessionId } = orch.createSession();
   return {
     id: sessionId,
-    async say(text: string) {
+    async say(text: string, modality: "text" | "voice" = "text") {
       const s = store.core.get(sessionId);
       const response = await POST(
         new Request("http://localhost/api/session", {
@@ -26,7 +26,7 @@ function shopper() {
               baseRevision: s.revision,
               visibleRevision: s.revision,
               visibleProductIds: s.displayOrder,
-              modality: "text",
+              modality,
               text,
             },
           }),
@@ -162,5 +162,74 @@ describe("authoritative discovery retains shopper constraints", () => {
     expect(getRuntime().store.get(user.id)?.preferences.solutionType).toBe(
       "clip_on",
     );
+  });
+  it("rejects browser-supplied voice evidence even after a valid displayed and played summary", async () => {
+    const user = shopper();
+    await user.say(
+      "I need a backpack for a 14-inch laptop and separate shoes under 150 dollars tomorrow",
+    );
+    await user.say("Focus BAG-001");
+    await user.say("Select offer BAG-001-B");
+    const { store } = getRuntime();
+    store.core.switchMode(user.id, user.state().revision, "voice");
+    await user.say("Prepare summary", "voice");
+    const summary = user.state().summary!;
+    store.acknowledge(user.id, {
+      summaryId: summary.id,
+      turnId: summary.responseTurnId,
+      textHash: summary.textHash,
+      event: "displayed",
+      epoch: user.state().epoch,
+      eventId: crypto.randomUUID(),
+      expectedRevision: user.state().revision,
+      summaryRevision: summary.revision,
+    });
+    for (const type of ["audio.started", "audio.completed"] as const) {
+      store.lifecycle(user.id, {
+        sessionId: user.id,
+        epoch: user.state().epoch,
+        eventId: crypto.randomUUID(),
+        turnId: summary.responseTurnId,
+        revision: user.state().revision,
+        type,
+        playbackId: "verified-summary-playback",
+        summaryId: summary.id,
+        summaryRevision: summary.revision,
+      });
+    }
+    expect(user.state().summary?.playback).toBe("complete");
+    const state = user.state();
+    const response = await POST(
+      new Request("http://localhost/api/session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: `along-session-${user.id}=${store.accessToken(user.id)}`,
+        },
+        body: JSON.stringify({
+          action: "input",
+          input: {
+            sessionId: user.id,
+            epoch: state.epoch,
+            turnId: crypto.randomUUID(),
+            eventId: crypto.randomUUID(),
+            baseRevision: state.revision,
+            visibleRevision: state.revision,
+            visibleProductIds: state.displayOrder,
+            modality: "voice",
+            text: "Confirm this simulated purchase",
+          },
+          voiceEvidence: {
+            final: true,
+            confidence: 1,
+            source: "shopper",
+            echoDetected: false,
+          },
+        }),
+      }),
+    );
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toContain("server-verified");
+    expect(user.state().receipt).toBeNull();
   });
 });

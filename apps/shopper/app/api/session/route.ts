@@ -286,6 +286,14 @@ export async function POST(request: Request) {
       );
     const confirm = /^confirm (?:this )?simulated purchase[.!]?$/i.test(text);
     if (exact || simple || confirm) {
+      // Browser claims about confidence/speaker identity are not provider proof.
+      // Only a server-verified voice channel may invoke store.confirmVoice;
+      // this public JSON route currently has no such channel or event binding.
+      if (confirm && input.modality === "voice") {
+        throw new Error(
+          "Voice approval needs server-verified speech evidence, which is not connected yet. Choose text mode, review a fresh summary, then type Confirm this simulated purchase.",
+        );
+      }
       // Confirmation is validated against stored shopper input, never model-produced text.
       store.ingestInput({
         ...input,
@@ -316,29 +324,7 @@ export async function POST(request: Request) {
           ...input,
           text: "Confirm this simulated purchase",
         };
-        if (input.modality === "voice") {
-          const evidence = b.voiceEvidence;
-          if (
-            !evidence ||
-            typeof evidence !== "object" ||
-            evidence.final !== true ||
-            evidence.source !== "shopper" ||
-            evidence.echoDetected === true ||
-            typeof evidence.confidence !== "number" ||
-            evidence.confidence < 0.9
-          ) {
-            throw new Error(
-              "Voice purchase approval requires trusted live voice evidence (final, non-echo, confidence ≥ 0.9). Choose text mode, review the summary again, then type Confirm this simulated purchase.",
-            );
-          }
-          store.confirmVoice(confirmInput, {
-            transcript: "Confirm this simulated purchase",
-            final: true,
-            confidence: evidence.confidence,
-            source: "shopper",
-            echoDetected: false,
-          });
-        } else if (input.modality === "text") {
+        if (input.modality === "text") {
           store.confirmText(confirmInput);
         } else {
           throw new Error(
