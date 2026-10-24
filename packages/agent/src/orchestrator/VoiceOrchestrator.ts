@@ -13,9 +13,12 @@ import { SessionThread } from "../thread/SessionThread.js";
 import { reduce } from "../thread/reduce.js";
 import type { VoiceAdapter } from "../voice/adapter.js";
 import { agentLoop } from "./agentLoop.js";
+import { openEndedLoop, type OpenEndedAgentConfig } from "./openEndedLoop.js";
 import { TurnMachine } from "./TurnMachine.js";
 
 export interface TurnOutcome {
+  narrationSegments?: Array<{ text: string; productId: string | null }>;
+  heading?: string;
   snapshot: SessionSnapshot;
   speakable: SpeakableResult[];
   cancelled: boolean;
@@ -41,6 +44,7 @@ export class VoiceOrchestrator {
   constructor(
     private readonly store: FixtureSessionStore,
     private readonly voice: VoiceAdapter,
+    private readonly options?: { agent?: OpenEndedAgentConfig },
   ) {}
 
   createSession(opts?: {
@@ -71,6 +75,21 @@ export class VoiceOrchestrator {
     reduce(thread, { type: "assistant_transcript", data: { turnId: result.turnId, text: result.speakable } });
     await this.voice.append(sessionId, "commentary", result.speakable, { turnId: result.turnId });
     return result;
+  }
+
+  getConversation(
+    sessionId: string,
+  ): Array<{ role: "user" | "assistant"; text: string }> {
+    const events = this.threads.get(sessionId)?.events ?? [];
+    return events.flatMap(
+      (event): Array<{ role: "user" | "assistant"; text: string }> => {
+        if (event.type === "user_input" && event.data.text?.trim())
+          return [{ role: "user" as const, text: event.data.text }];
+        if (event.type === "assistant_transcript" && event.data.text.trim())
+          return [{ role: "assistant" as const, text: event.data.text }];
+        return [];
+      },
+    );
   }
 
   async handleInput(input: InputEvent): Promise<TurnOutcome> {
@@ -108,6 +127,7 @@ export class VoiceOrchestrator {
     });
 
     const thread = this.thread(input.sessionId, basedOn);
+    thread.snapshot = basedOn;
     reduce(thread, { type: "user_input", data: input });
     reduce(thread, {
       type: "delegation_started",
@@ -129,19 +149,41 @@ export class VoiceOrchestrator {
       },
     );
 
-    const route = routeInput(input, basedOn);
+    const boundedRoute = routeInput(input, basedOn);
+    const useModel = !["discovery_return", "catalog_product"].includes(boundedRoute) ? this.options?.agent : undefined;
+    const route = useModel
+      ? "open_ended"
+      : boundedRoute;
     const normalized: InputEvent = {
       ...input,
       baseRevision: basedOn.revision,
     };
 
-    const result = await agentLoop({
-      input: normalized,
-      route,
-      thread,
-      store: this.store,
-      cancel: turn.cancelToken.signal,
-    });
+    let result;
+    try {
+      result = useModel
+        ? await openEndedLoop({
+            input: normalized,
+            thread,
+            store: this.store,
+            cancel: turn.cancelToken.signal,
+            config: useModel,
+          })
+        : await agentLoop({
+            input: normalized,
+            route: boundedRoute,
+            thread,
+            store: this.store,
+            cancel: turn.cancelToken.signal,
+          });
+    } catch (error) {
+      turns.cancel(turn.turnId, "agent_error");
+      reduce(thread, {
+        type: "delegation_cancelled",
+        data: { turnId: turn.turnId, reason: "agent_error" },
+      });
+      throw error;
+    }
     if (returningToCatalog && result.speakable[0])
       result.speakable[0].content = `Back to your catalog choices. ${result.speakable[0].content}`;
 
@@ -177,6 +219,8 @@ export class VoiceOrchestrator {
     return {
       snapshot: thread.snapshot,
       speakable: result.speakable,
+      heading: result.heading,
+      narrationSegments: result.narrationSegments,
       cancelled: false,
       route,
     };

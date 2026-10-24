@@ -149,7 +149,11 @@ export class FixtureSessionStore {
     switch (proposal.action) {
       case "clarify": {
         const q = String(proposal.payload["question"] ?? "Could you tell me a bit more?");
-        next.view = "understanding";
+        next.view = proposal.payload["stage"] === "solution_types"
+          ? "solution_types"
+          : proposal.payload["stage"] === "buying_priorities"
+            ? "buying_priorities" : "understanding";
+        if (next.view === "solution_types") next.preferences.audioDirectionPending = true;
         next.scenarioStage = "understand";
         speak = q;
         break;
@@ -161,6 +165,7 @@ export class FixtureSessionStore {
         const exclusions = (proposal.payload["exclusions"] ?? []) as string[];
         next.hardConstraints = { ...next.hardConstraints, ...hard };
         next.preferences = { ...next.preferences, ...prefs };
+        if (Object.hasOwn(prefs, "solutionType")) next.preferences.audioDirectionPending = false;
         if (needs.length) next.needs = [...new Set([...next.needs, ...needs])];
         if (exclusions.length) {
           next.exclusions = [...new Set([...next.exclusions, ...exclusions])];
@@ -210,7 +215,7 @@ export class FixtureSessionStore {
         });
         if (valid.length === 0) {
           speak =
-            "No products currently meet those hard constraints. Which constraint can change?";
+            "I haven’t found an option that fits everything yet. Would you like to adjust the budget or try something else?";
           next.view = "understanding";
         } else {
           next.shortlistEntries = valid.slice(0, 3);

@@ -74,6 +74,24 @@ test('private controls, modal dialogs and opaque overlays invalidate a photo cro
   } finally { await close(); }
 });
 
+test('small corner popovers and pointer-transparent overlays block the crop', async () => {
+  const { page, close } = await fixture(`<article><h1 data-along-post-caption>My blue everyday bag</h1><img class="main" alt="Blue tote bag" src="${image('blue')}"></article>`);
+  try {
+    for (const pointerEvents of ['auto', 'none']) {
+      await page.evaluate(pointerEvents => {
+        const box = document.querySelector('img.main').getBoundingClientRect();
+        const overlay = document.createElement('div'); overlay.id = 'private-corner';
+        overlay.textContent = 'Private DM';
+        overlay.style.cssText = `position:fixed;left:${box.left + 8}px;top:${box.top + 2}px;width:90px;height:25px;background:white;z-index:1000;pointer-events:${pointerEvents}`;
+        document.body.append(overlay);
+      }, pointerEvents);
+      assert.equal(await page.evaluate(() => globalThis.__check(globalThis.__observations[0]).media), null);
+      await page.locator('#private-corner').evaluate(element => element.remove());
+    }
+    assert.equal(await page.evaluate(() => globalThis.__check(globalThis.__observations[0]).media.kind), 'photo');
+  } finally { await close(); }
+});
+
 test('avatars and two competing main post photos never become a visual crop', async () => {
   const avatar = await fixture(`<article><h1 data-along-post-caption>My everyday bag</h1><img class="main" alt="Profile picture" src="${image('blue')}"></article>`);
   try { assert.equal(await avatar.page.evaluate(() => globalThis.__observations[0].media), null); } finally { await avatar.close(); }

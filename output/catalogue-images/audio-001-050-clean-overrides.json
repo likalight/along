@@ -1,0 +1,22 @@
+{
+  "MIC-003": {
+    "sourceUrl": "https://store.alnabaa.com/products/logitech-h390-usb-headset",
+    "imageUrl": "https://store.alnabaa.com/cdn/shop/products/LogitechH390USBHeadset_alnabaa.com4.jpg?v=1656401695&width=1000"
+  },
+  "MIC-005": {
+    "sourceUrl": "https://www.logitech.com/en-us/business/shop/p/zone-wired-noise-canceling",
+    "imageUrl": "https://resource.logitech.com/w_320%2Ch_204%2Cc_pad%2Cq_auto%2Cf_auto%2Cdpr_1.0/d_transparent.gif/content/dam/logitech/en/products/headsets/zone-wired-headset/gallery/zone-wired-gallery-01.png"
+  },
+  "MIC-006": {
+    "sourceUrl": "https://www.logitech.com/es-mx/shop/p/zone-vibe-100-wireless",
+    "imageUrl": "https://resource.logitech.com/w_544%2Ch_466%2Car_7%3A6%2Cc_pad%2Cq_auto%2Cf_auto%2Cdpr_1.0/d_transparent.gif/content/dam/logitech/en/products/headsets/zone-vibe-100/gallery/zone-vibe-100-gallery-graphite-1.png"
+  },
+  "MIC-024": {
+    "sourceUrl": "https://stockx.com/zh-cn/blue-yeti-professional-multi-pattern-usb-condenser-microphone-988-000100-blackout",
+    "imageUrl": "https://images.stockx.com/images/Blue-Yeti-Professional-Multi-Pattern-USB-Condenser-Microphone-988-000100-Blackout.jpg?auto=compress&bg=FFFFFF&dpr=4&fit=fill&fm=webp&h=384&q=35&trim=color&updated_at=1639065242&w=576"
+  },
+  "MIC-049": {
+    "sourceUrl": "https://www.voicetotextsolutions.com/products/philips-speechone-psm6300-wireless-speech-recognition-headset",
+    "imageUrl": "https://www.voicetotextsolutions.com/cdn/shop/products/csm_psm6000_philips-speechone_ap11_rgb_154d7cf564.png?v=1600288662"
+  }
+}

@@ -42,17 +42,18 @@ function canonicalLink(input: string): string | null {
   return url.href;
 }
 
-/** Only the first, product-identity source URL becomes a supported link. */
+/** Only unambiguous product-identity source URLs become supported links; family URLs shared by variants are omitted. */
 export function buildKnownLinks(products: Product[]): KnownLink[] {
   const result = new Map<string, string>();
+  const ambiguous = new Set<string>();
   for (const product of products) {
     const source = product.sourceUrls[0];
     if (!source) continue;
     const canonical = canonicalLink(source);
     if (!canonical) throw new Error(`Unsafe product source URL: ${product.id}`);
     const previous = result.get(canonical);
-    if (previous && previous !== product.id) throw new Error("Ambiguous catalog link");
-    result.set(canonical, product.id);
+    if (previous && previous !== product.id) { ambiguous.add(canonical); result.delete(canonical); }
+    else if (!ambiguous.has(canonical)) result.set(canonical, product.id);
   }
   return Array.from(result, ([url, productId]) => ({ url, productId }));
 }

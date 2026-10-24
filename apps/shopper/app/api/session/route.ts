@@ -1,11 +1,27 @@
+import {
+  beginActivity,
+  readActivity,
+  updateActivity,
+  turnHeadings,
+} from "@/lib/integration/activity";
 import { NextResponse } from "next/server";
+import {
+  parseProductNavigation,
+  resolveProductNavigation,
+} from "@coupang/agent";
 import { agreedCatalog } from "@coupang/contract";
-import { getRuntime } from "@/lib/integration/runtime";
+import { getRuntime, narrationSegments } from "@/lib/integration/runtime";
 import { authorize, assertOrigin } from "@/lib/integration/access";
 import { project, messages } from "@/lib/integration/projection";
 import type { Input } from "@/lib/session/contract";
 import { getPendingHandoff, acknowledgeHandoff } from "@/lib/discovery/store";
 import { assertShopperOrigin } from "@/lib/discovery/security";
+import { consumeVoiceEvidence } from "@/lib/voice/server";
+import {
+  classifyCheckoutReply,
+  isLiveDemoConfirmation,
+} from "@concierge/backend/store";
+import { parsePreferences } from "@/lib/context/memory";
 export const runtime = "nodejs";
 const playbacks = new Map<
   string,
@@ -14,6 +30,7 @@ const playbacks = new Map<
 export async function POST(request: Request) {
   let id: string | undefined,
     authenticated = false;
+  let activityIdentity: { epoch: number; turnId: string } | undefined;
   const { store, orch } = getRuntime();
   try {
     assertOrigin(request);
@@ -44,7 +61,12 @@ export async function POST(request: Request) {
     const i = b.input;
     id = b.action === "connect" ? b.sessionId : i?.sessionId;
     if (b.action === "connect" && !id) {
+      const context = parsePreferences(b.reviewedContext ?? []);
       const s = orch.createSession();
+      store.initializeReviewedPreferences(
+        s.sessionId,
+        context.map(({ key, value }) => ({ key, value })),
+      );
       const res = NextResponse.json(project(s.sessionId));
       res.cookies.set(
         `along-session-${s.sessionId}`,
@@ -107,10 +129,29 @@ export async function POST(request: Request) {
         turnId: result.turnId,
       });
     }
+    if (b.action === "activity") {
+      return NextResponse.json({
+        activity:
+          c.turn?.id === i.turnId
+            ? readActivity(sessionId, c.epoch, i.turnId)
+            : null,
+      });
+    }
     if (b.action === "cancel") {
       // Client sends cancellation only for actual in-flight work, never ordinary typing.
-      if (c.turn?.id === i.turnId && c.turn?.status === "active" && !c.receipt)
-        store.core.cancel(sessionId, i.turnId);
+      if (
+        c.turn?.id === i.turnId &&
+        c.turn?.status === "active" &&
+        !c.receipt
+      ) {
+        updateActivity(sessionId, c.epoch, i.turnId, {
+          phase: "done",
+          label: "Stopped. Ready when you are.",
+        });
+        await orch.bargeIn(sessionId, i.turnId);
+        if (store.core.get(sessionId).turn?.status === "active")
+          store.core.cancel(sessionId, i.turnId);
+      }
       return NextResponse.json(project(sessionId));
     }
     if (b.action === "mode") {
@@ -141,6 +182,9 @@ export async function POST(request: Request) {
     }
     if (b.action === "lifecycle") {
       const type = i.type as string;
+      // A receipt may be narrated, but its committed order cannot be mutated by
+      // subsequent audio lifecycle acknowledgments.
+      if (c.receipt) return NextResponse.json(project(sessionId));
       if (type === "video.started" || type === "video.stopped") {
         store.lifecycle(sessionId, {
           sessionId,
@@ -235,12 +279,82 @@ export async function POST(request: Request) {
     }
     let text = input.text?.trim() ?? "";
     const discoveryActive = Boolean(store.get(sessionId)?.discoveryReference);
+    // The browser supplies only provider identities. Transcript quality and
+    // finality come from the authenticated server sideband, never request flags.
+    const trustedVoice =
+      input.modality === "voice" && b.voiceEvidence
+        ? await consumeVoiceEvidence(sessionId, b.voiceEvidence, text)
+        : null;
+    const checkoutReply = classifyCheckoutReply(text);
+    // A retained review is not the current referent after navigation. In
+    // particular, "buy this" on another product must not approve the old order.
+    const reviewInView =
+      !discoveryActive && Boolean(c.summary && c.stage === "summary");
+    const selectedProductId = agreedCatalog.offers.find(
+      (offer: any) => offer.id === c.selection?.offerId,
+    )?.productId;
     const focus = discoveryActive
       ? undefined
-      : (c.view?.focusProductId ??
-        agreedCatalog.offers.find((o: any) => o.id === c.selection?.offerId)
-          ?.productId ??
-        c.shortlist[0]);
+      : (c.view?.focusProductId ?? selectedProductId ?? c.shortlist[0]);
+    // A short assent answers the order question only on that summary's own
+    // response turn. A later discussion cannot borrow its approval context.
+    const orderQuestionActive = Boolean(
+      reviewInView &&
+      c.summary?.displayed &&
+      c.summary.presentationMode === "text" &&
+      c.summary.responseTurnId === c.turn?.id &&
+      input.modality === "text",
+    );
+    // A purchase request advances the current checkout stage. Before a review
+    // exists it means "prepare this order", not an invalid approval attempt.
+    const confirm =
+      reviewInView && isLiveDemoConfirmation(text, orderQuestionActive);
+    const prepareCheckout =
+      !discoveryActive &&
+      checkoutReply === "approve" &&
+      !reviewInView &&
+      Boolean(c.selection?.offerId) &&
+      selectedProductId === focus;
+    const confirmationAttempt =
+      confirm ||
+      (reviewInView &&
+        (checkoutReply === "assent" || /\bconfirm(?:ation)?\b/i.test(text)));
+    if (confirmationAttempt) {
+      // Validate before ingestInput: beginning an unready voice turn invalidates
+      // its summary. A failed/ambiguous confirmation must keep the review visible.
+      if (!confirm)
+        throw new Error(
+          "Your order details are still here. Would you like me to place this order, or is there something you want to change?",
+        );
+      if (!c.summary || !c.summary.displayed)
+        throw new Error(
+          "Review the order details on screen before confirming.",
+        );
+      if (
+        input.modality === "voice" &&
+        (!trustedVoice || trustedVoice.confidence < 0.9)
+      )
+        throw new Error(
+          "That spoken confirmation could not be verified. Your order details are still here; use the confirmation controls to continue.",
+        );
+      if (
+        !c.summary.approvalNonce ||
+        c.summary.presentationMode !== input.modality
+      )
+        throw new Error(
+          "Your order details are still here. Complete the current review or switch to text confirmation before confirming.",
+        );
+    }
+    // Direction cards have their own stable order. Let the shopping agent
+    // resolve those choices instead of focusing a nonexistent product card.
+    const navigation =
+      discoveryActive || c.stage === "solution_types"
+        ? null
+        : parseProductNavigation(text);
+    // Navigation uses the same authenticated input and authoritative focus path.
+    // Never send compound shopping instructions through this shortcut.
+    if (navigation)
+      text = `Focus ${resolveProductNavigation(store.get(sessionId)!, navigation)}`;
     if (/^show offers$/i.test(text) && focus) text = `Show offers for ${focus}`;
     if (!discoveryActive && /^(compare|compare them)$/i.test(text))
       text = "Compare the first two";
@@ -294,13 +408,21 @@ export async function POST(request: Request) {
       const picked = ranked[0];
       if (picked?.offer?.id) text = `Select offer ${picked.offer.id}`;
     }
+    activityIdentity = { epoch: input.epoch, turnId: input.turnId };
     const removeReference = text.match(
       /^Remove reference ([A-Za-z0-9._:-]+)$/i,
     );
     if (removeReference) {
       store.ingestInput({ ...input, text });
+      beginActivity(sessionId, input.epoch, input.turnId);
       store.removeAttachment(sessionId, removeReference[1]);
       messages.set(sessionId, "Removed that reference.");
+      turnHeadings.set(sessionId, "Reference removed.");
+      updateActivity(sessionId, input.epoch, input.turnId, {
+        phase: "done",
+        label: "Ready when you are.",
+        heading: "Reference removed.",
+      });
       const removed = project(sessionId);
       return NextResponse.json({
         sessionId,
@@ -319,15 +441,15 @@ export async function POST(request: Request) {
       /^(Compare the first two|Back to shortlist|Restore shortlist|Show saved choices|Review summary|Prepare summary)$/i.test(
         text,
       );
-    const confirm = /^confirm (?:this )?simulated purchase[.!]?$/i.test(text);
     // The agent resolves explicit catalog navigation; vague commands must keep
     // referring to the visible discovery, never an earlier hidden selection.
-    if (!discoveryActive && (exact || simple || confirm)) {
+    if (!discoveryActive && (exact || simple || confirm || prepareCheckout)) {
       // Confirmation is validated against stored shopper input, never model-produced text.
       store.ingestInput({
         ...input,
         text: confirm ? "Confirm this simulated purchase" : text,
       });
+      beginActivity(sessionId, input.epoch, input.turnId);
       const apply = (action: any, payload: Record<string, unknown> = {}) => {
         const r = store.apply({
           sessionId,
@@ -348,32 +470,25 @@ export async function POST(request: Request) {
           turnId: input.turnId,
           ...p,
         });
-      if (confirm) {
+      if (prepareCheckout) {
+        apply("prepare_summary");
+      } else if (confirm) {
         const confirmInput = {
           ...input,
           text: "Confirm this simulated purchase",
         };
         if (input.modality === "voice") {
-          const evidence = b.voiceEvidence;
-          if (
-            !evidence ||
-            typeof evidence !== "object" ||
-            evidence.final !== true ||
-            evidence.source !== "shopper" ||
-            evidence.echoDetected === true ||
-            typeof evidence.confidence !== "number" ||
-            evidence.confidence < 0.9
-          ) {
+          const evidence = trustedVoice;
+          if (!evidence || evidence.confidence < 0.9) {
             throw new Error(
-              "Voice purchase approval requires trusted live voice evidence (final, non-echo, confidence ≥ 0.9). Choose text mode, review the summary again, then type Confirm this simulated purchase.",
+              "That spoken approval could not be verified clearly enough. Please speak the confirmation again, or choose text mode and review the summary before confirming.",
             );
           }
           store.confirmVoice(confirmInput, {
+            ...evidence,
+            // Canonical intent alias; finality and quality remain the actual
+            // server-observed provider evidence consumed against the raw text.
             transcript: "Confirm this simulated purchase",
-            final: true,
-            confidence: evidence.confidence,
-            source: "shopper",
-            echoDetected: false,
           });
         } else if (input.modality === "text") {
           store.confirmText(confirmInput);
@@ -385,11 +500,21 @@ export async function POST(request: Request) {
       } else if (exact) {
         const action = exact[1].toLowerCase(),
           pid = exact[2].toUpperCase();
-        if (action === "select offer") {
+        if (action === "select offer" || action === "choose offer") {
           apply("select_offer", { offerId: pid });
           apply("prepare_summary");
-        } else if (action === "focus") apply("focus", { productId: pid });
-        else if (action === "save") apply("save", { productId: pid });
+        } else if (action === "focus") {
+          apply("focus", { productId: pid });
+          {
+            const product = agreedCatalog.products.find(
+              (p: any) => p.id === pid,
+            );
+            messages.set(
+              sessionId,
+              `Here’s ${product ? `${product.brand} ${product.model}` : "that option"}.`,
+            );
+          }
+        } else if (action === "save") apply("save", { productId: pid });
         else if (action === "remove") {
           propose({
             excludedProductIds: [...c.excludedProductIds, pid],
@@ -431,10 +556,60 @@ export async function POST(request: Request) {
       else apply("prepare_summary");
     } else {
       const result = await orch.handleInput(input);
+      if (
+        !result.cancelled &&
+        store.core.get(sessionId).turn?.id === input.turnId &&
+        result.heading
+      )
+        turnHeadings.set(sessionId, result.heading);
       const spoken = result.speakable.map((x) => x.content).join(" ");
-      if (spoken) messages.set(sessionId, spoken);
+      if (
+        !result.cancelled &&
+        store.core.get(sessionId).turn?.id === input.turnId
+      ) {
+        if (spoken) messages.set(sessionId, spoken);
+        const segments = result.narrationSegments;
+        if (
+          segments?.length &&
+          segments.map((segment) => segment.text).join(" ") === spoken
+        ) {
+          narrationSegments.set(sessionId, {
+            turnId: input.turnId,
+            revision: store.get(sessionId)!.revision,
+            segments,
+          });
+        } else narrationSegments.delete(sessionId);
+      }
+    }
+    // Only the owning turn may publish its final heading or progress.
+    const currentTurn = store.core.get(sessionId).turn?.id;
+    if (
+      currentTurn === input.turnId &&
+      (exact || simple || confirm || prepareCheckout)
+    ) {
+      const actionHeading = confirm
+        ? "Your order is confirmed."
+        : /^compare/i.test(text)
+          ? "Your options, side by side."
+          : prepareCheckout || /summary|offer/i.test(text)
+            ? "Let’s check the details."
+            : /^save/i.test(text)
+              ? "Saved for later."
+              : /^remove/i.test(text)
+                ? "Your updated choices."
+                : "A closer look at your choices.";
+      turnHeadings.set(sessionId, actionHeading);
     }
     const snapshot = project(sessionId);
+    if (currentTurn === input.turnId) {
+      if (!readActivity(sessionId, input.epoch, input.turnId))
+        beginActivity(sessionId, input.epoch, input.turnId);
+      updateActivity(sessionId, input.epoch, input.turnId, {
+        phase: "done",
+        label: "Ready when you are.",
+        heading: snapshot.heading,
+      });
+    }
     return NextResponse.json({
       sessionId,
       epoch: snapshot.epoch,
@@ -445,6 +620,12 @@ export async function POST(request: Request) {
       snapshot,
     });
   } catch (e) {
+    if (authenticated && id && activityIdentity)
+      updateActivity(id, activityIdentity.epoch, activityIdentity.turnId, {
+        phase: "error",
+        label: "Something went wrong. Please try again.",
+        heading: "Let’s try that again.",
+      });
     return NextResponse.json(
       {
         error: e instanceof Error ? e.message : "Unable to update session.",

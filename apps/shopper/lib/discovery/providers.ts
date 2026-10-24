@@ -95,6 +95,18 @@ const categorySignals: Record<string, string[]> = {
   ],
 };
 function demoCandidates(observation: Observation): Candidate[] {
+  // Explicitly curated manufacturer tours for a reproducible, disclosed demo.
+  // The two models share most title words; never substitute the Large model
+  // for the 20 L model on a score tie. Live recognition never uses this map.
+  const page = new URL(observation.pageUrl);
+  const tourProducts: Record<string, string> = {
+    AVs7Do3J64I: "BAG-001",
+    "0S89xGN-SO8": "BAG-002",
+  };
+  const curatedProduct =
+    page.origin === "https://www.youtube.com" && page.pathname === "/watch"
+      ? tourProducts[page.searchParams.get("v") ?? ""]
+      : undefined;
   const words = new Set(
     tokens(observation.title + " " + (observation.text ?? "")),
   );
@@ -134,9 +146,14 @@ function demoCandidates(observation: Observation): Candidate[] {
       return {
         product,
         category,
-        score: eligible
-          ? category.length * 3 + modelHits.length * 2 + brandHits.length * 2
-          : 0,
+        score:
+          product.id === curatedProduct
+            ? 1000
+            : eligible
+              ? category.length * 3 +
+                modelHits.length * 2 +
+                brandHits.length * 2
+              : 0,
       };
     })
     .filter(
@@ -175,9 +192,11 @@ function demoCandidates(observation: Observation): Candidate[] {
       catalogProductId: product.id,
       linkKind: "search" as const,
       reasons: [
-        category.length
-          ? "Related catalog category from page text."
-          : "Related catalog brand/model words from page text.",
+        product.id === curatedProduct
+          ? "Curated manufacturer tour mapped to this seeded demo model; pictured variant may differ."
+          : category.length
+            ? "Related catalog category from page text."
+            : "Related catalog brand/model words from page text.",
         "Demo reference only; displayed USD item price is fictional, not a Coupang offer.",
       ],
       unknowns: [

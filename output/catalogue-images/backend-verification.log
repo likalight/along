@@ -1,0 +1,348 @@
+
+> @concierge/backend@0.1.0 verify
+> npm run check && npm test && npm run demo
+
+
+> @concierge/backend@0.1.0 check
+> tsc --noEmit
+
+
+> @concierge/backend@0.1.0 test
+> node --experimental-strip-types --test test/*.test.ts
+
+TAP version 13
+# Subtest: review: canonical default contains the complete shared catalog and independent stable display order
+ok 1 - review: canonical default contains the complete shared catalog and independent stable display order
+  ---
+  duration_ms: 17.011583
+  type: 'test'
+  ...
+# Subtest: review: focus and card presentation preserve stable order and recommendation ranks
+ok 2 - review: focus and card presentation preserve stable order and recommendation ranks
+  ---
+  duration_ms: 1.2165
+  type: 'test'
+  ...
+# Subtest: review: partial dimension constraints preserve prior axes and budget
+ok 3 - review: partial dimension constraints preserve prior axes and budget
+  ---
+  duration_ms: 1.108375
+  type: 'test'
+  ...
+# Subtest: review: valid voice and typed confirmations require a fresh turn and produce immutable identical retries
+ok 4 - review: valid voice and typed confirmations require a fresh turn and produce immutable identical retries
+  ---
+  duration_ms: 3.75725
+  type: 'test'
+  ...
+# Subtest: review: quoted, ambiguous, partial, background and echoed approvals never commit
+ok 5 - review: quoted, ambiguous, partial, background and echoed approvals never commit
+  ---
+  duration_ms: 17.828792
+  type: 'test'
+  ...
+# Subtest: review: voice evidence cannot replace a different transcript or typed shopper turn
+ok 6 - review: voice evidence cannot replace a different transcript or typed shopper turn
+  ---
+  duration_ms: 1.375625
+  type: 'test'
+  ...
+# Subtest: review: canonical voice approval cannot use the legacy turn-without-input bypass
+ok 7 - review: canonical voice approval cannot use the legacy turn-without-input bypass
+  ---
+  duration_ms: 574.965416
+  type: 'test'
+  ...
+# Subtest: review: displayed-only voice summary and stale presentation callbacks cannot enable approval
+ok 8 - review: displayed-only voice summary and stale presentation callbacks cannot enable approval
+  ---
+  duration_ms: 1.145917
+  type: 'test'
+  ...
+# Subtest: review: current exact playback identity is required and duplicate lifecycle events mutate once
+ok 9 - review: current exact playback identity is required and duplicate lifecycle events mutate once
+  ---
+  duration_ms: 1.979708
+  type: 'test'
+  ...
+# Subtest: review: summary changes in flight and interrupted audio cannot regain approval
+ok 10 - review: summary changes in flight and interrupted audio cannot regain approval
+  ---
+  duration_ms: 2.428917
+  type: 'test'
+  ...
+# Subtest: review: spoken stop wins against a pending typed confirmation and stale actions atomically
+ok 11 - review: spoken stop wins against a pending typed confirmation and stale actions atomically
+  ---
+  duration_ms: 1.074542
+  type: 'test'
+  ...
+# Subtest: review: completed confirmation wins if accepted first; a subsequent stop cannot mutate its receipt
+ok 12 - review: completed confirmation wins if accepted first; a subsequent stop cannot mutate its receipt
+  ---
+  duration_ms: 1.13075
+  type: 'test'
+  ...
+# Subtest: review: explicit mode switches, reset and old-session events revoke pending approval
+ok 13 - review: explicit mode switches, reset and old-session events revoke pending approval
+  ---
+  duration_ms: 1.3085
+  type: 'test'
+  ...
+# Subtest: review: inputs deduplicate once, reject conflicting event/turn reuse, and preserve prior state on failure
+ok 14 - review: inputs deduplicate once, reject conflicting event/turn reuse, and preserve prior state on failure
+  ---
+  duration_ms: 0.323625
+  type: 'test'
+  ...
+# Subtest: review: only own curated link mappings resolve; image/link content cannot inherit purchase eligibility
+ok 15 - review: only own curated link mappings resolve; image/link content cannot inherit purchase eligibility
+  ---
+  duration_ms: 2.2975
+  type: 'test'
+  ...
+# Subtest: review: curated video owns playback, cancels approval and cannot impersonate shopper speech
+ok 16 - review: curated video owns playback, cancels approval and cannot impersonate shopper speech
+  ---
+  duration_ms: 1.288333
+  type: 'test'
+  ...
+# Subtest: review: structurally invalid images reject atomically; assets cannot cross sessions or survive reset/end
+ok 17 - review: structurally invalid images reject atomically; assets cannot cross sessions or survive reset/end
+  ---
+  duration_ms: 1.038958
+  type: 'test'
+  ...
+# Subtest: \#6: default backend retains the complete shared catalog, all canonical provenance, nullable metrics and archive identities
+ok 18 - \#6: default backend retains the complete shared catalog, all canonical provenance, nullable metrics and archive identities
+  ---
+  duration_ms: 32.563667
+  type: 'test'
+  ...
+# Subtest: \#8.1: unknown IDs, mismatched variants, unavailable stock, invalid quantities and currency conflicts are rejected
+ok 19 - \#8.1: unknown IDs, mismatched variants, unavailable stock, invalid quantities and currency conflicts are rejected
+  ---
+  duration_ms: 51.159834
+  type: 'test'
+  ...
+# Subtest: expanded audio, bags and bedding have complete simulated quotes with separate demo review provenance
+ok 20 - expanded audio, bags and bedding have complete simulated quotes with separate demo review provenance
+  ---
+  duration_ms: 23.796709
+  type: 'test'
+  ...
+# Subtest: \#8.2: reference prices stay separate, required hardware appears exactly once, and explicit tax completes the line items
+ok 21 - \#8.2: reference prices stay separate, required hardware appears exactly once, and explicit tax completes the line items
+  ---
+  duration_ms: 15.508709
+  type: 'test'
+  ...
+# Subtest: \#8.2: missing fees, inconsistent totals, missing hardware and changed display aliases fail closed
+ok 22 - \#8.2: missing fees, inconsistent totals, missing hardware and changed display aliases fail closed
+  ---
+  duration_ms: 75.792125
+  type: 'test'
+  ...
+# Subtest: \#8.3: bag laptop fit and exterior dimensions use evidence, convert units and reject unknown or ambiguous measurements
+ok 23 - \#8.3: bag laptop fit and exterior dimensions use evidence, convert units and reject unknown or ambiguous measurements
+  ---
+  duration_ms: 29.996041
+  type: 'test'
+  ...
+# Subtest: \#8.3: exact bedding dimensions, conservative depth and essential package information are required
+ok 24 - \#8.3: exact bedding dimensions, conservative depth and essential package information are required
+  ---
+  duration_ms: 28.041958
+  type: 'test'
+  ...
+# Subtest: \#8.3: audio requires an explicit compatible host and includes every required interface and cable
+ok 25 - \#8.3: audio requires an explicit compatible host and includes every required interface and cable
+  ---
+  duration_ms: 27.509625
+  type: 'test'
+  ...
+# Subtest: \#8.4/6: deadline revisions recalculate the same-variant cheap/late versus fast/dearer trade-off and expose no-match conflicts
+ok 26 - \#8.4/6: deadline revisions recalculate the same-variant cheap/late versus fast/dearer trade-off and expose no-match conflicts
+  ---
+  duration_ms: 1344.386
+  type: 'test'
+  ...
+# Subtest: \#8.5: quote snapshot includes exact item/variant, seller, quantity, destination, timestamps, returns, hardware and uncertainty
+ok 27 - \#8.5: quote snapshot includes exact item/variant, seller, quantity, destination, timestamps, returns, hardware and uncertainty
+  ---
+  duration_ms: 11.49725
+  type: 'test'
+  ...
+# Subtest: \#8: canonical constraint ingress rejects malformed measurements, unknown fields and date-only deadlines
+ok 28 - \#8: canonical constraint ingress rejects malformed measurements, unknown fields and date-only deadlines
+  ---
+  duration_ms: 0.363416
+  type: 'test'
+  ...
+# Subtest: HTTP default catalog preserves the complete shared USD fixtures and serves bounded illustrations
+ok 29 - HTTP default catalog preserves the complete shared USD fixtures and serves bounded illustrations
+  ---
+  duration_ms: 396.528291
+  type: 'test'
+  ...
+# Subtest: HTTP trust boundary rejects forged voice and playback; guarded lifecycle binds exact summary and receipt
+ok 30 - HTTP trust boundary rejects forged voice and playback; guarded lifecycle binds exact summary and receipt
+  ---
+  duration_ms: 652.786
+  type: 'test'
+  ...
+# Subtest: HTTP input interruption and epoch changes reject callbacks without altering accepted state
+ok 31 - HTTP input interruption and epoch changes reject callbacks without altering accepted state
+  ---
+  duration_ms: 430.696334
+  type: 'test'
+  ...
+# Subtest: canonical HTTP cancellation cannot affect a reused provider turn ID after reset
+ok 32 - canonical HTTP cancellation cannot affect a reused provider turn ID after reset
+  ---
+  duration_ms: 22.909959
+  type: 'test'
+  ...
+# Subtest: canonical HTTP presentation requires complete identity guards on both route surfaces
+ok 33 - canonical HTTP presentation requires complete identity guards on both route surfaces
+  ---
+  duration_ms: 429.5385
+  type: 'test'
+  ...
+# Subtest: canonical HTTP cannot bypass guarded confirmation through input-less legacy turns and approval
+ok 34 - canonical HTTP cannot bypass guarded confirmation through input-less legacy turns and approval
+  ---
+  duration_ms: 433.614375
+  type: 'test'
+  ...
+# Subtest: HTTP action shortcuts validate evidence before any save, restore, summary or cancellation
+ok 35 - HTTP action shortcuts validate evidence before any save, restore, summary or cancellation
+  ---
+  duration_ms: 10.239333
+  type: 'test'
+  ...
+# Subtest: HTTP assets are session scoped, failures preserve state, and end closes streams and erases assets
+ok 36 - HTTP assets are session scoped, failures preserve state, and end closes streams and erases assets
+  ---
+  duration_ms: 19.470833
+  type: 'test'
+  ...
+# Subtest: browser clients refuse an embedded trusted bridge credential
+ok 37 - browser clients refuse an embedded trusted bridge credential
+  ---
+  duration_ms: 0.460875
+  type: 'test'
+  ...
+# Subtest: legacy profile regression: unavailable, missing hardware, wrong depth and deadline
+ok 38 - legacy profile regression: unavailable, missing hardware, wrong depth and deadline
+  ---
+  duration_ms: 1.041667
+  type: 'test'
+  ...
+# Subtest: contract \#2: typed display + fresh exact confirmation creates one receipt; input/action retries do not duplicate mutations
+ok 39 - contract \#2: typed display + fresh exact confirmation creates one receipt; input/action retries do not duplicate mutations
+  ---
+  duration_ms: 1188.963333
+  type: 'test'
+  ...
+# Subtest: contract \#2: stale display, stop race, mode switch and reset cannot revive approval or session images
+ok 40 - contract \#2: stale display, stop race, mode switch and reset cannot revive approval or session images
+  ---
+  duration_ms: 836.664791
+  type: 'test'
+  ...
+# Subtest: HTTP journey: late offer rejected; exact summary; concurrent confirmation creates one receipt
+ok 41 - HTTP journey: late offer rejected; exact summary; concurrent confirmation creates one receipt
+  ---
+  duration_ms: 53.271417
+  type: 'test'
+  ...
+# Subtest: HTTP constraints: budget change clears selection and approval; no silent relaxation
+ok 42 - HTTP constraints: budget change clears selection and approval; no silent relaxation
+  ---
+  duration_ms: 31.225125
+  type: 'test'
+  ...
+# Subtest: HTTP cancelled, superseded and reset turns cannot commit delayed actions
+ok 43 - HTTP cancelled, superseded and reset turns cannot commit delayed actions
+  ---
+  duration_ms: 20.818542
+  type: 'test'
+  ...
+# Subtest: HTTP approval matrix rejects uncertain, ambiguous, background, echo and stale speech
+ok 44 - HTTP approval matrix rejects uncertain, ambiguous, background, echo and stale speech
+  ---
+  duration_ms: 53.336375
+  type: 'test'
+  ...
+# Subtest: HTTP interrupted or incomplete summary never opens an approval window
+ok 45 - HTTP interrupted or incomplete summary never opens an approval window
+  ---
+  duration_ms: 20.305875
+  type: 'test'
+  ...
+# Subtest: HTTP unknown fees/IDs and malformed proposals preserve last accepted state
+ok 46 - HTTP unknown fees/IDs and malformed proposals preserve last accepted state
+  ---
+  duration_ms: 12.291208
+  type: 'test'
+  ...
+# Subtest: HTTP auth boundary: browser token cannot propose or approve; wrong session cannot read
+ok 47 - HTTP auth boundary: browser token cannot propose or approve; wrong session cannot read
+  ---
+  duration_ms: 10.4195
+  type: 'test'
+  ...
+# Subtest: HTTP reconnect stream sends authoritative snapshot and subsequent updates
+ok 48 - HTTP reconnect stream sends authoritative snapshot and subsequent updates
+  ---
+  duration_ms: 5.927584
+  type: 'test'
+  ...
+# Subtest: expired sessions release data and cannot be resurrected
+ok 49 - expired sessions release data and cannot be resurrected
+  ---
+  duration_ms: 0.2485
+  type: 'test'
+  ...
+# Subtest: AI adapter uses accepted constraints and cannot expose approval capabilities or continue cancelled work
+ok 50 - AI adapter uses accepted constraints and cannot expose approval capabilities or continue cancelled work
+  ---
+  duration_ms: 46.843917
+  type: 'test'
+  ...
+# Subtest: new voice brief: lighting cards preserve visible order; USD audio offers and destination survive into receipt
+ok 51 - new voice brief: lighting cards preserve visible order; USD audio offers and destination survive into receipt
+  ---
+  duration_ms: 72.557333
+  type: 'test'
+  ...
+# Subtest: rejected offer selection does not mutate any session fields or revision
+ok 52 - rejected offer selection does not mutate any session fields or revision
+  ---
+  duration_ms: 594.4315
+  type: 'test'
+  ...
+# Subtest: rejected exclusion does not mutate shortlist, constraints, summary or revision
+ok 53 - rejected exclusion does not mutate shortlist, constraints, summary or revision
+  ---
+  duration_ms: 474.541334
+  type: 'test'
+  ...
+1..53
+# tests 53
+# suites 0
+# pass 53
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2600.849208
+
+> @concierge/backend@0.1.0 demo
+> node --experimental-strip-types scripts/demo.ts
+
+cafe-dictation: voice path; USD 148.00; duplicate confirmation returned one simulated receipt.
+work-gym: text path; USD 119.00; duplicate confirmation returned one simulated receipt.
+warm-room: text path; USD 63.99; duplicate confirmation returned one simulated receipt.
+All three HTTP journeys passed. Display/playback callbacks were emulated; live speech and frontend rehearsal remain separate.

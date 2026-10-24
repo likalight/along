@@ -1,5 +1,7 @@
 # Along — conversational shopping session
 
+The integrated demo uses **GPT-Live** for continuous conversation and **GPT-6 Luna / GPT-6.1 Sol** for routed open-ended shopping reasoning with server-validated tools. See the [open-ended harness](docs/open-ended-harness.md), root [integration guide](../../INTEGRATION.md), and [live voice guide](docs/live-voice.md). A server-side `OPENAI_API_KEY` is required for live conversation. The fixture-specific behavior documented below is historical and does not describe the integrated server.
+
 Next.js App Router + TypeScript implementation of [issue #3](https://github.com/likalight/coupangchallenge/issues/3), using the [contract v1 baseline](https://github.com/likalight/coupangchallenge/issues/2). A light canvas, persistent blue ElevenLabs UI Orb, one adaptive content stage, optional composer, and photo/link reference tray.
 
 ## Run locally
@@ -14,7 +16,7 @@ Requires Node 22.13+ and npm. `npm ci`, then `npm run dev`. Open http://127.0.0.
 
 ## Try a complete journey
 
-Choose **Start Chat** for browser voice, or **I’d rather type** for explicit text mode. Say/type:
+Choose **Start talking** for GPT-Live, or **Type instead** for explicit text mode. Say/type:
 
 1. “cafe dictation” → “choose headset” → “best value” (alternatives: “a work and gym bag” → “shape, budget USD 150”; or “bedsheets for a warm room” → “budget USD 150”).
 2. “compare” → “show option 1” → “show evidence” → “show offers”.

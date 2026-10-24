@@ -22,8 +22,11 @@ function renderResults() {
     for (const candidate of record.candidates) {
       const card = node('div', 'product-card');
       const top = node('div', 'product-top');
-      if (candidate.imageUrl && safeUrl(candidate.imageUrl, { images: true })) {
-        const image = node('img', 'product-image'); image.src = candidate.imageUrl; image.alt = ''; image.loading = 'lazy'; image.referrerPolicy = 'no-referrer'; image.addEventListener('error', () => image.remove()); top.append(image);
+      const catalogImage = record.mode === 'demo' && /^\/catalog\/images\/(?:products\/)?[A-Za-z0-9_-]+\.(?:svg|png|jpe?g|webp)$/.test(candidate.imageUrl || '')
+        ? new URL(candidate.imageUrl, backendOrigin(state.settings.backendOrigin)).href : null;
+      const imageUrl = catalogImage || (safeUrl(candidate.imageUrl, { images: true }) ? candidate.imageUrl : null);
+      if (imageUrl) {
+        const image = node('img', 'product-image'); image.src = imageUrl; image.alt = ''; image.loading = 'lazy'; image.referrerPolicy = 'no-referrer'; image.addEventListener('error', () => image.remove()); top.append(image);
       }
       const copy = node('div', 'product-copy'); copy.append(node('h3', '', candidate.title), node('p', 'price', candidate.price ? money(candidate.price) : 'See prices on Coupang'));
       copy.append(node('p', 'match', candidate.linkKind === 'search' ? 'Suggested search · no listing verified' : candidate.match === 'exact' ? 'Exact match reported by source' : 'Possible match · check on Coupang'));
@@ -63,6 +66,10 @@ async function refresh() {
   const { settings: config, connection } = state;
   if (!config.consentVersion) setupOpen = true;
   $('setup').hidden = !setupOpen;
+  document.body.classList.toggle('connected', Boolean(connection));
+  $('intro').hidden = Boolean(connection) && !setupOpen;
+  $('connection-copy').hidden = Boolean(connection) && !setupOpen;
+  $('disconnect').hidden = !connection || !setupOpen;
   $('settings-toggle').setAttribute('aria-expanded', String(setupOpen));
   if (!backendDirty && document.activeElement !== $('backend')) $('backend').value = config.backendOrigin;
   $('consent').checked = config.consentVersion === 1;
@@ -72,7 +79,7 @@ async function refresh() {
   $('connection-dot').classList.toggle('on', Boolean(connection));
   $('connection-label').textContent = connection ? 'Your conversation is connected' : 'Connect your conversation';
   $('connection-copy').textContent = connection ? 'Discoveries return to this Along session. No second chatbot.' : 'Use the Along conversation you already have.';
-  $('connect').hidden = Boolean(connection); $('disconnect').hidden = !connection;
+  $('connect').hidden = Boolean(connection);
   $('mode-pill').hidden = !connection; $('mode-pill').textContent = config.demo ? 'demo' : connection?.mode || ''; $('mode-pill').classList.toggle('demo', config.demo);
   $('pause').textContent = config.paused ? 'Resume' : 'Pause'; $('pause').setAttribute('aria-pressed', String(config.paused));
   $('scan-state').textContent = config.paused ? 'Paused. Your pages are not being observed.' : !connection ? 'Connect Along to begin discovering.' : config.enabledOrigins.length ? `${config.enabledOrigins.length} enabled site${config.enabledOrigins.length === 1 ? '' : 's'} · quiet, automatic discovery` : 'Enable a site in settings to get started.';
@@ -80,7 +87,7 @@ async function refresh() {
   $('notice').hidden = !state.notice; $('notice').textContent = state.notice;
   renderSites(); renderResults();
 }
-$('settings-toggle').addEventListener('click', () => { setupOpen = !setupOpen; $('setup').hidden = !setupOpen; $('settings-toggle').setAttribute('aria-expanded', String(setupOpen)); });
+$('settings-toggle').addEventListener('click', () => { setupOpen = !setupOpen; refresh().catch(error); });
 $('backend').addEventListener('input', () => { backendDirty = true; });
 $('consent').addEventListener('change', async () => {
   try {

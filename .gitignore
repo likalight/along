@@ -1,8 +1,12 @@
 node_modules
 .next
+.next-e2e
+test-results
+playwright-report
 dist
 *.tsbuildinfo
 .env
 .env.local
 .DS_Store
 coverage
+output/catalogue-images/originals/

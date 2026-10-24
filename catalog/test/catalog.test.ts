@@ -5,16 +5,16 @@ import { readFileSync } from "node:fs";
 import { getCatalog, validateCatalog, quoteOffer, eligibleOffers, microphoneArchive, resolveDelivery } from "../src/index.ts";
 import type { Catalog } from "../src/types.ts";
 
-test("source is retained verbatim with reproducible hash and active/archive separation", () => {
-  const bytes = readFileSync(new URL("../sources/microphone-demo-data.md", import.meta.url));
+test("100-product index is retained verbatim with reproducible hash and full active coverage", () => {
+  const bytes = readFileSync(new URL("../sources/microphone-demo-data-100.md", import.meta.url));
   assert.equal(createHash("sha256").update(bytes).digest("hex"), microphoneArchive.sourceSha256);
-  assert.equal(microphoneArchive.records.length, 50);
+  assert.equal(microphoneArchive.records.length, 100);
   const data = getCatalog();
-  assert.equal(data.products.length, 24);
-  assert.equal(data.offers.length, 48);
-  assert.equal(data.products.filter(p => p.id.startsWith("MIC-")).length, 12);
+  assert.equal(data.products.length, 200);
+  assert.equal(data.offers.length, 400);
+  assert.equal(data.products.filter(p => p.id.startsWith("MIC-")).length, 100);
   for (const product of data.products) assert.equal(data.offers.filter(o => o.productId === product.id).length, 2);
-  assert.equal(data.products.some(p => p.id === "MIC-018"), false);
+  assert.equal(data.products.some(p => p.id === "MIC-018"), true);
   assert.equal(microphoneArchive.records.find(p => p.id === "MIC-018")!.availability, "discontinued");
 });
 

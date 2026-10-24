@@ -35,6 +35,9 @@ export function createApp(options: {
   if (options.store && options.profile && options.store.profile !== options.profile)
     throw new Error("The HTTP catalog and session store must share one profile.");
   const { catalog, scenarios, preparedImages } = profile;
+  const productPhotoPaths = new Set(catalog.products.flatMap(product => (product.media ?? [])
+    .map(image => image.url?.replace(/^\//, ""))
+    .filter((path): path is string => typeof path === "string" && /^catalog\/images\/products\/(?:MIC|BAG|BED)-\d{3}\.webp$/.test(path))));
   const store = options.store ?? new SessionStore(undefined, profile);
   const origins = new Set(
     options.origins ?? [
@@ -159,10 +162,21 @@ export function createApp(options: {
         );
         return;
       }
+      if (req.method === "GET" && productPhotoPaths.has(path.join("/"))) {
+        try {
+          const asset = await readFile(new URL("../public/" + path.join("/"), import.meta.url));
+          res.writeHead(200, { "content-type": "image/webp", "cache-control": "public, max-age=3600" });
+          res.end(asset);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+          json(res, 404, { error: { code: "ASSET_NOT_FOUND" } });
+        }
+        return;
+      }
       if (req.method === "GET" && [
         "catalog/images/bag.svg", "catalog/images/bedding.svg", "catalog/images/audio.svg",
       ].includes(path.join("/"))) {
-        const asset = await readFile(new URL("../../catalog/public/" + path.join("/"), import.meta.url));
+        const asset = await readFile(new URL("../public/" + path.join("/"), import.meta.url));
         res.writeHead(200, {
           "content-type": "image/svg+xml",
           "content-security-policy": "default-src 'none'; sandbox",

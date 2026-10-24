@@ -253,3 +253,16 @@
     padding: 80px 20px;
   }
 }
+
+/* Match the shopping surface so fixture reviews reflect the actual contrast. */
+.preview { background: #29241e; color: #f1eadf; font-family: "DM Sans", sans-serif; }
+.header { border-color: #5b5140; }
+.wordmark { color: #f1eadf; }
+.wordmark span { color: #d1d4ac; }
+.tagline, .fixture, .revision, .scenario > span:first-child, .anchor p, .note { color: #c6b9a7; }
+.scenario button { color: #e7ddcf; border-color: #786954; }
+.scenario button[aria-pressed="true"] { background: #d1d4ac; color: #292b20; border-color: #d1d4ac; }
+.dock form { background: #302a22; border-color: #7a6851; box-shadow: none; }
+.dock input { color: #f1eadf; }
+.dock input::placeholder { color: #c6b9a7; }
+.dock button { background: #d1d4ac; color: #292b20; }

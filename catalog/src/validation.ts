@@ -19,7 +19,7 @@ function metricsValid(m: Metrics) {
     (m.purchaseCount !== null && typeof m.purchaseCountPeriod === "string" && m.purchaseCountPeriod.length > 0), "PURCHASE_PERIOD_MISMATCH");
 }
 export function validateCatalog(data: Catalog): void {
-  requireValue(data.currency === "USD" && data.checkedOn === "2026-10-24", "INVALID_CATALOG_PROVENANCE");
+  requireValue(data.currency === "USD" && data.checkedOn === "2026-10-25", "INVALID_CATALOG_PROVENANCE");
   requireValue(validDate(data.scenarioNow) && data.timezone === "Asia/Singapore", "INVALID_SCENARIO_CLOCK");
   const unique = <T extends {id: string}>(rows: T[], name: string) => {
     requireValue(rows.every(row => typeof row.id === "string" && row.id.length > 0), `MISSING_${name}_ID`);
@@ -29,11 +29,11 @@ export function validateCatalog(data: Catalog): void {
   const products = unique(data.products, "PRODUCT"), offers = unique(data.offers, "OFFER");
   const evidence = unique(data.evidence, "EVIDENCE"), sellers = unique(data.sellers, "SELLER");
   unique(data.scenarios, "SCENARIO"); unique(data.imageFixtures, "IMAGE");
-  requireValue(data.products.length === 24, "EXPECTED_24_ACTIVE_PRODUCTS");
-  requireValue(data.products.filter(p => p.category === "audio-accessories").length === 12 &&
+  requireValue(data.products.length === 200, "EXPECTED_200_ACTIVE_PRODUCTS");
+  requireValue(data.products.filter(p => p.category === "audio-accessories").length === 100 &&
     activeAudioIds.every(id => products.has(id)) &&
-    data.products.filter(p => p.category === "everyday-bags").length === 6 &&
-    data.products.filter(p => p.category === "bedsheet-sets").length === 6, "INVALID_CATEGORY_COUNTS");
+    data.products.filter(p => p.category === "everyday-bags").length === 50 &&
+    data.products.filter(p => p.category === "bedsheet-sets").length === 50, "INVALID_CATEGORY_COUNTS");
   requireValue(new Set(data.products.map(p => p.variantId)).size === data.products.length, "DUPLICATE_VARIANT_ID");
   const references = (ids: string[], type: "product" | "seller", subjectId: string) => {
     requireValue(ids.length > 0 && new Set(ids).size === ids.length, "MISSING_OR_DUPLICATE_EVIDENCE");
@@ -44,7 +44,7 @@ export function validateCatalog(data: Catalog): void {
   };
   for (const e of data.evidence) {
     requireValue(e.subjectType === "product" ? products.has(e.subjectId) : e.subjectType === "seller" && sellers.has(e.subjectId), "ORPHAN_EVIDENCE");
-    requireValue(e.checkedOn === data.checkedOn && ["observed", "snapshot", "proxy"].includes(e.classification), "INVALID_EVIDENCE_PROVENANCE");
+    requireValue(["2026-10-24", "2026-10-25"].includes(e.checkedOn) && ["observed", "snapshot", "proxy"].includes(e.classification), "INVALID_EVIDENCE_PROVENANCE");
     requireValue(e.claim.length > 0, "MISSING_EVIDENCE_CLAIM");
     metricsValid(e);
     if (e.classification !== "proxy") {
@@ -59,10 +59,18 @@ export function validateCatalog(data: Catalog): void {
   for (const p of data.products) {
     requireValue(finiteNumbers(p.specs), "NONFINITE_SPECIFICATION");
     references(p.evidenceIds, "product", p.id); metricsValid(p.buyerMetrics);
-    requireValue(p.checkedOn === data.checkedOn && p.sourceUrls.length > 0, "MISSING_PRODUCT_PROVENANCE");
+    requireValue(p.provenance && ["source_snapshot", "synthetic"].includes(p.provenance.kind) && p.provenance.notice.length > 0, "MISSING_PRODUCT_DISCLOSURE");
+    const reviews = p.demoReviews;
+    requireValue(reviews && reviews.classification === "proxy" && /fictional/i.test(reviews.disclosure), "MISSING_DEMO_REVIEW_DISCLOSURE");
+    requireValue(reviews!.entries.length >= 4 && reviews!.ratingCount === reviews!.entries.length && reviews!.writtenReviewCount === reviews!.entries.length, "INVALID_DEMO_REVIEW_COUNTS");
+    requireValue(new Set(reviews!.entries.map(r => r.id)).size === reviews!.entries.length && reviews!.entries.every(r => r.id.startsWith(`DEMO-REVIEW-${p.id}-`) && r.author.startsWith("Demo shopper") && r.verifiedPurchase === false && r.title && r.body && r.usedFor && /^2026-10-\d{2}$/.test(r.postedOn) && Number.isInteger(r.rating) && r.rating >= 1 && r.rating <= 5), "INVALID_DEMO_REVIEW");
+    requireValue(reviews!.rating === reviews!.entries.reduce((sum, r) => sum + r.rating, 0) / reviews!.entries.length, "DEMO_REVIEW_AVERAGE_MISMATCH");
+    if (p.provenance!.kind === "synthetic") requireValue(Object.values(p.buyerMetrics).every(v => v === null) && p.sourceUrls.length === 0 && p.specs.specificationClassification === "proxy", "SYNTHETIC_PRODUCT_CLAIMS_SOURCE_FACTS");
+    requireValue(["2026-10-24", "2026-10-25"].includes(p.checkedOn) && (p.sourceUrls.length > 0 || p.provenance?.kind === "synthetic"), "MISSING_PRODUCT_PROVENANCE");
     requireValue(p.referencePrice.currency === "USD" && p.referencePrice.payableTotalMinor === null &&
       (p.referencePrice.amountMinor === null || minor(p.referencePrice.amountMinor)), "INVALID_REFERENCE_PRICE");
-    requireValue(p.image.url.startsWith("/catalog/images/") && p.image.alt && p.image.source && p.image.classification === "proxy", "INVALID_IMAGE");
+    requireValue(p.image.url.startsWith("/catalog/images/") && p.image.alt && p.image.source && ["proxy", "snapshot"].includes(p.image.classification), "INVALID_IMAGE");
+    if (p.image.classification === "snapshot") requireValue(p.image.sourceUrl && p.sourceUrls.includes(p.image.sourceUrl) && /^https:\/\//.test(p.image.originalUrl ?? ""), "MISSING_PHOTO_PROVENANCE");
     requireValue(p.video.status === "missing" ? !!p.video.reason :
       p.evidenceIds.includes(p.video.evidenceId) && !!evidence.get(p.video.evidenceId)?.media, "INVALID_VIDEO");
     if (p.authoredFit) requireValue(p.authoredFit.measuredPerformance === false &&
@@ -74,7 +82,7 @@ export function validateCatalog(data: Catalog): void {
     requireValue(keys.every(key => Object.hasOwn(p.specs, key)), "MISSING_SPEC_FIELD");
     const productOffers = data.offers.filter(o => o.productId === p.id);
     requireValue(productOffers.length === 2, "EXPECTED_TWO_OFFERS");
-    if (["out_of_stock", "unavailable", "discontinued", "discontinued_at_seller"].includes(p.sourceAvailability))
+    if (["out_of_stock", "unavailable", "discontinued", "discontinued_at_seller", "backordered", "special_order", "available_soon"].includes(p.sourceAvailability))
       requireValue(productOffers.every(o => o.availability !== "in_stock"), "NEGATIVE_STOCK_OVERWRITTEN");
   }
   for (const seller of data.sellers) references(seller.evidenceIds, "seller", seller.id);
@@ -135,6 +143,7 @@ export function quoteOffer(data: Catalog, offerId: string, constraints: Constrai
   if (constraints.budgetMinor !== undefined && (!minor(constraints.budgetMinor) || !complete || offer.totalMinor > constraints.budgetMinor)) conflicts.push("BUDGET_CONFLICT");
   if (constraints.deadline !== undefined && (!validDate(constraints.deadline) || Date.parse(offer.deliveryWindow.latest) > Date.parse(constraints.deadline))) conflicts.push("DELIVERY_CONFLICT");
   if (constraints.category && constraints.category !== product.category) conflicts.push("CATEGORY_CONFLICT");
+  if (constraints.candidateProductIds && !constraints.candidateProductIds.includes(product.id)) conflicts.push("SCENARIO_CANDIDATE_CONFLICT");
   if (constraints.productId && constraints.productId !== product.id) conflicts.push("PRODUCT_CONFLICT");
   if (constraints.variantId && constraints.variantId !== offer.variantId) conflicts.push("VARIANT_CONFLICT");
   const atLeast = (requested: number | undefined, key: string, code: string) => {

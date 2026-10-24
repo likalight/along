@@ -10,10 +10,12 @@ export default defineConfig({
   webServer: {
     command: `npm run dev -- --port ${port}`,
     url: `http://127.0.0.1:${port}`,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     env: {
       ...process.env,
       OPENAI_API_KEY: "",
+      ALONG_AGENT_MODE: "fixture",
+      ALONG_E2E: "1",
       ALONG_DISCOVERY_PROVIDER: "",
       ALONG_DISCOVERY_VISION: "false",
     },

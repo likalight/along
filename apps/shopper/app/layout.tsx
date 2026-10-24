@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import "./fonts.css";
 import "./globals.css";
 export const metadata: Metadata = {
   title: "Along — a shopping conversation",

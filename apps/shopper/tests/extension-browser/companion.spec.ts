@@ -47,7 +47,7 @@ test("real unpacked extension discovers automatically and continues the same con
     const id = new URL(worker.url()).host;
     const page = await context.newPage();
     await page.goto(baseURL!);
-    await page.getByRole("button", { name: "I’d rather type" }).click();
+    await page.getByRole("button", { name: "Type instead" }).click();
     await page
       .getByRole("textbox", { name: "Your message" })
       .fill("a work and gym bag");
@@ -109,7 +109,7 @@ test("real unpacked extension discovers automatically and continues the same con
     const unrelated = await context.newPage();
     await unrelated.goto(baseURL!);
     await expect(
-      unrelated.getByRole("button", { name: "Start Chat" }),
+      unrelated.getByRole("button", { name: "Start talking" }),
     ).toBeEnabled();
     expect(
       await unrelated.evaluate(() => sessionStorage.getItem("along.sessionId")),
@@ -134,6 +134,9 @@ test("real unpacked extension discovers automatically and continues the same con
     await expect(panel.locator(".discuss").first()).toBeVisible();
     await panel.locator("#settings-toggle").click();
     await panel.setViewportSize({ width: 390, height: 850 });
+    await expect(panel.locator("#intro")).toBeHidden();
+    const actionBounds = await panel.locator(".discuss").first().boundingBox();
+    expect(actionBounds!.y + actionBounds!.height).toBeLessThan(850);
     await panel.screenshot({
       path: info.outputPath("extension-panel.png"),
       fullPage: true,
@@ -164,13 +167,13 @@ test("real unpacked extension discovers automatically and continues the same con
       page.getByText("DEMO DISCOVERY", { exact: true }),
     ).toBeVisible();
     await page
-      .getByRole("button", { name: "Would my laptop fit?", exact: true })
+      .getByRole("button", { name: "Check my requirements", exact: true })
       .click();
     await expect(page.getByRole("status").first()).not.toContainText(
       "Thinking",
     );
     await expect(
-      page.getByText(/usable compartment measurements/).first(),
+      page.getByRole("region", { name: "How this fits your needs" }),
     ).toBeVisible();
     await page.screenshot({
       path: info.outputPath("same-conversation.png"),
@@ -190,7 +193,7 @@ test("real unpacked extension discovers automatically and continues the same con
       page.getByText(/cannot purchase it here/).first(),
     ).toBeVisible();
     await page
-      .getByRole("button", { name: "Back to my catalog", exact: true })
+      .getByRole("button", { name: "Explore this demo product", exact: true })
       .click();
     await expect(
       page.getByRole("article", { name: "Discovery in this conversation" }),
@@ -198,6 +201,44 @@ test("real unpacked extension discovers automatically and continues the same con
     expect(
       await page.evaluate(() => sessionStorage.getItem("along.sessionId")),
     ).toBe(sessionId);
+    // The source product continues into the same catalog identity and a reviewed
+    // simulated order. A nudge or handoff alone never places that order.
+    const send = async (text: string) => {
+      await page.getByRole("textbox", { name: "Your message" }).fill(text);
+      const response = page.waitForResponse(
+        (r) =>
+          r.url().endsWith("/api/session") &&
+          r.request().postDataJSON()?.input?.text === text,
+      );
+      await page.getByRole("button", { name: "Send message" }).click();
+      const result = await response;
+      expect(result.status()).toBe(200);
+      await expect(page.locator(".voice-status")).toContainText("Ready");
+      return result.json();
+    };
+    await expect(
+      page.getByRole("region", { name: "Order confirmation" }),
+    ).toHaveCount(0);
+    await send("show offers");
+    await expect(
+      page.getByText("Offers for this product", { exact: true }),
+    ).toBeVisible();
+    await send("choose faster offer");
+    const review = page.getByRole("article", {
+      name: "Complete current order summary",
+    });
+    await expect(review).toContainText("Daylite Large Tote Pack");
+    await expect(review).toHaveAttribute("data-summary-status", "eligible");
+    const completed = await send("Yes, go ahead and place the order");
+    expect(completed.snapshot.receipt.simulated).toBe(true);
+    expect(completed.snapshot.receipt.acceptedOrder.productId).toBe("BAG-001");
+    await expect(
+      page.getByRole("region", { name: "Order confirmation" }),
+    ).toContainText("Order confirmed");
+    await page.screenshot({
+      path: info.outputPath("discovery-to-simulated-order.png"),
+      fullPage: true,
+    });
     await panel.bringToFront();
     await panel.locator("#pause").click();
     await demo.bringToFront();

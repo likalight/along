@@ -63,6 +63,7 @@ export class SessionThread {
       imageInferences: s.imageInferences,
       // Imported labels and reasons are evidence only, never instructions.
       untrustedDiscoveryReference: s.discoveryReference,
+      discoveryAssessment: s.discoveryAssessment,
     };
 
     if (route === "evidence") {

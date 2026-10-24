@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DiscoveryReferenceSchema } from "./discovery.js";
+import { DiscoveryReferenceSchema, DiscoveryAssessmentSchema } from "./discovery.js";
 
 /** Contract v1 — shared shopping session types (#2). */
 
@@ -74,6 +74,22 @@ export const ProductSchema = z.object({
   specs: z.record(z.unknown()).default({}),
   limitations: z.array(z.string()).default([]),
   evidenceIds: z.array(z.string()).default([]),
+  provenance: z.object({
+    kind: z.enum(["source_snapshot", "synthetic"]),
+    notice: z.string(),
+  }).optional(),
+  demoReviews: z.object({
+    classification: z.literal("proxy"),
+    disclosure: z.string(),
+    rating: z.number().min(0).max(5),
+    ratingCount: z.number().int().nonnegative(),
+    writtenReviewCount: z.number().int().nonnegative(),
+    entries: z.array(z.object({
+      id: z.string(), author: z.string(), rating: z.number().min(0).max(5),
+      title: z.string(), body: z.string(), usedFor: z.string(), postedOn: z.string(),
+      verifiedPurchase: z.literal(false),
+    })),
+  }).optional(),
   solutionType: z
     .enum(["headset", "clip_on", "directional_desktop"])
     .optional(),
@@ -199,6 +215,7 @@ export const SessionSnapshotSchema = z.object({
   epoch: z.number().int(),
   revision: z.number().int(),
   discoveryReference: DiscoveryReferenceSchema.optional(),
+  discoveryAssessment: DiscoveryAssessmentSchema.optional(),
   needs: z.array(z.string()).default([]),
   hardConstraints: z.record(z.unknown()).default({}),
   preferences: z.record(z.unknown()).default({}),

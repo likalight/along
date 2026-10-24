@@ -129,6 +129,34 @@ afterEach(() => {
 });
 
 describe("discovery pairing and boundaries", () => {
+  it.each([
+    ["AVs7Do3J64I", "BAG-001"],
+    ["0S89xGN-SO8", "BAG-002"],
+  ])(
+    "keeps the curated tour %s on its own seeded model",
+    async (video, productId) => {
+      const p = await paired();
+      const response = await discoveryPost(
+        extensionRequest(p.token, {
+          action: "discover",
+          demo: true,
+          observation: {
+            pageUrl: `https://www.youtube.com/watch?v=${video}`,
+            title: "Osprey Daylite Tote Pack Product Tour",
+            kind: "video",
+          },
+        }),
+      );
+      expect(response.status).toBe(200);
+      const result = await response.json();
+      expect(result.mode).toBe("demo");
+      expect(result.candidates[0].catalogProductId).toBe(productId);
+      expect(result.candidates[0].reasons[0]).toContain(
+        "Curated manufacturer tour",
+      );
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
   it("requires a same-origin session cookie and exact scheme, then one-time matching extension claim", async () => {
     const s = session();
     for (const headers of [

@@ -1,12 +1,12 @@
 .canvas {
-  --ink: #20343f;
-  --muted: #65747d;
-  --blue: #356fca;
-  --line: #dce4e5;
+  --ink: #f1eadf;
+  --muted: #c6b9a7;
+  --blue: #d1d4ac;
+  --line: #514637;
   color: var(--ink);
   max-width: 1240px;
   margin: 0 auto;
-  padding: 34px 40px 48px;
+  padding: 8px 0 24px;
   font-family: inherit;
   line-height: 1.55;
   isolation: isolate;
@@ -73,7 +73,7 @@
   gap: 25px;
   margin-bottom: 45px;
   color: #86929b;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   flex-wrap: wrap;
@@ -90,12 +90,12 @@
   color: #456c8e;
   text-transform: uppercase;
   letter-spacing: 0.14em;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 600;
   margin-bottom: 10px;
 }
 .heading h1 {
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: "Newsreader", Georgia, serif;
   font-size: clamp(33px, 4vw, 51px);
   font-weight: 400;
   letter-spacing: -1.7px;
@@ -128,9 +128,9 @@
   flex-wrap: wrap;
 }
 .chips > span {
-  font-size: 10px;
+  font-size: 12px;
   border: 1px solid #dae4e6;
-  border-radius: 20px;
+  border-radius: 14px;
   background: #ffffff73;
   padding: 6px 11px;
   color: #62717a;
@@ -157,7 +157,7 @@
   background: #edf4fd;
 }
 .understanding h2 {
-  font-family: Georgia, serif;
+  font-family: "Newsreader", Georgia, serif;
   font-weight: 400;
   font-size: 29px;
 }
@@ -188,7 +188,7 @@
 }
 .hint {
   margin-top: 15px !important;
-  font-size: 10px !important;
+  font-size: 12px !important;
 }
 .choices {
   display: grid;
@@ -211,8 +211,27 @@
   object-fit: contain;
   margin-bottom: 28px;
 }
-.choice h2 {
+.choice h2,
+.choice h3 {
   font-size: 21px;
+}
+.directionIntro {
+  margin-bottom: 22px;
+  max-width: 620px;
+}
+.directionIntro h2 {
+  font-size: 26px;
+  margin-bottom: 10px;
+}
+.directionIntro p {
+  color: var(--muted);
+  line-height: 1.6;
+}
+.directionLabel {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+  margin-bottom: 10px;
 }
 .choice p {
   font-size: 12px;
@@ -227,10 +246,157 @@
   height: 110px;
   display: grid;
   align-items: center;
-  font-family: Georgia, serif;
+  font-family: "Newsreader", Georgia, serif;
   font-size: 64px;
   font-weight: 400;
   color: #5485b3;
+}
+
+/* A small conversational aid; product discovery keeps its circular carousel. */
+.directionChoices {
+  max-width: 620px;
+  margin: 10px auto 0;
+}
+.canvas .directionChoice {
+  width: 100%;
+  justify-content: space-between;
+  text-align: left;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  padding: 17px 3px;
+  gap: 20px;
+}
+.canvas .directionChoice:hover {
+  background: #ffffff06;
+}
+.directionChoice > span {
+  display: grid;
+  gap: 5px;
+}
+.directionChoice strong {
+  font-size: 16px;
+  font-weight: 500;
+}
+.directionChoice span span,
+.directionChoices > p {
+  font-size: 13px;
+  color: var(--muted);
+}
+.directionChoices > p {
+  margin-top: 15px;
+}
+
+.purchaseComplete {
+  color: #f1eadf;
+  width: min(100%, 680px);
+  margin: 0 auto;
+  padding: 16px 0 30px;
+}
+.purchaseHeading {
+  text-align: center;
+  margin-bottom: 36px;
+}
+.purchaseCheck {
+  width: 82px;
+  height: 82px;
+  margin: 0 auto 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #ceefd9;
+  background: #36764e;
+  box-shadow: 0 0 0 9px #36764e20;
+}
+.purchaseCheck svg {
+  width: 47px;
+  height: 47px;
+}
+.purchaseHeading p {
+  margin: 0 0 9px;
+  color: #a6d6b4;
+  font-size: 14px;
+}
+.purchaseHeading h2 {
+  font-family: "Newsreader", Georgia, serif;
+  font-size: clamp(32px, 5vw, 42px);
+  line-height: 1.15;
+  font-weight: 400;
+  margin: 0;
+}
+.purchaseHeading .purchaseDisclosure {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.purchaseItem {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  border-top: 1px solid #514637;
+  border-bottom: 1px solid #514637;
+  padding: 24px 0;
+}
+.purchaseItem img {
+  width: 76px;
+  height: 76px;
+  object-fit: contain;
+  border-radius: 10px;
+  background: #f2eee8;
+}
+.purchaseItem > div {
+  display: grid;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+}
+.purchaseItem strong {
+  font-size: 16px;
+  font-weight: 500;
+}
+.purchaseItem span {
+  font-size: 13px;
+  color: #c6b9a7;
+}
+.purchaseTotal {
+  white-space: nowrap;
+}
+.purchaseDetails {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin: 25px 0 30px;
+}
+.purchaseDetails dt {
+  font-size: 12px;
+  color: #c6b9a7;
+  margin-bottom: 7px;
+}
+.purchaseDetails dd {
+  font-size: 15px;
+  line-height: 1.6;
+  margin: 0;
+}
+.purchaseReference {
+  font-size: 11px;
+  color: #a89d8c;
+  overflow-wrap: anywhere;
+  margin: 0;
+}
+@media (max-width: 520px) {
+  .purchaseItem {
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+  .purchaseItem img {
+    width: 62px;
+    height: 62px;
+  }
+  .purchaseDetails {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
 }
 .stageToolbar {
   display: flex;
@@ -238,7 +404,7 @@
   align-items: center;
   gap: 12px;
   margin: 0 0 18px;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
 }
 .stageToolbar > div {
@@ -246,7 +412,7 @@
   gap: 7px;
 }
 .stageToolbar button {
-  font-size: 10px;
+  font-size: 12px;
   padding: 7px 11px;
 }
 .products {
@@ -266,16 +432,15 @@
 .card {
   position: relative;
   border: 1px solid #e4e9e9;
-  border-radius: 21px;
+  border-radius: 14px;
   background: #fff;
-  box-shadow: 0 12px 28px #20394d0b;
+
   overflow: hidden;
   min-width: 0;
   transform-style: preserve-3d;
 }
 .focused {
-  outline: 3px solid #4380d0;
-  outline-offset: 4px;
+  border-color: #87a2b5;
 }
 .cardTop {
   padding: 14px 16px 0;
@@ -286,12 +451,12 @@
   min-height: 41px;
 }
 .number {
-  color: #7e8b94;
-  font-size: 9px;
+  color: #56636b;
+  font-size: 12px;
   letter-spacing: 0.05em;
 }
 .rank {
-  font-size: 8px;
+  font-size: 12px;
   padding: 3px 7px;
   border-radius: 12px;
   background: #fbf4dc;
@@ -306,7 +471,7 @@
   color: #936344;
 }
 .focusLabel {
-  font-size: 8px;
+  font-size: 12px;
   color: #2b66ad;
   border: 1px solid #c9dcf6;
   border-radius: 9px;
@@ -318,21 +483,20 @@
   display: grid;
   place-items: center;
   margin: 8px 9px 0;
-  background: radial-gradient(ellipse at center, #edf1f3, #fff 70%);
+  background: #f5f6f4;
   border-radius: 13px;
 }
 .productImage > img {
   width: 87%;
   height: 160px;
   object-fit: contain;
-  filter: drop-shadow(0 12px 8px #3048591a);
 }
 .productImage > span {
   position: absolute;
   bottom: 2px;
   right: 7px;
-  font-size: 7px;
-  color: #8a959d;
+  font-size: 12px;
+  color: #56636b;
 }
 .cardBody {
   padding: 20px;
@@ -341,7 +505,7 @@
   margin-bottom: 12px;
 }
 .brand {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
   margin-bottom: 5px;
 }
@@ -351,7 +515,7 @@
   margin: 0 0 6px;
 }
 .variant {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
   min-height: 28px;
   line-height: 1.6;
@@ -360,10 +524,10 @@
 .fit {
   font-size: 12px;
   line-height: 1.75;
-  min-height: 64px;
+  min-height: 0;
 }
 .compromise {
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.7;
   color: #7d7771;
   border-top: 1px solid #edf0f0;
@@ -387,11 +551,11 @@
   letter-spacing: -0.5px;
 }
 .price > span {
-  font-size: 8px;
-  color: #82909b;
+  font-size: 12px;
+  color: #56636b;
 }
 .metricHint {
-  font-size: 9px;
+  font-size: 12px;
   color: #74838d;
   margin: 8px 0 18px;
 }
@@ -406,7 +570,7 @@
 }
 .canvas .cardActions button {
   padding: 7px 10px;
-  font-size: 10px;
+  font-size: 12px;
 }
 .discovery .cardBody {
   padding: 16px;
@@ -434,7 +598,7 @@
 .offers {
   background: #ffffffb3;
   border: 1px solid var(--line);
-  border-radius: 20px;
+  border-radius: 14px;
   padding: 26px;
   margin-top: 26px;
   font-size: 12px;
@@ -458,7 +622,7 @@
   margin-bottom: 5px;
 }
 .sectionHeading p {
-  font-size: 11px;
+  font-size: 12px;
   margin: 0;
 }
 .specs {
@@ -473,14 +637,14 @@
 }
 .specs dt,
 .metrics dt {
-  font-size: 9px;
+  font-size: 12px;
   color: #7b8992;
   margin-bottom: 5px;
 }
 .specs dd,
 .metrics dd {
   margin: 0;
-  font-size: 11px;
+  font-size: 12px;
   overflow-wrap: anywhere;
 }
 .metrics {
@@ -493,12 +657,61 @@
   background: #f8fafc;
 }
 .scope {
-  font-size: 9px !important;
-  color: #7d8c96 !important;
+  font-size: 12px !important;
+  color: #56636b !important;
   line-height: 1.8;
 }
+.demoReviews {
+  margin-top: 28px;
+}
+.demoReviews h4,
+.reviewHeading {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.demoReviews .sectionHeading {
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.demoReviews .sectionHeading > span {
+  font-size: 12px;
+  color: #56636b;
+}
+.reviewList {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0 28px;
+}
+.reviewCard {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fbfaf7;
+}
+.reviewMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: #56636b;
+}
+.reviewMeta > span:last-child {
+  color: #876831;
+  letter-spacing: 1px;
+}
+.reviewCard h5 {
+  font-size: 14px;
+  margin: 12px 0 6px;
+}
+.reviewCard p {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.7;
+}
 .unavailable {
-  font-size: 10px;
+  font-size: 12px;
   color: #896b59 !important;
 }
 .inlineActions {
@@ -514,7 +727,7 @@
   align-items: start;
 }
 .evidencePanel > h2 {
-  font-family: Georgia, serif;
+  font-family: "Newsreader", Georgia, serif;
   font-weight: 400;
   font-size: 28px;
 }
@@ -529,7 +742,7 @@
   display: flex;
   gap: 7px;
   align-items: center;
-  font-size: 9px;
+  font-size: 12px;
   color: #6e8090;
   margin-bottom: 10px;
 }
@@ -538,7 +751,7 @@
   background: #eef2f7;
   border-radius: 5px;
   padding: 3px 7px;
-  font-size: 9px;
+  font-size: 12px;
   color: #557492;
 }
 .evidenceItem p {
@@ -574,7 +787,7 @@
 .tableScroll {
   overflow: auto;
   border: 1px solid var(--line);
-  border-radius: 20px;
+  border-radius: 14px;
   margin-top: 28px;
   background: #fff;
   max-width: 100%;
@@ -590,7 +803,7 @@
 .comparison caption {
   text-align: left;
   padding: 16px 20px;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
   caption-side: bottom;
 }
@@ -602,7 +815,7 @@
   min-width: 175px;
 }
 .comparison th:first-child {
-  font-size: 10px;
+  font-size: 12px;
   color: #72818c;
   min-width: 130px;
 }
@@ -612,7 +825,7 @@
 }
 .comparison small {
   display: block;
-  font-size: 9px;
+  font-size: 12px;
   color: var(--muted);
   font-weight: 400;
 }
@@ -635,24 +848,24 @@
   margin-bottom: 8px;
 }
 .offer h3 small {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 400;
   color: var(--muted);
 }
 .offer p {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   margin-bottom: 8px;
 }
 .onTime {
   color: #367660;
-  font-size: 10px;
+  font-size: 12px;
 }
 .sellerEvidence {
   padding: 10px;
   background: #f3f6f8;
   border-radius: 10px;
-  font-size: 10px !important;
+  font-size: 12px !important;
 }
 .sellerEvidence strong {
   display: block;
@@ -677,7 +890,7 @@
   border-radius: 12px;
 }
 .restore {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   display: flex;
   align-items: center;
@@ -689,14 +902,14 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  font-size: 9px;
+  font-size: 12px;
   color: #8a979d;
   border-top: 1px solid var(--line);
   padding-top: 22px;
   margin-top: 32px;
 }
 .canvasFooter button {
-  font-size: 10px;
+  font-size: 12px;
 }
 .empty {
   padding: 60px 20px;
@@ -727,13 +940,13 @@
 }
 @media (max-width: 1050px) {
   .canvas {
-    padding: 28px 24px;
+    padding: 8px 0 24px;
   }
   .discovery {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   .discovery .fit {
-    min-height: 64px;
+    min-height: 0;
   }
   .progress {
     gap: 16px;
@@ -745,7 +958,7 @@
     gap: 16px;
   }
   .rank {
-    font-size: 7px;
+    font-size: 12px;
   }
   .evidenceLayout {
     grid-template-columns: 1fr;
@@ -757,11 +970,11 @@
     min-width: 44px;
   }
   .canvas {
-    padding: 24px 18px 30px;
+    padding: 8px 0 24px;
   }
   .progress {
     gap: 12px;
-    font-size: 8px;
+    font-size: 12px;
     margin-bottom: 30px;
   }
   .heading h1 {
@@ -772,7 +985,7 @@
     font-size: 12px;
   }
   .chips > span {
-    font-size: 9px;
+    font-size: 12px;
     padding: 5px 9px;
     overflow-wrap: anywhere;
     max-width: 100%;
@@ -815,7 +1028,6 @@
     flex: 0 0 85%;
     scroll-snap-align: center;
     max-width: 350px;
-    box-shadow: 0 8px 20px #20394d0b;
   }
   .discovery .productImage {
     height: 180px;
@@ -837,17 +1049,17 @@
   }
   .stageToolbar > span {
     max-width: 140px;
-    font-size: 9px;
+    font-size: 12px;
   }
   .stageToolbar > div {
     justify-content: flex-end;
     flex-wrap: wrap;
   }
   .stageToolbar button {
-    font-size: 9px;
+    font-size: 12px;
   }
   .rank {
-    font-size: 8px;
+    font-size: 12px;
   }
   .focusSheet,
   .evidencePanel,
@@ -893,7 +1105,7 @@
     gap: 8px;
   }
   .examples span {
-    font-size: 10px;
+    font-size: 12px;
   }
   .savedReasons p {
     flex-wrap: wrap;
@@ -905,7 +1117,7 @@
     gap: 10px;
   }
   .canvas .cardActions button {
-    font-size: 11px;
+    font-size: 12px;
     padding: 8px 12px;
   }
   .cardTop {
@@ -958,4 +1170,527 @@
   .evidencePanel {
     margin-top: 0;
   }
+}
+
+/* Compact product detail sits directly beneath the voice-led image carousel. */
+.moreDetails {
+  margin-top: 16px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+  font-size: 14px;
+}
+.moreDetails > summary {
+  cursor: pointer;
+  color: var(--ink);
+  width: fit-content;
+}
+.moreDetails > summary:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 4px;
+}
+.moreDetails .focusSheet {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 18px 0 0;
+  margin: 0;
+}
+.offerPrice {
+  font-size: 13px;
+  color: #374c41;
+  margin: 6px 0 12px;
+}
+.cardBody {
+  padding: 16px 20px;
+}
+.card h3 {
+  font-size: 22px;
+}
+.cardTop {
+  min-height: 0;
+  padding: 14px 20px 0;
+}
+.brand {
+  font-size: 13px;
+}
+.fit {
+  font-size: 14px;
+  line-height: 1.55;
+  margin-bottom: 10px;
+}
+.compromise {
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 10px 0;
+  padding-top: 0;
+  border: 0;
+  color: #5f584f;
+}
+.price {
+  margin-top: 12px;
+}
+.price strong {
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+.stageToolbar {
+  margin-bottom: 2px;
+  font-size: 13px;
+}
+.stageToolbar > span {
+  font-size: 13px;
+}
+.stageToolbar button {
+  font-size: 12px;
+}
+.cardActions {
+  padding-top: 12px;
+  margin-top: 12px;
+}
+.canvas .cardActions button {
+  font-size: 13px;
+  min-height: 40px;
+}
+.canvas button {
+  border-radius: 8px;
+}
+.canvas ::selection {
+  background: #d8e6ee;
+  color: #20343f;
+}
+.canvas {
+  scrollbar-color: #98a7ac #f2f4f2;
+}
+.understanding {
+  margin: 20px 0;
+}
+.understanding h2 {
+  font-size: 22px;
+}
+.comparisonSpread {
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+@media (max-width: 700px) {
+  .comparisonSpread {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: visible;
+    padding: 0;
+    margin: 0;
+    gap: 10px;
+  }
+  .comparisonSpread .card {
+    width: 100%;
+  }
+  .comparisonSpread .cardBody {
+    padding: 12px;
+  }
+  .comparisonSpread .card h3 {
+    font-size: 18px;
+  }
+  .comparisonSpread .productImage {
+    height: 120px;
+  }
+  .comparisonSpread .productImage > img {
+    height: 100px;
+  }
+  .comparisonSpread .cardActions {
+    flex-wrap: wrap;
+  }
+  .comparisonSpread .cardActions > button:first-child {
+    width: 100%;
+  }
+  .price > span {
+    display: block;
+    width: 100%;
+  }
+}
+
+.carouselDetails {
+  border: 0;
+  background: transparent;
+  border-radius: 0;
+  width: 100%;
+  max-width: none;
+}
+.carouselDetails .cardTop {
+  padding: 0 0 4px;
+}
+.carouselDetails .cardBody {
+  padding: 0;
+}
+.carouselDetails .brand {
+  margin-bottom: 3px;
+}
+.carouselDetails .cardActions {
+  border: 0;
+  padding-top: 0;
+}
+
+/* Focused product listing: product, price, reason, then optional detail. */
+.canvas {
+  padding-bottom: 8px;
+  scrollbar-color: #786954 #29241e;
+}
+.canvas ::selection {
+  background: #d1d4ac;
+  color: #292b20;
+}
+.canvas button {
+  background: #342d24;
+  color: #eee6d9;
+  border-color: #77654e;
+  border-radius: 10px;
+  font-size: 13px;
+  min-height: 44px;
+}
+.canvas button:hover:not(:disabled) {
+  background: #443b2e;
+}
+.canvas button:focus-visible,
+.canvas a:focus-visible,
+.canvas [tabindex="0"]:focus-visible {
+  outline-color: #d9c99e;
+}
+.canvas a {
+  color: #d7dcb7;
+  font-size: 13px;
+}
+.canvas .primary {
+  background: #d1d4ac;
+  border-color: transparent;
+  color: #292b20;
+}
+.canvas .primary:hover:not(:disabled) {
+  background: #e1e3c6;
+}
+.heading {
+  margin-bottom: 16px;
+}
+.heading h1 {
+  color: #f1eadf;
+}
+.context {
+  margin-bottom: 18px;
+}
+.chips > span,
+.chips > .constraint {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: #c6b9a7;
+}
+.chips {
+  gap: 6px 14px;
+}
+.reference,
+.productImage,
+.offerProductImage {
+  background: #f1ecdf;
+}
+.productImage > span {
+  color: #4c4941;
+}
+.stageToolbar {
+  margin-bottom: 6px;
+  align-items: center;
+}
+.card {
+  background: #302a22;
+  border-color: #514637;
+  border-radius: 14px;
+  box-shadow: none;
+}
+.focused {
+  border-color: #8f7c60;
+}
+.carouselDetails {
+  background: transparent;
+  border: 0;
+}
+.brand {
+  color: #c6b9a7;
+  font-size: 13px;
+}
+.card h3 {
+  font-family: "DM Sans", system-ui, sans-serif;
+  color: #f3ecdf;
+  font-size: 25px;
+  letter-spacing: -0.025em;
+  font-weight: 500;
+  line-height: 1.2;
+}
+.listingHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  margin: 0 0 16px;
+}
+.listingHeader > div:first-child {
+  min-width: 0;
+}
+.listingHeader .price {
+  flex: 0 0 auto;
+  margin: 0;
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+}
+.price strong {
+  color: #f3ecdf;
+  font-size: 25px;
+  font-weight: 650;
+  letter-spacing: -0.035em;
+  line-height: 1.2;
+}
+.price > span {
+  color: #c6b9a7;
+  font-size: 12px;
+}
+.fit {
+  background: #3b3d2d;
+  color: #eeeede;
+  border-radius: 12px;
+  padding: 13px 15px;
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0 0 8px;
+}
+.fit > strong,
+.fit > span {
+  color: #d7dbb2;
+}
+.compromise {
+  background: #352e25;
+  color: #ded1be;
+  border-radius: 12px;
+  padding: 13px 15px;
+  margin: 0 0 14px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.compromise > span,
+.compromise > strong {
+  color: #ead0a4;
+}
+.offerPrice,
+.metricHint {
+  color: #c6b9a7;
+  font-size: 13px;
+}
+.variant {
+  color: #c6b9a7;
+  min-height: 0;
+  margin-bottom: 12px;
+}
+.cardActions {
+  gap: 10px;
+  border-color: #514637;
+  flex-wrap: wrap;
+}
+.carouselDetails .cardActions {
+  margin-top: 16px;
+}
+.canvas .cardActions button {
+  min-height: 44px;
+  padding: 10px 15px;
+}
+.focusSheet,
+.evidencePanel,
+.offers {
+  background: transparent;
+  border-color: #514637;
+  padding: 20px;
+  font-size: 14px;
+}
+.focusSheet p,
+.sectionHeading p,
+.evidenceItem p,
+.offer p {
+  color: #c6b9a7;
+  font-size: 14px;
+}
+.sectionHeading {
+  margin-bottom: 16px;
+}
+.sectionHeading h2,
+.sectionHeading h3 {
+  color: #f1eadf;
+}
+.moreDetails {
+  border-top: 1px solid #514637;
+  margin-top: 20px;
+  padding-top: 4px;
+}
+.moreDetails > summary {
+  color: #d7ccba;
+  cursor: pointer;
+  min-height: 48px;
+  padding: 12px 0;
+  font-size: 14px;
+}
+.moreDetails > summary:focus-visible {
+  outline: 2px solid #d9c99e;
+  outline-offset: 3px;
+}
+.moreDetails .focusSheet {
+  border: 0;
+  padding: 8px 0;
+  margin: 0;
+}
+.specs {
+  gap: 12px 24px;
+  margin: 12px 0 20px;
+}
+.specs dt,
+.metrics dt {
+  color: #c6b9a7;
+  font-size: 13px;
+}
+.specs dd,
+.metrics dd {
+  color: #eee6d9;
+  font-size: 14px;
+}
+.metrics {
+  background: transparent;
+  padding: 16px 0;
+  border-width: 1px 0;
+  border-radius: 0;
+  gap: 16px;
+}
+.scope,
+.unavailable {
+  color: #c6b9a7 !important;
+  font-size: 13px !important;
+}
+.evidenceMeta {
+  color: #c6b9a7;
+  font-size: 13px;
+}
+.evidenceMeta > span:first-child,
+.proxy {
+  background: #443b2e;
+  color: #eadbc3;
+}
+.videoPanel,
+.sellerEvidence {
+  background: #352e25;
+  color: #e3d7c5;
+}
+.takeaway {
+  background: #3b3d2d;
+  border: 0;
+  border-radius: 12px;
+  font-size: 14px;
+  color: #e5e7cf;
+}
+.tableScroll {
+  background: #302a22;
+}
+.comparison {
+  font-size: 14px;
+}
+.comparison thead th {
+  background: #3c3428;
+}
+.comparison th:first-child {
+  color: #d0c1aa;
+}
+.selectedOffer {
+  background: #3b3d2d;
+  outline-color: #777952;
+}
+.onTime {
+  color: #d5dfb6;
+}
+.savedReasons p {
+  background: #352e25;
+  color: #e3d7c5;
+  font-size: 14px;
+}
+.canvasFooter,
+.restore {
+  color: #c6b9a7;
+}
+.choice {
+  background: #302a22;
+  border-color: #514637;
+  box-shadow: none;
+  border-radius: 14px;
+}
+.prioritySymbol {
+  color: #d1d4ac;
+}
+.understandSymbol {
+  color: #d1d4ac;
+  background: #35382a;
+  border-color: #777952;
+}
+.examples span {
+  background: #302a22;
+  color: #c6b9a7;
+  border-color: #675943;
+}
+@media (max-width: 700px) {
+  .listingHeader {
+    gap: 12px;
+  }
+  .card h3 {
+    font-size: 23px;
+  }
+  .price strong {
+    font-size: 23px;
+  }
+  .listingHeader .price {
+    max-width: 125px;
+  }
+  .comparisonSpread .listingHeader {
+    flex-wrap: wrap;
+  }
+  .comparisonSpread .listingHeader .price {
+    align-items: flex-start;
+    text-align: left;
+  }
+  .fit,
+  .compromise {
+    font-size: 14px;
+    padding: 12px 14px;
+  }
+  .focusSheet,
+  .evidencePanel,
+  .offers {
+    padding: 16px;
+  }
+  .moreDetails .focusSheet {
+    padding: 8px 0;
+  }
+  .metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.fit > span,
+.compromise > span {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.canvas .recommendationHeading {
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 36px;
+  font-weight: 400;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  margin: 0 0 14px;
+  color: #f1eadf;
+  text-wrap: balance;
+}
+@media (max-width: 700px) {
+  .canvas .recommendationHeading { font-size: 30px; margin-bottom: 12px; }
 }

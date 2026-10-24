@@ -31,7 +31,7 @@ export function audioPriorityProposal(
     evidenceIds: [],
     payload: {
       question:
-        "Within that type, should we optimize for best value, best supported quality, or lowest-cost suitable? Best value is not the same as cheapest.",
+        "Would you like the best value, the best quality, or the lowest-cost suitable option?",
       stage: "buying_priorities",
     },
   };

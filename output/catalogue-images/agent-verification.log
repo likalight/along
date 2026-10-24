@@ -1,0 +1,368 @@
+
+> @coupang/agent@0.1.0 test
+> node --import tsx --test src/*.test.ts src/**/*.test.ts
+
+TAP version 13
+# Subtest: contract + voice adapter metadata
+    # Subtest: documents GPT-Live as proposed duplex adapter
+    ok 1 - documents GPT-Live as proposed duplex adapter
+      ---
+      duration_ms: 0.450792
+      type: 'test'
+      ...
+    # Subtest: forbids purchase tools
+    ok 2 - forbids purchase tools
+      ---
+      duration_ms: 0.066833
+      type: 'test'
+      ...
+    1..2
+ok 1 - contract + voice adapter metadata
+  ---
+  duration_ms: 1.076292
+  type: 'suite'
+  ...
+# Subtest: A1 multimodal turn orchestration (\#10)
+    # Subtest: cold start opens clarification with spoken output
+    ok 1 - cold start opens clarification with spoken output
+      ---
+      duration_ms: 2.201958
+      type: 'test'
+      ...
+    # Subtest: typed turns still produce spoken commentary
+    ok 2 - typed turns still produce spoken commentary
+      ---
+      duration_ms: 0.926417
+      type: 'test'
+      ...
+    # Subtest: barge-in cancels active turn and interrupts voice
+    ok 3 - barge-in cancels active turn and interrupts voice
+      ---
+      duration_ms: 0.153125
+      type: 'test'
+      ...
+    # Subtest: stop/defer is a valid outcome without receipt
+    ok 4 - stop/defer is a valid outcome without receipt
+      ---
+      duration_ms: 0.195834
+      type: 'test'
+      ...
+    1..4
+ok 2 - A1 multimodal turn orchestration (\#10)
+  ---
+  duration_ms: 3.656667
+  type: 'suite'
+  ...
+# Subtest: A2 guided priorities and shortlist (\#11)
+    # Subtest: audio path: solution type then priority then ranked shortlist
+    ok 1 - audio path: solution type then priority then ranked shortlist
+      ---
+      duration_ms: 2.411791
+      type: 'test'
+      ...
+    # Subtest: resolves second ordinal against displayOrder
+    ok 2 - resolves second ordinal against displayOrder
+      ---
+      duration_ms: 0.252875
+      type: 'test'
+      ...
+    # Subtest: lowest-cost uses complete totals not unit price alone
+    ok 3 - lowest-cost uses complete totals not unit price alone
+      ---
+      duration_ms: 0.103167
+      type: 'test'
+      ...
+    # Subtest: save does not approve
+    ok 4 - save does not approve
+      ---
+      duration_ms: 0.485625
+      type: 'test'
+      ...
+    1..4
+ok 3 - A2 guided priorities and shortlist (\#11)
+  ---
+  duration_ms: 3.473959
+  type: 'suite'
+  ...
+# Subtest: A3 evidence and offers (\#12)
+    # Subtest: show_evidence keeps product vs seller evidence ids
+    ok 1 - show_evidence keeps product vs seller evidence ids
+      ---
+      duration_ms: 1.830667
+      type: 'test'
+      ...
+    # Subtest: video lifecycle pauses narration then resumes takeaway
+    ok 2 - video lifecycle pauses narration then resumes takeaway
+      ---
+      duration_ms: 0.333167
+      type: 'test'
+      ...
+    1..2
+ok 4 - A3 evidence and offers (\#12)
+  ---
+  duration_ms: 2.251375
+  type: 'suite'
+  ...
+# Subtest: A4 image and links (\#13)
+    # Subtest: prepared image asks shape vs colour before hard constraints
+    ok 1 - prepared image asks shape vs colour before hard constraints
+      ---
+      duration_ms: 0.560208
+      type: 'test'
+      ...
+    # Subtest: unknown link recovers without inventing products
+    ok 2 - unknown link recovers without inventing products
+      ---
+      duration_ms: 0.2095
+      type: 'test'
+      ...
+    # Subtest: known link cites fixture mapping
+    ok 3 - known link cites fixture mapping
+      ---
+      duration_ms: 0.167417
+      type: 'test'
+      ...
+    1..3
+ok 5 - A4 image and links (\#13)
+  ---
+  duration_ms: 1.002625
+  type: 'suite'
+  ...
+# Subtest: routing helpers
+    # Subtest: routes evidence questions
+    ok 1 - routes evidence questions
+      ---
+      duration_ms: 0.040833
+      type: 'test'
+      ...
+    1..1
+ok 6 - routing helpers
+  ---
+  duration_ms: 0.062334
+  type: 'suite'
+  ...
+# Subtest: spatial references never confuse rotating screen positions with product ordinals
+ok 7 - spatial references never confuse rotating screen positions with product ordinals
+  ---
+  duration_ms: 2.246792
+  type: 'test'
+  ...
+# Subtest: color references use declared product colors rather than old product IDs
+ok 8 - color references use declared product colors rather than old product IDs
+  ---
+  duration_ms: 0.807041
+  type: 'test'
+  ...
+# Subtest: simple filtering and preference corrections avoid reasoning overhead
+ok 9 - simple filtering and preference corrections avoid reasoning overhead
+  ---
+  duration_ms: 1.655125
+  type: 'test'
+  ...
+# Subtest: ordinary recommendations and short comparisons use low effort
+ok 10 - ordinary recommendations and short comparisons use low effort
+  ---
+  duration_ms: 0.133042
+  type: 'test'
+  ...
+# Subtest: multi-constraint comparisons use both current request and accepted preferences
+ok 11 - multi-constraint comparisons use both current request and accepted preferences
+  ---
+  duration_ms: 0.256709
+  type: 'test'
+  ...
+# Subtest: complex research uses Sol but subsequent routine turns are not sticky
+ok 12 - complex research uses Sol but subsequent routine turns are not sticky
+  ---
+  duration_ms: 0.093333
+  type: 'test'
+  ...
+# Subtest: operator model overrides preserve prior explicit configuration
+ok 13 - operator model overrides preserve prior explicit configuration
+  ---
+  duration_ms: 0.157292
+  type: 'test'
+  ...
+# Subtest: model sees conversation and state and may answer without forced workflow
+ok 14 - model sees conversation and state and may answer without forced workflow
+  ---
+  duration_ms: 19.989125
+  type: 'test'
+  ...
+# Subtest: model can choose multiple tools then compose one natural response
+ok 15 - model can choose multiple tools then compose one natural response
+  ---
+  duration_ms: 3.29025
+  type: 'test'
+  ...
+# Subtest: provider errors are explicit and never trigger scripted fallback
+ok 16 - provider errors are explicit and never trigger scripted fallback
+  ---
+  duration_ms: 0.393041
+  type: 'test'
+  ...
+# Subtest: cancellation discards in-flight model output before tools run
+ok 17 - cancellation discards in-flight model output before tools run
+  ---
+  duration_ms: 0.922416
+  type: 'test'
+  ...
+# Subtest: bounded tool budget reports failure instead of looping forever
+ok 18 - bounded tool budget reports failure instead of looping forever
+  ---
+  duration_ms: 1.196208
+  type: 'test'
+  ...
+# Subtest: checkout summary is returned verbatim without another model rewrite
+ok 19 - checkout summary is returned verbatim without another model rewrite
+  ---
+  duration_ms: 1.522833
+  type: 'test'
+  ...
+# Subtest: conversational turn still ingests authoritative input and advances revision
+ok 20 - conversational turn still ingests authoritative input and advances revision
+  ---
+  duration_ms: 8.1485
+  type: 'test'
+  ...
+# Subtest: provider failure clears active orchestrator turn
+ok 21 - provider failure clears active orchestrator turn
+  ---
+  duration_ms: 0.582292
+  type: 'test'
+  ...
+# Subtest: progress describes real tool stages and persists context during the next model request
+ok 22 - progress describes real tool stages and persists context during the next model request
+  ---
+  duration_ms: 1.578458
+  type: 'test'
+  ...
+# Subtest: malformed structured replies fail without speaking JSON or leaking provider text
+ok 23 - malformed structured replies fail without speaking JSON or leaking provider text
+  ---
+  duration_ms: 0.44225
+  type: 'test'
+  ...
+# Subtest: narration cues require exact accepted text and visible product IDs
+ok 24 - narration cues require exact accepted text and visible product IDs
+  ---
+  duration_ms: 0.554083
+  type: 'test'
+  ...
+# Subtest: automatic model routing reaches provider requests without changing tools
+ok 25 - automatic model routing reaches provider requests without changing tools
+  ---
+  duration_ms: 0.535125
+  type: 'test'
+  ...
+# Subtest: catalog pages are complete, disjoint, deterministic and quote only returned products
+ok 26 - catalog pages are complete, disjoint, deterministic and quote only returned products
+  ---
+  duration_ms: 174.59975
+  type: 'test'
+  ...
+# Subtest: exact IDs and new family metadata make every catalog product reachable
+ok 27 - exact IDs and new family metadata make every catalog product reachable
+  ---
+  duration_ms: 157.445667
+  type: 'test'
+  ...
+# Subtest: product inspection returns only its own evidence and referenced seller evidence
+ok 28 - product inspection returns only its own evidence and referenced seller evidence
+  ---
+  duration_ms: 4.207334
+  type: 'test'
+  ...
+# Subtest: search rejects invalid offsets and preserves category scope for unmatched queries
+ok 29 - search rejects invalid offsets and preserves category scope for unmatched queries
+  ---
+  duration_ms: 45.227
+  type: 'test'
+  ...
+# Subtest: full catalog tool results stay compact while preserving authoritative quotes
+ok 30 - full catalog tool results stay compact while preserving authoritative quotes
+  ---
+  duration_ms: 175.112625
+  type: 'test'
+  ...
+# Subtest: model tools reject purchase, unknown identities, extra metadata and unknown IDs
+ok 31 - model tools reject purchase, unknown identities, extra metadata and unknown IDs
+  ---
+  duration_ms: 5.291834
+  type: 'test'
+  ...
+# Subtest: opening seeded reviews focuses their product without a separate focus call
+ok 32 - opening seeded reviews focuses their product without a separate focus call
+  ---
+  duration_ms: 914.119209
+  type: 'test'
+  ...
+# Subtest: remembering preferences retains budget; model cannot silently raise it
+ok 33 - remembering preferences retains budget; model cannot silently raise it
+  ---
+  duration_ms: 1136.709375
+  type: 'test'
+  ...
+# Subtest: offer selection and summary remain authoritative
+ok 34 - offer selection and summary remain authoritative
+  ---
+  duration_ms: 351.581834
+  type: 'test'
+  ...
+# Subtest: catalog exposes factual products and current authoritative quotes
+ok 35 - catalog exposes factual products and current authoritative quotes
+  ---
+  duration_ms: 32.130708
+  type: 'test'
+  ...
+# Subtest: successful summary returns exact canonical text without issuing a purchase
+ok 36 - successful summary returns exact canonical text without issuing a purchase
+  ---
+  duration_ms: 717.561542
+  type: 'test'
+  ...
+# Subtest: capacity and shoe compartment requirements survive later preferences
+ok 37 - capacity and shoe compartment requirements survive later preferences
+  ---
+  duration_ms: 741.289791
+  type: 'test'
+  ...
+# Subtest: cancelled turns cannot use read-only catalog tools
+ok 38 - cancelled turns cannot use read-only catalog tools
+  ---
+  duration_ms: 0.52925
+  type: 'test'
+  ...
+# Subtest: five-product shortlist uses only three ranked cards and compare rejects five
+ok 39 - five-product shortlist uses only three ranked cards and compare rejects five
+  ---
+  duration_ms: 886.360125
+  type: 'test'
+  ...
+# Subtest: carousel navigation wraps without changing stable product order or purchasing
+ok 40 - carousel navigation wraps without changing stable product order or purchasing
+  ---
+  duration_ms: 2756.202333
+  type: 'test'
+  ...
+# Subtest: carousel navigation handles empty, stale and cancelled turns safely
+ok 41 - carousel navigation handles empty, stale and cancelled turns safely
+  ---
+  duration_ms: 436.832416
+  type: 'test'
+  ...
+# Subtest: navigation shortcut recognizes standalone speech without swallowing requests
+ok 42 - navigation shortcut recognizes standalone speech without swallowing requests
+  ---
+  duration_ms: 0.710416
+  type: 'test'
+  ...
+1..42
+# tests 52
+# suites 6
+# pass 52
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 8218.47925

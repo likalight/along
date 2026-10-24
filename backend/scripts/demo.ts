@@ -24,7 +24,11 @@ try {
     let session: ShoppingSnapshot = await client.create(scenario.id);
     session = await client.input(session, scenario.modality, { text: "I need it tomorrow." });
     session = await client.action(session, "set_constraints", { constraints: { deliveryWithinDays: 1 } });
-    const offers = await client.request("/catalog/search", { constraints: session.hardConstraints });
+    // Fixture candidate scope is internal; public search accepts shopper constraints only.
+    const searchConstraints = Object.fromEntries(
+      Object.entries(session.hardConstraints).filter(([key]) => key !== "candidateProductIds"),
+    );
+    const offers = await client.request("/catalog/search", { constraints: searchConstraints });
     assert(offers.eligible.some((q: any) => q.offer.id === scenario.offerId));
     assert(offers.ineligible.some((q: any) => q.offer.id === scenario.offerId.replace(/B$/, "A") &&
       q.conflicts.some((x: any) => x.code === "DELIVERY_CONFLICT")));

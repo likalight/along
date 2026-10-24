@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import type { AcceptedEvent } from "../../../lib/canvas/contracts";
 const runtimeErrors = new WeakMap<Page, string[]>();
 test.beforeEach(({ page }) => {
   const errors: string[] = [];
@@ -12,18 +13,36 @@ async function say(page: Page, text: string) {
   const input = page.getByRole("textbox", { name: "Your shopping request" });
   await expect(input).toBeEnabled();
   await input.fill(text);
+  const response = page.waitForResponse(
+    (reply) =>
+      new URL(reply.url()).pathname === "/api/canvas" &&
+      reply.request().method() === "POST" &&
+      reply.request().postDataJSON().text === text,
+  );
   await input.press("Enter");
+  const reply = await response;
+  expect(reply.ok()).toBe(true);
+  const body: { event: AcceptedEvent } = await reply.json();
+  await expect(
+    page.getByText(`Accepted revision ${body.event.revision}`, { exact: true }),
+  ).toBeVisible();
   await expect(input).toBeEnabled();
+  return body.event.snapshot;
 }
+const options = (page: Page) =>
+  page.getByRole("button", { name: /^Focus option \d+:/ });
 async function start(page: Page, category = "Noisy café") {
   await page.goto("/canvas-preview");
   await expect(
-    page.getByRole("heading", { name: "Let’s get the essentials right." }),
-  ).toBeVisible();
+    page.getByRole("textbox", { name: "Your shopping request" }),
+  ).toBeEnabled();
   if (category !== "Noisy café") {
     await page.getByRole("button", { name: category, exact: true }).click();
     await expect(page.getByRole("textbox")).toBeEnabled();
   }
+  await expect(
+    page.getByRole("button", { name: category, exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
 }
 test("audio choices separate solution and priority; stable ranks and correctable budget", async ({
   page,
@@ -35,32 +54,40 @@ test("audio choices separate solution and priority; stable ranks and correctable
   await say(page, "Under $100");
   await say(page, "Explore options");
   await expect(
-    page.getByRole("heading", {
-      name: "Three ways to bring your voice closer.",
-    }),
+    page.getByRole("region", { name: "Microphone setups" }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Microphone setups" }).getByRole("button"),
+  ).toHaveCount(3);
   expect(await page.locator("[data-product-id]").count()).toBe(0);
   await say(page, "Choose headset");
   await expect(
-    page.getByRole("heading", { name: "What kind of good matters most?" }),
+    page.getByRole("region", { name: "Choose a buying priority" }),
   ).toBeVisible();
-  await say(page, "Choose quality regardless of cost");
-  await expect(page.locator("[data-product-id]")).toHaveCount(2);
-  await expect(page.getByText(/Fewer than three are eligible/)).toBeVisible();
-  const ids = await page
-    .locator("[data-product-id]")
-    .evaluateAll((nodes) =>
-      nodes.map((n) => n.getAttribute("data-product-id")),
-    );
-  await say(page, "Focus the second");
+  const shortlist = await say(page, "Choose quality regardless of cost");
+  expect(shortlist.hardConstraints.budgetMinor).toBe("10000");
+  expect(shortlist.displayOrder).toEqual(["MIC-003", "MIC-001"]);
+  await expect(options(page)).toHaveCount(2);
+  await expect(page.locator("[data-product-id]")).toHaveCount(1);
+  await expect(page.getByText("2 options", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Image carousel" }),
+  ).toBeVisible();
+  const labels = await options(page).evaluateAll((nodes) =>
+    nodes.map((node) => node.getAttribute("aria-label")),
+  );
+  const focused = await say(page, "Focus the second");
+  expect(focused.displayOrder).toEqual(shortlist.displayOrder);
   expect(
-    await page
-      .locator("[data-product-id]")
-      .evaluateAll((nodes) =>
-        nodes.map((n) => n.getAttribute("data-product-id")),
-      ),
-  ).toEqual(ids);
-  await expect(page.getByText("In focus", { exact: true })).toBeVisible();
+    await options(page).evaluateAll((nodes) =>
+      nodes.map((node) => node.getAttribute("aria-label")),
+    ),
+  ).toEqual(labels);
+  await expect(options(page).nth(1)).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator('[data-product-id="MIC-001"]')).toHaveAttribute(
+    "data-number",
+    "2",
+  );
   await page.screenshot({
     path: "test-results/canvas-audio.png",
     fullPage: true,
@@ -71,12 +98,17 @@ test("bag collection narrows, saves, removes and restores without losing referen
   page,
 }) => {
   await start(page, "Work + gym bag");
-  await say(page, "Explore options");
-  await expect(page.locator("[data-product-id]")).toHaveCount(5);
-  await expect(page.getByText("Close match", { exact: true })).toHaveCount(2);
-  await expect(
-    page.getByText("Related discovery", { exact: true }),
-  ).toHaveCount(3);
+  const discovery = await say(page, "Explore options");
+  await expect(options(page)).toHaveCount(5);
+  expect(
+    discovery.displayOrder.map((id) => discovery.canvas.annotations[id].role),
+  ).toEqual([
+    "Close match",
+    "Close match",
+    "Related discovery",
+    "Related discovery",
+    "Related discovery",
+  ]);
   await expect
     .poll(() =>
       page
@@ -89,27 +121,31 @@ test("bag collection narrows, saves, removes and restores without losing referen
     path: "test-results/canvas-discovery.png",
     fullPage: true,
   });
-  await say(page, "I prefer the softer shape");
-  await expect(page.locator("[data-product-id]")).toHaveCount(3);
+  const narrowed = await say(page, "I prefer the softer shape");
+  await expect(options(page)).toHaveCount(3);
+  expect(narrowed.displayOrder).toEqual(["BAG-001", "BAG-002", "BAG-003"]);
   await expect(
     page.getByAltText("Prepared navy rounded bag reference · schematic"),
   ).toBeVisible();
-  await expect(
-    page.getByText("Under USD 150.00", { exact: true }),
-  ).toBeVisible();
+  expect(narrowed.hardConstraints.budgetMinor).toBe("15000");
   await say(page, "Save the first");
   await say(page, "Remove the first");
   await expect(page.locator('[data-product-id="BAG-001"]')).toHaveCount(0);
+  await expect(options(page)).toHaveCount(2);
+  await expect(
+    page.getByRole("button", { name: /Focus option \d+: Dayform$/ }),
+  ).toHaveCount(0);
   await say(page, "Restore shortlist");
   await expect(page.locator('[data-product-id="BAG-001"]')).toBeVisible();
-  await say(page, "Show saved choices");
+  const saved = await say(page, "Show saved choices");
+  await expect(options(page)).toHaveCount(1);
   await expect(page.locator("[data-product-id]")).toHaveCount(1);
-  await expect(
-    page.getByText(
-      "Soft rounded silhouette; 22 L for your work + gym kit. Laptop sleeve + separate kit pocket.",
-      { exact: true },
-    ),
-  ).toBeVisible();
+  const rationale =
+    "Soft rounded silhouette; 22 L for your work + gym kit. Laptop sleeve + separate kit pocket.";
+  expect(saved.savedItems).toEqual([{ id: "BAG-001", rationale }]);
+  await expect(page.locator('[data-product-id="BAG-001"]')).toContainText(
+    rationale,
+  );
 });
 test("comparison holds numbered identity and exposes explicit trade-offs", async ({
   page,
@@ -199,12 +235,8 @@ test("same-variant offers separate price/deadline and unknown totals", async ({
   await say(page, "Explore options");
   await say(page, "Offers for the first");
   await say(page, "I need it tomorrow");
-  await expect(
-    page.getByRole("heading", { name: /USD 84\.00/ }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: /USD 99\.00/ }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: /USD 84\.00/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /USD 99\.00/ })).toBeVisible();
   await expect(
     page.getByText("Misses your deadline", { exact: true }),
   ).toBeVisible();
@@ -216,17 +248,21 @@ test("same-variant offers separate price/deadline and unknown totals", async ({
   ).toBeVisible();
   await expect(
     page.getByText("Seller evidence · proxy", { exact: true }),
-  ).toHaveCount(3);
-  await say(page, "Choose faster offer");
+  ).toHaveCount(0);
   await expect(
-    page.getByRole("button", { name: "Selected for comparison" }),
+    page.getByRole("button", { name: "Review this offer" }),
+  ).toHaveCount(3);
+  const selected = await say(page, "Choose faster offer");
+  expect(selected.selectedOfferId).toBe("BAG-001-fast");
+  await expect(
+    page.getByRole("button", { name: "Selected offer" }),
   ).toBeVisible();
   await page.screenshot({
     path: "test-results/canvas-offers.png",
     fullPage: true,
   });
 });
-test("mobile reduced motion uses a readable strip and full-width focus sheet", async ({
+test("mobile reduced motion uses a static image and readable product details", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -236,10 +272,21 @@ test("mobile reduced motion uses a readable strip and full-width focus sheet", a
   await say(page, "Choose headset");
   await say(page, "Choose value");
   await say(page, "Focus the second");
+  await expect(options(page).nth(1)).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator('[data-product-id="MIC-001"]')).toHaveAttribute(
+    "data-number",
+    "2",
+  );
+  await expect(
+    page.getByRole("region", { name: "Product choices" }),
+  ).toHaveAttribute("data-reduced", "true");
+  await expect(
+    page.getByRole("region", { name: "Image carousel" }),
+  ).toHaveCount(0);
+  await page.getByText("Product details", { exact: true }).click();
   await expect(
     page.getByRole("region", { name: "Details for EarPods" }),
   ).toBeVisible();
-  await expect(page.getByText("In focus", { exact: true })).toBeVisible();
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth),
   ).toBeLessThanOrEqual(390);
@@ -269,16 +316,24 @@ test("restricted bag counts and middle references follow the visible accepted or
   await start(page, "Work + gym bag");
   await say(page, "Explore options");
   await say(page, "Focus the middle");
-  await expect(page.locator('[data-product-id="BAG-003"]')).toContainText(
-    "In focus",
+  await expect(options(page).nth(2)).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator('[data-product-id="BAG-003"]')).toHaveAttribute(
+    "data-number",
+    "3",
   );
   await say(page, "Under $60");
-  await say(page, "Explore options");
+  const restricted = await say(page, "Explore options");
+  expect(restricted.hardConstraints.budgetMinor).toBe("6000");
+  expect(restricted.displayOrder).toEqual(["BAG-006"]);
+  await expect(options(page)).toHaveCount(1);
   await expect(page.locator("[data-product-id]")).toHaveCount(1);
   await expect(page.locator('[data-product-id="BAG-006"]')).toBeVisible();
   await expect(
-    page.getByText(/Fewer|Only one|1 close match/i).first(),
-  ).toBeVisible();
+    page.getByRole("button", { name: "Previous product" }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Next product" }),
+  ).toBeDisabled();
 });
 
 test("deep-pocket sheets expose the same exact variant on product and offers", async ({
@@ -308,9 +363,17 @@ test("unpriced required audio setup remains an incomplete total", async ({
   await expect(
     page.getByText(/Not available required setup/).first(),
   ).toBeVisible();
-  await say(page, "Choose faster offer");
   await expect(
-    page.getByRole("button", { name: "Selected for comparison" }),
+    page.getByRole("button", { name: "Review this offer" }),
+  ).toHaveCount(3);
+  for (const offer of await page
+    .getByRole("button", { name: "Review this offer" })
+    .all())
+    await expect(offer).toBeDisabled();
+  const unchanged = await say(page, "Choose faster offer");
+  expect(unchanged.selectedOfferId).toBeNull();
+  await expect(
+    page.getByRole("button", { name: "Selected offer" }),
   ).toHaveCount(0);
 });
 
@@ -347,8 +410,11 @@ test("switching categories during video cannot carry old playback status", async
     .getByRole("button", { name: "Work + gym bag", exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Let’s get the essentials right." }),
-  ).toBeVisible();
+    page.getByRole("button", { name: "Work + gym bag", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.getByRole("textbox", { name: "Your shopping request" }),
+  ).toBeEnabled();
   await expect(page.locator("video")).toHaveCount(0);
   await expect(page.locator("footer").getByRole("status")).toHaveText(
     "Say it in the voice shell, or type it here.",

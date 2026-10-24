@@ -6,7 +6,14 @@ import type { CatalogData, CatalogProfile, Constraints, Product, Offer, Quote } 
 const minor = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 const same = (left: unknown, right: unknown) => JSON.stringify(left) === JSON.stringify(right);
 const category = (value: string | undefined) => value === "bags" ? "everyday-bags" : value === "bedding" ? "bedsheet-sets" : value;
-const host = (value: string | undefined) => value?.trim().toLowerCase();
+/** USB names an interface family; it does not establish the host's connector. */
+export function normalizeHostConnection(value: string | undefined): string | undefined {
+  const normalized = value?.trim().toLowerCase().replace(/\s+/g, " ");
+  if (normalized && /^usb(?:\s*[234](?:\.\d+)?)?(?: (?:ports?|connection|interface))?$/.test(normalized)) return undefined;
+  const usbConnector = normalized?.match(/^usb[ -]?(?:type[ -]?)?([ac])(?: port)?$/);
+  return usbConnector ? `usb-${usbConnector[1]}` : normalized;
+}
+const host = normalizeHostConnection;
 
 /** Legacy aliases are presentation adapters only. Canonical source fields remain lossless. */
 function adaptProduct(product: CanonicalProduct, data: Catalog): Product {
@@ -26,7 +33,7 @@ function adaptProduct(product: CanonicalProduct, data: Catalog): Product {
     specifications.includedPieces = product.specs.includedPieces === null ? null : JSON.stringify(product.specs.includedPieces);
   }
   const path = product.specs.compatibilityFixture as { supportedHostConnections: string[] } | undefined;
-  const reviews = data.evidence.filter(e => product.evidenceIds.includes(e.id) && e.sourceType === "review");
+  const reviews = data.evidence.filter(e => product.evidenceIds.includes(e.id) && e.sourceType === "review" && e.classification !== "proxy");
   return {
     canonical: product,
     id: product.id, category: product.category, brand: product.brand, name: product.title,
@@ -109,6 +116,18 @@ export function buildAlongProfile(): CatalogProfile {
 
 export const alongProfile = buildAlongProfile();
 
+/** Only this validated, recursively immutable source may reuse integrity validation.
+ * Fresh profiles and caller-owned clones remain mutable and are checked on every quote. */
+const immutableCanonical = alongProfile.catalog.canonical!;
+function freezeSource(value: unknown, visited = new WeakSet<object>()): void {
+  if (value === null || typeof value !== "object" || visited.has(value)) return;
+  visited.add(value);
+  for (const child of Object.values(value)) freezeSource(child, visited);
+  Object.freeze(value);
+}
+validateCanonical(immutableCanonical);
+freezeSource(immutableCanonical);
+
 function deadlineForDays(data: Catalog, days: number): string {
   // Calendar-day delivery means 18:00 in the explicit Asia/Singapore fixture timezone, not a rolling 24 hours.
   const date = new Date(`${data.scenarioNow.slice(0, 10)}T00:00:00Z`);
@@ -138,7 +157,7 @@ const conflictMessages: Record<string, string> = {
   INCOMPLETE_TOTAL: "A mandatory price, fee or tax is missing or inconsistent; checkout is blocked.",
 };
 
-/** Canonical validation is authoritative; legacy aliases may never weaken it. */
+/** Canonical validation is authoritative; an explicit shopper choice can cover routine USB cabling for a proxy offer. */
 export function quoteAlongOffer(offerId: string, quantity: number, constraints: Constraints, excluded: string[], data: CatalogData, destination: string): Quote {
   const canonical = data.canonical!;
   const offer = data.offers.find(o => o.id === offerId);
@@ -152,7 +171,7 @@ export function quoteAlongOffer(offerId: string, quantity: number, constraints: 
     if (!conflicts.some(existing => existing.code === code && existing.field === field)) conflicts.push({ code, message, field, offerId });
   };
   let canonicalValid = true;
-  try { validateCanonical(canonical); } catch (error) {
+  try { if (canonical !== immutableCanonical) validateCanonical(canonical); } catch (error) {
     canonicalValid = false;
     conflict("INVALID_CATALOG", `Catalog integrity failed: ${error instanceof Error ? error.message : "unknown data error"}. Approval is blocked.`);
   }
@@ -167,12 +186,22 @@ export function quoteAlongOffer(offerId: string, quantity: number, constraints: 
   const mapped: CanonicalConstraints = {
     ...(constraints as CanonicalConstraints),
     category: category(constraints.category) as CanonicalConstraints["category"],
-    hostConnection: host(constraints.hostConnection ?? fit.hostConnection),
+    hostConnection: host(constraints.hostConnection) ?? host(fit.hostConnection),
     laptopInches: constraints.laptopInches ?? fit.laptopInches,
     bedWidthIn: constraints.bedWidthIn ?? fit.bedWidthInches,
     bedLengthIn: constraints.bedLengthIn ?? fit.bedLengthInches,
     mattressDepthIn: constraints.mattressDepthIn ?? fit.mattressDepthInches,
   };
+  // A shopper can take care of ordinary USB cabling without identifying each
+  // connector. This does not assert manufacturer compatibility or rewrite the
+  // known host, and cannot bypass an analogue/Bluetooth mismatch or setup cost.
+  const shopperHandlesUsbConnection =
+    sourceOffer.classification === "proxy" &&
+    sourceProduct.category === "audio-accessories" &&
+    constraints.shopperHandledConnectionFor?.includes(sourceProduct.id) &&
+    expectedProduct.compatibility?.hostConnections?.some(connection => connection === "usb-a" || connection === "usb-c") &&
+    [host(constraints.hostConnection), host(fit.hostConnection)]
+      .every(connection => connection === undefined || connection === "usb-a" || connection === "usb-c");
   for (const [flat, nested] of [[constraints.hostConnection && host(constraints.hostConnection), fit.hostConnection && host(fit.hostConnection)],
     [constraints.laptopInches, fit.laptopInches], [constraints.bedWidthIn, fit.bedWidthInches],
     [constraints.bedLengthIn, fit.bedLengthInches], [constraints.mattressDepthIn, fit.mattressDepthInches]])
@@ -189,7 +218,10 @@ export function quoteAlongOffer(offerId: string, quantity: number, constraints: 
   try {
     const result = quoteCanonical(canonical, offerId, mapped, { destination, quantity });
     total = result.totalMinor;
-    result.conflicts.forEach(code => conflict(code));
+    result.conflicts.forEach(code => {
+      if (shopperHandlesUsbConnection && (code === "HOST_CONNECTION_REQUIRED" || code === "INCOMPATIBLE_HARDWARE")) return;
+      conflict(code);
+    });
   } catch (error) {
     conflict(error instanceof Error ? error.message : "INVALID_CATALOG", "The offer has an invalid product/variant reference or incomplete compatibility data.");
   }

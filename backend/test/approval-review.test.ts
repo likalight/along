@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { SessionStore } from "../src/store.ts";
 import { nonTechProfile } from "../src/catalog.ts";
+import { getCatalog } from "../../catalog/src/index.ts";
 import type { Session, InputEnvelope } from "../src/contracts.ts";
 
 const fixture = () => new SessionStore(60_000, structuredClone(nonTechProfile));
@@ -45,8 +46,8 @@ const observation = (s: Session, transcript = s.turn!.input!.text) => ({
 // A complete, valid one-pixel PNG; raw source bytes are held only in the current session.
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII=", "base64");
 
-test("review: canonical default contains the shared 24-product catalog and independent stable display order", () => {
-  assert.equal(new SessionStore().profile.catalog.products.length, 24);
+test("review: canonical default contains the complete shared catalog and independent stable display order", () => {
+  assert.equal(new SessionStore().profile.catalog.products.length, getCatalog().products.length);
   const store = fixture();
   let s = input(store, store.create().session, "Show two bags");
   s = store.propose(s.id, { expectedRevision: s.revision, turnId: s.turn!.id,

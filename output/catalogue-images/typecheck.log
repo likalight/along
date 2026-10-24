@@ -1,0 +1,19 @@
+
+> typecheck
+> npm run typecheck -w @coupang/contract && npm run typecheck -w @coupang/agent && npm run typecheck -w @coupang/web && npm run typecheck -w @along/shopper
+
+
+> @coupang/contract@0.1.0 typecheck
+> tsc -p tsconfig.json --noEmit
+
+
+> @coupang/agent@0.1.0 typecheck
+> tsc -p tsconfig.json --noEmit
+
+
+> @coupang/web@0.1.0 typecheck
+> tsc -p tsconfig.json --noEmit
+
+
+> @along/shopper@0.1.0 typecheck
+> tsc --noEmit

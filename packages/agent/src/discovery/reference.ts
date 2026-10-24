@@ -8,19 +8,25 @@ export type DiscoveryImportResult = {
   turnId: string;
 };
 
-export function discoveryArrival(reference: DiscoveryReference): string {
+export function discoveryArrival(reference: DiscoveryReference, snapshot?: SessionSnapshot): string {
   const candidate = reference.candidate;
   const price = candidate.price
     ? `${candidate.price.currency} ${candidate.price.amount.toFixed(2)} is a ${reference.mode === "demo" ? "demo" : "captured listing"} price, not a delivered total.`
     : "Price and delivery costs are unknown.";
   return `I've brought ${quoted(candidate.title)} into our conversation. ` +
     `${candidate.linkKind === "search" ? "This opens a search page; a specific listing still needs checking." : "The exact item and seller details still need checking."} ` +
-    `${price} Your requirements are unchanged. We can discuss fit or similarity, or say “Back to my catalog” to resume your choices.`;
+    `${price} Your requirements are unchanged. ${snapshot?.discoveryAssessment
+      ? `${snapshot.discoveryAssessment.checks.find(check => check.status === "conflict")?.detail ?? snapshot.discoveryAssessment.checks.find(check => check.key !== "identity")?.detail ?? ""} ${snapshot.discoveryAssessment.nextQuestion}`
+      : "We can discuss fit or similarity, or say “Back to my catalog” to resume your choices."}`;
 }
 
 /** An explicit new catalog request changes the visible referent; vague commands do not. */
 export function isExplicitCatalogRequest(text: string): boolean {
-  if (/\b(catalog|(?:MIC|BAG|BED)-\d{3})\b/i.test(text)) return true;
+  if (/\b(?:do not|don't|never)\b/i.test(text)) return false;
+  // A mention ("is this in your catalog?") is not permission to replace the
+  // active reference. Only an explicit shopper navigation/search request is.
+  if (/^(?:please\s+)?(?:back|return|go back|switch)(?:\s+to)?\s+(?:my|the|your)?\s*catalog\b/i.test(text.trim())) return true;
+  if (/^(?:(?:please|can you|could you|let's|i want to)\s+)?(?:show|find|search|compare|resume|choose|select|buy|open)\b[^.!?]*\b(?:catalog|(?:MIC|BAG|BED)-\d{3})\b/i.test(text.trim())) return true;
   return !/\b(this|that|it|external)\b/i.test(text) &&
     /\b(find|search|show|need|want|looking for)\b.*\b(bags?|backpacks?|totes?|bedsheets?|sheets?|bedding|microphones?|headsets?)\b/i.test(text);
 }
@@ -36,7 +42,9 @@ const quoted = (value: string) => JSON.stringify(value.length > 140 ? `${value.s
 /** Only the shopper's fresh question is interpreted; imported labels are evidence. */
 export function discoveryReply(reference: DiscoveryReference, snapshot: SessionSnapshot, text: string): string {
   const candidate = reference.candidate;
-  if (/\b(laptop|fit)\b/i.test(text)) {
+  const savedLaptop = snapshot.hardConstraints.laptopInches ??
+    (snapshot.hardConstraints.compatibility as { laptopInches?: number } | undefined)?.laptopInches;
+  if (/\blaptop\b/i.test(text) || /\bfit\b/i.test(text) && typeof savedLaptop === "number") {
     const product = reference.mode === "demo" && candidate.catalogProductId ? getProduct(candidate.catalogProductId) : undefined;
     const max = product?.specs.laptopFitInches;
     const requested = text.match(/\b(\d{1,2}(?:\.\d+)?)\s*(?:[- ]?inch|inches|["”])/i)?.[1];
@@ -49,12 +57,21 @@ export function discoveryReply(reference: DiscoveryReference, snapshot: SessionS
   }
   if (/\b(cheaper|less expensive)\b/i.test(text)) {
     const price = candidate.price ? `${candidate.price.currency} ${candidate.price.amount.toFixed(2)}` : "an unknown price";
-    return `This ${reference.mode === "demo" ? "demo reference" : "listing snapshot"} shows ${price}, before unknown delivery costs and taxes. I have not searched for a cheaper listing or converted currencies. Find another match in the discovery panel, or say “Back to my catalog” to compare your earlier choices.`;
+    const alternative = snapshot.discoveryAssessment?.alternatives[0];
+    return `This ${reference.mode === "demo" ? "demo reference" : "listing snapshot"} shows ${price}, before unknown delivery costs and taxes. I have not searched for a cheaper listing or converted currencies. ${alternative
+      ? `A separate catalog option is ${alternative.title} (${alternative.productId}) at ${alternative.total.currency} ${alternative.total.amount.toFixed(2)} total under a simulated offer that passes your saved catalog requirements. This is not a verified match to the external item. Say “Back to my catalog” to consider it.`
+      : "No eligible catalog alternative is established for your saved requirements. Find another match in the discovery panel, or say “Back to my catalog” to compare your earlier choices."}`;
   }
   if (/\b(buy|purchase|approve|confirm|order|offers?|seller|compare|save|first|second|third|select|choose)\b/i.test(text))
     return "This match needs its exact listing, seller and delivery details checked before you decide. I cannot purchase it here or use an earlier catalog offer for it. Say “Back to my catalog” to resume your earlier choices.";
-  if (!/\b(similar|similarity|exact|same|match|why)\b/i.test(text))
-    return "We are discussing the match you brought in. I can explain its similarity or what we still need to check for fit. Say “Back to my catalog” to resume your earlier choices.";
+  if (!/\b(similar|similarity|exact|same|match|why)\b/i.test(text)) {
+    const assessment = snapshot.discoveryAssessment;
+    const relevant = assessment?.checks.find(check => text.toLowerCase().includes(check.label.toLowerCase().split(" ")[0]!))
+      ?? assessment?.checks.find(check => check.status === "conflict")
+      ?? assessment?.checks.find(check => check.key !== "identity");
+    return assessment ? `${relevant?.detail ?? "The exact item and seller are still unverified."} ${assessment.nextQuestion}`
+      : "We are discussing the match you brought in. I can explain its similarity or what we still need to check for fit. Say “Back to my catalog” to resume your earlier choices.";
+  }
   const reasons = candidate.reasons.length
     ? `The match was suggested for ${candidate.reasons.slice(0, 2).map(quoted).join(" and ")}. `
     : "No specific similarity details were supplied. ";

@@ -9,8 +9,10 @@ From the repository root with Node.js 22.18 or later:
 ```sh
 npm ci
 npm run build
-npm run start -w @along/shopper -- --port 4324
+npm run dev:shopper -- --port 4324
 ```
+
+For an offline fixture rehearsal, set `ALONG_AGENT_MODE=fixture` in the development server environment. For live text/voice, configure `OPENAI_API_KEY` as described in [live voice](../apps/shopper/docs/live-voice.md). Demo mode only replaces the discovery provider, not the conversation agent.
 
 1. Open `chrome://extensions`, enable Developer mode, choose **Load unpacked**, and select `apps/extension/dist/along`. The build also writes `apps/extension/dist/along-extension.zip` with its manifest at the archive root.
 2. Open [the Along app](http://127.0.0.1:4324), start a text conversation, and describe a need such as `a work and gym bag`.
@@ -66,7 +68,7 @@ Provide server variables through the process environment or `apps/shopper/.env.l
 | `COUPANG_ACCESS_KEY`, `COUPANG_SECRET_KEY` | Empty. Server-only Coupang Partners credentials. |
 | `COUPANG_SEARCH_PATH` | `/v2/providers/affiliate_open_api/apis/openapi/v1/products/search`. The legacy path without `/v1` is the only other allowed path. Confirm the account's documented endpoint before live testing. |
 | `ALONG_DISCOVERY_VISION` | `false`. Set to `true` only when optional crop processing is intended. |
-| `OPENAI_API_KEY` | Required for search-mode recognition, optional web search and vision, as well as the separate voice-secret mint feature. |
+| `OPENAI_API_KEY` | Required for search-mode recognition, optional web search and vision, as well as the main Responses shopping agent and GPT-Live voice. |
 | `ALONG_DISCOVERY_VISION_MODEL` | `gpt-4.1-mini`. A compatible image-input Responses model supporting strict structured output. |
 
 Coupang's [seller OpenAPI](https://developers.coupang.com/en/api) manages seller operations; this adapter targets the separate [Coupang Partners Open API](https://partners.coupang.com/#help/open-api) keyword search. Its guide describes API-key eligibility after final approval, HMAC authentication, product-search fields and limits. It does not document an image-search endpoint or grant blanket permission for a proactive browser extension. Review the [operating policy](https://partners.coupang.com/#help/operating-policy) and [terms](https://partners.coupang.com/#help/terms), and confirm software/placement, transient retention, link handling and quotas with Coupang before enabling production use. The approval flag does not replace that confirmation.
@@ -81,7 +83,7 @@ Automated tests mock external AI and marketplace responses. Real Coupang Partner
 
 Pairing starts from the authenticated Along page. A five-minute single-use code binds the extension ID to that session and epoch. Claiming it from the matching `chrome-extension://` origin yields a two-hour bearer token; the server retains only its hash. Cross-origin website requests cannot use the extension API, and reset/end invalidates the pairing.
 
-Discoveries retain their source and candidate separately from the shopper's words. **Discuss with Along** selects a server-retained candidate, then routes to the tab with the matching session or resumes that exact authorized session. Text/voice mode, constraints, saved choices and history remain in the same conversation. If the shopper is paused, drafting, capturing speech or otherwise busy, the pending reference waits for an explicit safe import rather than interrupting their input. It does not turn on a microphone.
+Discoveries retain their source and candidate separately from the shopper's words. **Discuss with Along** selects a server-retained candidate, then routes to the tab with the matching session or resumes that exact authorized session. Text/voice mode, constraints, saved choices and history remain in the same conversation. If the shopper is paused, drafting, capturing speech, processing a live voice turn, reviewing an order or otherwise busy, the pending reference waits for an explicit safe import rather than interrupting their input. It does not turn on a microphone.
 
 An imported reference invalidates an old purchase summary and is never an approval. Page text, captions, model output and extension clicks cannot confirm a purchase. External candidates are discussion context, not complete catalog offers: a captured price is not a delivered total, and selecting one cannot create a real order or payment. Returning to the curated catalog preserves its existing explicit simulated-confirmation boundary.
 
@@ -105,3 +107,7 @@ npm run test:extension:e2e
 ```
 
 Root `npm run build` also packages the extension. CI runs the unit/syntax checks and the extension browser suite after installing Chromium. The browser suite loads the extension's real scripts in a persistent Chromium profile against `/extension-demo`. A temporary test copy grants localhost in its manifest because headless Chromium cannot accept the native optional-permission dialog; the shipped manifest has no required host permissions. This verifies automatic detection, consent and pause controls, preserved drafts, correct conversation/tab selection, follow-ups and reconnect. Its managed app server disables live provider and vision credentials. The native Chrome permission dialog, real Amazon/social-site layouts, Chrome Web Store review, live inventory and paid provider behavior are outside that fixture test's coverage.
+
+## Judging and rehearsal
+
+See [the judging evidence and seven-minute demo](judging-demo.md) for answers to the challenge questions and the live-platform test matrix. Context assessments are source-labelled, and demo alternatives never imply that external listing prices, stock, fit or delivery were verified.

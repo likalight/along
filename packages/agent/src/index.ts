@@ -38,3 +38,14 @@ export {
   type VoiceConfirmEvidence,
   type PresentationAck,
 } from "./session/AuthoritativeSessionStore.js";
+
+export {
+  openEndedLoop,
+  type OpenEndedAgentConfig,
+} from "./orchestrator/openEndedLoop.js";
+
+export {
+  resolveProductNavigation,
+  parseProductNavigation,
+  type ProductNavigation,
+} from "./tools/shoppingTools.js";

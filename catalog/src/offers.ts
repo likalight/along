@@ -1,5 +1,8 @@
 import type { Evidence, Offer, Product, Seller } from "./types.ts";
 import { emptyMetrics } from "./types.ts";
+import { microphoneArchive } from "./microphones.ts";
+import { seededNonTechProducts } from "./seeded-nontech.ts";
+import { personalNonTechPrices } from "./personal-nontech.ts";
 export const scenarioNow = "2026-10-24T10:00:00+08:00";
 export const timezone = "Asia/Singapore";
 export const destination = "DEMO-DESTINATION-01 (fictional service zone; not Singapore stock)";
@@ -10,6 +13,7 @@ export function resolveDelivery(offsetDays: number, hour = 18): string {
 }
 // Explicit authored amounts, independent of reference prices (including estimates/range floors).
 const prices: Record<string, [number, number]> = {
+  ...personalNonTechPrices,
   "MIC-001": [1900, 2400], "MIC-003": [2200, 2900], "MIC-009": [27700, 28700],
   "MIC-015": [16900, 17900], "MIC-020": [5800, 6800], "MIC-022": [10900, 11900],
   "MIC-025": [5000, 6000], "MIC-037": [8900, 9900], "MIC-038": [5900, 6900],
@@ -19,8 +23,20 @@ const prices: Record<string, [number, number]> = {
   "BED-001": [2999, 3499], "BED-002": [5999, 6499], "BED-003": [4999, 5499],
   "BED-004": [3999, 4499], "BED-005": [19900, 20900], "BED-006": [37900, 38900],
 };
+// Frozen seed calibration, separate from mutable product referencePrice. These are not retail offers.
+for (const row of [...microphoneArchive.records.map(r => ({ id: r.id, amount: r.referencePrice.amountMinor })),
+  ...seededNonTechProducts.map(p => ({ id: p.id, amount: p.referencePrice.amountMinor }))]) {
+  if (!prices[row.id]) {
+    const base = row.amount ?? 9900;
+    prices[row.id] = [Math.max(100, Math.round(base * 0.94)), base + (base >= 20000 ? 1500 : 800)];
+  }
+}
 const hardware: Record<string, { description: string; priceMinor: number }> = {
+  "universal-usb-data-kit": { description: "Synthetic compatible USB data cable and host adapter kit", priceMinor: 1200 },
+  "usb-c-xlr-audio-kit": { description: "Synthetic USB-C audio interface with XLR microphone input, XLR cable and switchable phantom power", priceMinor: 7900 },
+  "usb-c-trrs-mic-interface": { description: "Synthetic USB-C CTIA headset microphone interface, not a headphone-only adapter", priceMinor: 1800 },
   "usb-a-to-c-data-cable": { description: "Synthetic USB-A host to USB-C device data cable; declared demo audio path", priceMinor: 500 },
+  "usb-a-and-c-data-cable-kit": { description: "Compatible USB-A to USB-C and USB-C to USB-C data cables", priceMinor: 500 },
   "usb-c-trs-mic-interface": { description: "Synthetic USB-C interface with powered 3.5mm TRS microphone input; not a headphone-only adapter", priceMinor: 2000 },
   "usb-c-data-cable": { description: "Synthetic compatible USB data cable (not charge-only)", priceMinor: 800 },
   "desktop-mic-stand": { description: "Synthetic compatible desktop microphone stand", priceMinor: 1200 },
@@ -48,7 +64,7 @@ export function buildOffers(products: Product[]) {
       const unitPriceMinor = prices[p.id][i];
       const shippingMinor = i === 0 ? (["BED-005", "BED-006"].includes(p.id) ? 0 : 500) : 900;
       const id = `${p.id}-${i === 0 ? "A" : "B"}`;
-      const availability = ["out_of_stock", "unavailable", "discontinued", "discontinued_at_seller"].includes(p.sourceAvailability)
+      const availability = p.specs.demoPurchaseHold === true ? "unavailable" : ["out_of_stock", "unavailable", "discontinued", "discontinued_at_seller", "backordered", "special_order", "available_soon"].includes(p.sourceAvailability)
         ? (p.sourceAvailability === "out_of_stock" ? "out_of_stock" : "unavailable") : "in_stock";
       const offerEvidenceId = `FIXTURE-${id}`;
       evidence.push({ ...emptyMetrics(), id: offerEvidenceId, subjectType: "seller", subjectId: seller.id,
@@ -68,6 +84,7 @@ export function buildOffers(products: Product[]) {
           "All offer prices, destination eligibility, fees and delivery windows are synthetic.",
           "Tax is explicitly zero in this fictional scenario, not a real tax assessment.",
           "Known negative source availability is retained; all other stock is an explicit proxy assumption.",
+          ...(p.specs.demoPurchaseHold === true ? ["This simulated offer is withheld pending the manufacturer's recall serial-number verification. See the product source notice."] : []),
           "Quantity one only; shipping and setup hardware totals are defined for one bundle.",
           ...(setupHardware.length ? ["Required demo setup hardware is included in otherFeesMinor and must be shown in the purchase summary."] : [])],
         evidenceIds: [seller.evidenceIds[0], offerEvidenceId], classification: "proxy", setupHardware,

@@ -14,6 +14,8 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
+    "@coupang/agent": "*",
+    "@coupang/contract": "*",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.4.0",
     "lucide-react": "^1.31.0",
@@ -22,8 +24,7 @@
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "three": "^0.180.0",
-    "@coupang/agent": "*",
-    "@coupang/contract": "*"
+    "ws": "^8.22.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.0",
@@ -31,6 +32,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@types/three": "^0.180.0",
+    "@types/ws": "^8.18.2",
     "prettier": "^3.9.10",
     "typescript": "^5.9.3",
     "vitest": "^4.0.0"

@@ -23,7 +23,7 @@ export const DiscoveryReferenceSchema = z.object({
     id: z.string().min(1).max(150),
     title: label,
     url: httpsUrl,
-    imageUrl: z.string().max(2048).refine(value => /^\/catalog\/images\/[A-Za-z0-9_-]+\.(?:svg|png|jpe?g|webp)$/.test(value) || httpsUrl.safeParse(value).success).optional(),
+    imageUrl: z.string().max(2048).refine(value => /^\/catalog\/images\/(?:products\/)?[A-Za-z0-9_-]+\.(?:svg|png|jpe?g|webp)$/.test(value) || httpsUrl.safeParse(value).success).optional(),
     price: z.object({ amount: z.number().finite().nonnegative().max(1e12), currency: z.string().regex(/^[A-Z]{3}$/) }).strict().nullable(),
     match: z.enum(["similar", "exact"]),
     reasons: z.array(label).max(12),
@@ -40,3 +40,21 @@ export const DiscoveryReferenceSchema = z.object({
 });
 export type DiscoveryReference = z.infer<typeof DiscoveryReferenceSchema>;
 export type DiscoveryImportIdentity = { epoch: number; baseRevision: number };
+
+/** Read-only evaluation of a reference against accepted shopper requirements. */
+export const DiscoveryAssessmentSchema = z.object({
+  requirements: z.array(z.string()),
+  checks: z.array(z.object({
+    key: z.string(), label: z.string(),
+    status: z.enum(["match", "conflict", "unknown"]),
+    detail: z.string(), source: z.enum(["catalog", "listing", "unknown"]),
+  }).strict()),
+  nextQuestion: z.string(),
+  alternatives: z.array(z.object({
+    productId: z.string(), title: z.string(), offerId: z.string(),
+    total: z.object({ amount: z.number().finite().nonnegative(), currency: z.string() }).strict(),
+    reason: z.string(), compromises: z.array(z.string()),
+  }).strict()).max(3),
+  alternativesNotice: z.string(),
+}).strict();
+export type DiscoveryAssessment = z.infer<typeof DiscoveryAssessmentSchema>;

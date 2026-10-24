@@ -1,6 +1,6 @@
 # Along: combined integration handoff
 
-This branch combines backend #6–9 (including main’s acceptance hardening), the canonical catalog, the AI harness, and the frontend session shell + product canvas. The actual shopper UI completes a **production-build text journey**; live AI/provider voice remains pending.
+This branch combines backend #6–9, the canonical catalog, the AI harness, and the frontend session shell + product canvas. The shopper completes a production-build text journey. For the GPT-Live continuous voice bridge, routed reasoning models, private key setup, and reviewed-text purchase confirmation boundary, see [live voice](apps/shopper/docs/live-voice.md). The historical voice-pending notes below describe the previous handoff; the linked guide is authoritative for the new shopper audio path.
 
 ## Run
 

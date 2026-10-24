@@ -36,6 +36,8 @@ import { reduce } from "../thread/reduce.js";
 import { discoveryReply } from "../discovery/reference.js";
 
 export interface LoopResult {
+  narrationSegments?: Array<{ text: string; productId: string | null }>;
+  heading?: string;
   proposals: AgentProposal[];
   speakable: SpeakableResult[];
   cancelled: boolean;
@@ -69,6 +71,7 @@ export async function agentLoop(opts: {
   const proposals: AgentProposal[] = [];
   const speakable: SpeakableResult[] = [];
   let snapshot = thread.snapshot;
+  let updateReply: SpeakableResult | undefined;
 
   const push = (proposal: AgentProposal) => {
     if (cancel.aborted) return false;
@@ -94,7 +97,14 @@ export async function agentLoop(opts: {
       result.snapshot,
     );
     proposals.push(proposal);
-    speakable.push(result.speakable);
+    // Keep tool outcomes in the thread, but do not narrate bookkeeping before
+    // the actual answer. Errors remain visible and audible.
+    if (
+      result.ok &&
+      ["set_constraints", "set_priority"].includes(proposal.action)
+    )
+      updateReply = result.speakable;
+    else speakable.push(result.speakable);
     snapshot = result.snapshot;
     // Keep baseRevision in sync for chained proposals within the same turn
     input.baseRevision = snapshot.revision;
@@ -104,6 +114,26 @@ export async function agentLoop(opts: {
   if (cancel.aborted) return { proposals, speakable, cancelled: true };
 
   switch (route) {
+    case "catalog_product": {
+      const id = input.text?.match(/\b(?:MIC|BAG|BED)-\d{3}\b/i)?.[0].toUpperCase();
+      const product = id ? getProduct(id) : undefined;
+      if (!product) {
+        speakable.push({ turnId: input.turnId, revision: snapshot.revision, channel: "commentary", content: "That catalog product is unavailable. No offer has been selected." });
+        break;
+      }
+      const shown = push({ ...baseProposal(input, "catalog-product"), action: "shortlist",
+        payload: { entries: [{ productId: product.id, fitReason: "The catalog product you explicitly chose to explore.",
+          compromise: product.limitations[0] ?? "Offers are simulated; the external listing is not verified." }] }, evidenceIds: [] });
+      if (shown && snapshot.shortlistIds.includes(product.id)) {
+        const focused = push({ ...baseProposal(input, "catalog-focus"), action: "focus", payload: { productId: product.id }, evidenceIds: [] });
+        if (focused) {
+          speakable.length = 0;
+          speakable.push({ turnId: input.turnId, revision: snapshot.revision, channel: "commentary",
+            content: `Here is ${product.title}. This is the catalog item you chose, with simulated offers. Your requirements still apply; opening it does not select an offer or approve a purchase.` });
+        }
+      }
+      break;
+    }
     case "discovery_return": {
       snapshot = store.clearDiscovery(input.sessionId) ?? snapshot;
       speakable.push({ turnId: input.turnId, revision: snapshot.revision, channel: "commentary",
@@ -303,13 +333,14 @@ export async function agentLoop(opts: {
         (e) => e.subjectType === "product" && e.subjectId === productId,
       );
       const offer = offersForProduct(productId)[0];
-      const sellerEv = offer
-        ? EVIDENCE.filter(
-            (e) => e.subjectType === "seller" && e.subjectId === offer.sellerId,
-          )
-        : [];
-      // Progressive: synthesis ids first
-      const evidenceIds = [...productEv, ...sellerEv].map((e) => e.id);
+      // Shared sellers have evidence for many unrelated offers. Follow this
+      // offer's references so the panel stays relevant and within backend bounds.
+      const evidenceIds = [
+        ...new Set([
+          ...productEv.map((e) => e.id),
+          ...(offer?.evidenceIds ?? []),
+        ]),
+      ];
       push({
         ...baseProposal(input, "focus"),
         action: "focus",
@@ -396,6 +427,7 @@ export async function agentLoop(opts: {
     }
   }
 
+  if (!speakable.length && updateReply) speakable.push(updateReply);
   return { proposals, speakable, cancelled: cancel.aborted };
 }
 
@@ -487,8 +519,14 @@ function runGuidedNeed(
     if (
       !prefs.shape &&
       !prefs.color &&
+      !prefs.bagPriority &&
+      !snapshot.preferences["bagPriority"] &&
+      !snapshot.preferences["shape"] &&
+      !snapshot.preferences["color"] &&
       !prefs.budgetMinor &&
       !prefs.needTomorrow &&
+      !snapshot.preferences["shape"] &&
+      !snapshot.preferences["color"] &&
       !Object.keys(parseCompatibility(text)).length &&
       route !== "strong_intent"
     ) {
@@ -496,6 +534,8 @@ function runGuidedNeed(
       patchScenario(store, input.sessionId, "bag_inspiration");
       return;
     }
+    const bagPriority =
+      prefs.bagPriority ?? snapshot.preferences["bagPriority"];
     push({
       ...baseProposal(input, "constraints"),
       action: "set_constraints",
@@ -511,6 +551,7 @@ function runGuidedNeed(
             : {}),
         },
         preferences: {
+          ...(bagPriority ? { bagPriority } : {}),
           ...(prefs.color ? { color: prefs.color } : {}),
           ...(prefs.shape ? { shape: prefs.shape } : {}),
         },
@@ -654,13 +695,19 @@ function inferScenario(
   if (snapshot.scenarioId) {
     return { id: snapshot.scenarioId, needs: snapshot.needs };
   }
+  const requestedId = text.match(/\b(?:MIC|BAG|BED)-\d{3}\b/i)?.[0].toUpperCase();
+  const product = requestedId ? getProduct(requestedId) : undefined;
+  if (product) return {
+    id: product.category === "bags" ? "bag_inspiration" : product.category === "bedding" ? "warm_bedding" : "cafe_dictation",
+    needs: [`Explore ${product.title}`],
+  };
   if (/bag|backpack|gym|tote|sling/i.test(text)) {
     return { id: "bag_inspiration", needs: ["bag inspiration"] };
   }
   if (/sheet|bedding|linen|percale|mattress/i.test(text)) {
     return { id: "warm_bedding", needs: ["warm room bedding"] };
   }
-  if (/mic|café|cafe|dictation|headset|noisy/i.test(text)) {
+  if (/mic|café|cafe|dictation|headset|headphone|earbud|earpod|airpod|noisy/i.test(text)) {
     return { id: "cafe_dictation", needs: ["café dictation"] };
   }
   // default opening — café is scenario 1

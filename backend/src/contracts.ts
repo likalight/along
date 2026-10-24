@@ -107,6 +107,8 @@ export type Constraints = {
   composition?: string;
   hostConnection?: string;
   availableHardwareIds?: string[];
+  /** Products whose routine USB cabling the shopper has explicitly agreed to handle. */
+  shopperHandledConnectionFor?: string[];
   bagMaxDimensionsCm?: { height?: number; width?: number; depth?: number };
   compatibility?: Compatibility;
   currency?: Currency;
@@ -223,6 +225,8 @@ export type Receipt = {
   summaryRevision: number;
   createdAt: string;
   quote: Quote;
+  /** Separate no-payment Live rehearsal, never verified financial authorization. */
+  completionSource?: "live_demo";
 };
 export type Session = {
   displayOrder: string[];

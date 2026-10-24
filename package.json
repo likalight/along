@@ -12,6 +12,9 @@
     "test": "npm run test -w @coupang/agent",
     "typecheck": "npm run typecheck -w @coupang/contract && npm run typecheck -w @coupang/agent && npm run typecheck -w @coupang/web && npm run typecheck -w @along/shopper",
     "sync:catalog": "node scripts/sync-catalog.mjs",
+    "seed:catalog": "npm --prefix catalog run build && npm run sync:catalog",
+    "prepare:catalog-media": "node scripts/catalog-media.mjs --prepare",
+    "verify:catalog-media": "node scripts/catalog-media.mjs",
     "dev:shopper": "npm run dev -w @along/shopper",
     "test:e2e": "npm run test:e2e -w @along/shopper",
     "test:canvas": "npm run test:canvas -w @along/shopper",
@@ -22,5 +25,8 @@
   },
   "engines": {
     "node": ">=22.18"
+  },
+  "devDependencies": {
+    "sharp": "^0.35.5"
   }
 }

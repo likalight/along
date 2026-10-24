@@ -3,7 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowUpRight, Check, Compass, LoaderCircle } from "lucide-react";
 import type { SessionController, ClientState } from "@/lib/session/controller";
-import type { DiscoveryReference } from "@coupang/contract";
+import { canAutoImportDiscovery } from "@/lib/session/controller";
+import type {
+  DiscoveryReference,
+  DiscoveryAssessment,
+} from "@coupang/contract";
 import styles from "./extension-companion.module.css";
 
 type Pending = DiscoveryReference & { sessionId: string; epoch: number };
@@ -358,9 +362,7 @@ export function ExtensionCompanion({
         setPending(item);
         const { state: now, hasDraft: typing } = current.current;
         if (
-          !typing &&
-          !now.capturing &&
-          now.status === "ready" &&
+          canAutoImportDiscovery(now, typing) &&
           failed.current !== item.handoffId
         )
           await bringIntoConversation(item);
@@ -429,9 +431,11 @@ export function ExtensionCompanion({
 
 export function DiscoveryContext({
   reference,
+  assessment,
   onCommand,
 }: {
   reference: DiscoveryReference;
+  assessment?: DiscoveryAssessment;
   onCommand: (text: string) => void;
 }) {
   const { candidate, source, mode } = reference;
@@ -450,14 +454,24 @@ export function DiscoveryContext({
         </a>
       </div>
       <h2>{candidate.title}</h2>
+      {mode === "demo" &&
+        candidate.imageUrl?.startsWith("/catalog/images/") && (
+          <img
+            className={styles.referenceImage}
+            src={candidate.imageUrl}
+            alt={`${candidate.title}; catalog photograph or labelled illustration, variant may differ`}
+          />
+        )}
       <p>
-        {candidate.match === "exact"
-          ? "Identity matched"
-          : "A similar option — exact identity is unverified"}
+        {candidate.linkKind === "search"
+          ? "Suggested search; no listing verified"
+          : candidate.match === "exact"
+            ? "Identity matched"
+            : "A similar option — exact identity is unverified"}
         .{" "}
         {mode === "demo"
           ? "Prepared catalog example; this is not a live Coupang listing or price."
-          : "Listing information is a snapshot, not a checkout quote."}
+          : "Confirm identity, price and availability on Coupang."}
       </p>
       <div className={styles.referenceBottom}>
         <span>
@@ -476,12 +490,84 @@ export function DiscoveryContext({
           <ArrowUpRight size={14} />
         </a>
       </div>
+      {assessment && (
+        <section
+          className={styles.assessment}
+          aria-label="How this fits your needs"
+        >
+          <h3>How this fits your needs</h3>
+          {assessment.requirements.length > 0 && (
+            <p>Keeping in mind: {assessment.requirements.join(" · ")}</p>
+          )}
+          <ul className={styles.fitChecks}>
+            {assessment.checks.map((check) => (
+              <li key={check.key} data-status={check.status}>
+                <strong>
+                  {check.label}{" "}
+                  <span>
+                    {check.status === "match"
+                      ? "Fits"
+                      : check.status === "conflict"
+                        ? "Doesn’t fit"
+                        : "Not verified"}
+                  </span>
+                </strong>
+                <p>{check.detail}</p>
+                <small>
+                  {check.source === "catalog"
+                    ? "Demo catalog evidence"
+                    : check.source === "listing"
+                      ? "Listing snapshot"
+                      : "More information needed"}
+                </small>
+              </li>
+            ))}
+          </ul>
+          <p className={styles.nextQuestion}>{assessment.nextQuestion}</p>
+          {assessment.alternatives.length > 0 && (
+            <details className={styles.alternatives}>
+              <summary>
+                Compare with {assessment.alternatives.length} catalog option
+                {assessment.alternatives.length === 1 ? "" : "s"}
+              </summary>
+              <p>{assessment.alternativesNotice}</p>
+              <ul>
+                {assessment.alternatives.map((alternative) => (
+                  <li key={alternative.productId}>
+                    <strong>{alternative.title}</strong>
+                    <span>
+                      {new Intl.NumberFormat("en", {
+                        style: "currency",
+                        currency: alternative.total.currency,
+                      }).format(alternative.total.amount)}{" "}
+                      · demo total
+                    </span>
+                    <p>{alternative.reason}</p>
+                    {alternative.compromises.length > 0 && (
+                      <p>Trade-offs: {alternative.compromises.join(" · ")}</p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </section>
+      )}
       <div className={styles.questions}>
+        {mode === "demo" && candidate.catalogProductId && (
+          <button
+            onClick={() =>
+              onCommand(`Show catalog ${candidate.catalogProductId}`)
+            }
+          >
+            Explore this demo product
+          </button>
+        )}
         <button onClick={() => onCommand("Why is this similar?")}>
           Why this match?
         </button>
-        <button onClick={() => onCommand("Would my laptop fit?")}>
-          Would my laptop fit?
+        <button onClick={() => onCommand("How does this fit my requirements?")}>
+          Check my requirements
         </button>
         <button onClick={() => onCommand("Back to my catalog")}>
           Back to my catalog

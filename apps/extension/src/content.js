@@ -85,7 +85,23 @@
       const style = getComputedStyle(element), box = element.getBoundingClientRect();
       if (style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity) !== 0 && box.width > 0 && box.height > 0 && D.intersects(region, box)) return null;
     }
-    // Reject occluded media, including non-dialog popovers. No pixels from an unrelated overlay are sent.
+    // Sparse hit tests miss small corner popovers and pointer-events:none overlays.
+    // Conservatively skip any intersecting positioned surface outside the media's
+    // ancestor chain. Geometry only: never read its text or form values.
+    for (const element of document.querySelectorAll('body *')) {
+      if (element === current.media.element || element.contains(current.media.element)) continue;
+      const style = getComputedStyle(element);
+      if (!['absolute', 'fixed', 'sticky'].includes(style.position)) continue;
+      const box = element.getBoundingClientRect();
+      if (!box.width || !box.height || !D.intersects(region, box)) continue;
+      let painted = true;
+      for (let parent = element; parent; parent = parent.parentElement) {
+        const appearance = getComputedStyle(parent);
+        if (appearance.display === 'none' || appearance.visibility === 'hidden' || Number(appearance.opacity) === 0) { painted = false; break; }
+      }
+      if (painted) return null;
+    }
+    // Also reject ordinary-flow occlusion at representative media points.
     const left = Math.max(0, region.left), top = Math.max(0, region.top), right = Math.min(innerWidth, region.right), bottom = Math.min(innerHeight, region.bottom);
     for (const [fx, fy] of [[0.5, 0.5], [0.25, 0.25], [0.75, 0.25], [0.25, 0.75], [0.75, 0.75]]) {
       const hit = document.elementFromPoint(left + (right - left) * fx, top + (bottom - top) * fy);
