@@ -1,96 +1,89 @@
 "use client";
-
 import { useEffect, useState } from "react";
-import {
-  MEMORY_STORAGE_KEY,
-  parseContextExport,
-  readLocalPreferences,
-  type ReviewedPreference,
-} from "@/lib/context/memory";
-
+import type { LearnedMemory } from "@/lib/context/automatic";
+const options: Record<string, string[]> = {
+  color: ["black", "navy", "olive", "khaki", "slate"],
+  shape: ["backpack", "tote", "sling", "duffel"],
+  bagPriority: ["weight", "capacity"],
+};
+const labels: Record<string, string> = {
+  color: "Bag colour",
+  shape: "Bag style",
+  bagPriority: "Bag priority",
+};
+type Profile = {
+  enabled: boolean;
+  memories: LearnedMemory[];
+  status: string;
+  lastSyncedAt: string | null;
+};
 export default function ContextPage() {
-  const [saved, setSaved] = useState<ReviewedPreference[]>([]);
-  const [pending, setPending] = useState<ReviewedPreference[]>([]);
-  const [message, setMessage] = useState("");
+  const [profile, setProfile] = useState<Profile | null>(null),
+    [message, setMessage] = useState("Connecting…"),
+    [busy, setBusy] = useState(false);
+  async function action(action: string, extra: Record<string, unknown> = {}) {
+    setBusy(true);
+    try {
+      const r = await fetch("/api/context", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, ...extra }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error);
+      setProfile(data);
+      setMessage("");
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "Unable to connect.");
+    } finally {
+      setBusy(false);
+    }
+  }
   useEffect(() => {
-    setSaved(readLocalPreferences());
+    let alive = true;
+    const token = new URLSearchParams(location.hash.slice(1)).get("pair");
+    if (token) {
+      history.replaceState(null, "", location.pathname);
+      void action("pair", { token });
+    }
+    const refresh = async () => {
+      try {
+        const r = await fetch("/api/context", { cache: "no-store" });
+        const data = await r.json();
+        if (alive) {
+          if (r.ok) {
+            setProfile(data);
+            setMessage("");
+          } else setMessage(data.error);
+        }
+      } catch {
+        if (alive)
+          setMessage(
+            "Along is offline. Your saved preferences remain on this Mac.",
+          );
+      }
+    };
+    if (!token) void refresh();
+    const interval = setInterval(refresh, 5000);
+    return () => {
+      alive = false;
+      clearInterval(interval);
+    };
   }, []);
-  async function load(file?: File) {
-    if (!file) return;
-    setPending([]);
-    try {
-      if (file.size > 16384)
-        throw new Error(
-          "Choose a reviewed-preferences export under 16 KB, not raw activity history.",
-        );
-      const next = parseContextExport(JSON.parse(await file.text()));
-      setPending(next);
-      setMessage(
-        next.length
-          ? "Review these preferences before enabling them."
-          : "This export has no reviewed preferences.",
-      );
-    } catch (error) {
-      setMessage(
-        error instanceof Error ? error.message : "Unable to read this file.",
-      );
-    }
-  }
-  function save() {
-    try {
-      localStorage.setItem(MEMORY_STORAGE_KEY, JSON.stringify(pending));
-      setSaved(pending);
-      setPending([]);
-      setMessage(
-        "Enabled on this browser. New shopping sessions receive these preferences. Existing sessions keep their current context.",
-      );
-    } catch {
-      setMessage("Browser storage is unavailable. Preferences were not saved.");
-    }
-  }
-  function forget() {
-    try {
-      localStorage.removeItem(MEMORY_STORAGE_KEY);
-      setSaved([]);
-      setPending([]);
-      setMessage(
-        "Removed from this browser. Start a new shopping session to stop using previously imported context. Delete the Mac copy separately in Along Context.",
-      );
-    } catch {
-      setMessage("Unable to clear browser storage.");
-    }
-  }
-  function rows(items: ReviewedPreference[]) {
-    return items.map((p) => (
-      <li key={p.key} style={{ padding: "14px 0" }}>
-        <strong>
-          {p.key === "color" ? "Bag colour" : "Bag style"}: {p.value}
-        </strong>
-        <p style={{ margin: "4px 0", color: "#526056" }}>
-          Source label: {p.sourceApp} · Reviewed{" "}
-          {new Date(p.approvedAt).toLocaleDateString()}
-        </p>
-        <small>
-          This is your confirmed preference, not proof of ownership or an
-          instruction to purchase.
-        </small>
-      </li>
-    ));
-  }
   const control = {
-    padding: "12px 18px",
-    border: "1px solid #56735c",
+    padding: "11px 16px",
+    border: "1px solid #607566",
     borderRadius: 10,
-    cursor: "pointer",
     background: "#edf3ed",
     color: "#203327",
+    cursor: "pointer",
   };
   return (
     <main
       style={{
-        maxWidth: 780,
+        maxWidth: 740,
         margin: "40px auto",
-        padding: 24,
+        padding: 28,
         color: "#203327",
         background: "#fafcf8",
         borderRadius: 18,
@@ -98,75 +91,124 @@ export default function ContextPage() {
       }}
     >
       <a href="/">← Along shopping</a>
-      <h1 style={{ fontSize: 36, marginBottom: 8 }}>Bring your Mac context.</h1>
+      <h1 style={{ fontSize: 36, marginBottom: 8 }}>Along remembers.</h1>
       <p>
-        Review locally collected activity in Along Context, then choose what
-        your shopper should remember. This website does not record your Mac.
+        Your Mac companion learns shopping preferences as you use supported
+        apps. No files to export or import.
       </p>
-      <ol>
-        <li>Open the Along Context Mac companion and click Allow.</li>
-        <li>Complete macOS Accessibility permission if prompted.</li>
-        <li>
-          Review an activity, confirm a bag colour or style, and export reviewed
-          preferences.
-        </li>
-        <li>Import that file here. Raw activity text stays on your Mac.</li>
-      </ol>
-      <label
-        style={{
-          display: "block",
-          padding: 20,
-          border: "1px dashed #56735c",
-          borderRadius: 12,
-        }}
-      >
-        <strong>Choose an Along Context export (.json)</strong>
-        <br />
-        <input
-          type="file"
-          accept=".json,application/json"
-          onChange={(e) => {
-            void load(e.target.files?.[0]);
-            e.target.value = "";
-          }}
-        />
-      </label>
-      {pending.length > 0 && (
-        <section>
-          <h2>Review before enabling</h2>
-          <ul>{rows(pending)}</ul>
-          <button style={control} onClick={save}>
-            Use these preferences on this browser
+      <p>
+        When you allow learning, redacted text from TextEdit, Notes, Mail and
+        Outlook goes to OpenAI through this local server. Browser content,
+        passwords, screenshots and audio are excluded. Inferences can be wrong;
+        change or remove them here.
+      </p>
+      {!profile ? (
+        <p role="status">
+          {message} Open the Mac companion, click Allow, then Open Along to pair
+          this browser.
+        </p>
+      ) : (
+        <>
+          <p role="status">
+            <strong>
+              {profile.enabled ? "Learning is on" : "Learning is paused"}
+            </strong>{" "}
+            · {profile.status}
+          </p>
+          <button
+            style={control}
+            disabled={busy}
+            onClick={() => void action(profile.enabled ? "pause" : "resume")}
+          >
+            {profile.enabled ? "Pause learning" : "Allow learning"}
           </button>
-        </section>
+          <p>
+            <small>
+              This controls learning. Use Pause in the Mac companion to stop
+              recording too.
+            </small>
+          </p>
+          <h2>What Along knows</h2>
+          {!profile.memories.length ? (
+            <p>
+              No preferences learned yet. A clear statement such as “I prefer
+              olive backpacks” in a supported app is enough. Product mentions
+              alone do not count.
+            </p>
+          ) : (
+            profile.memories.map((m) => (
+              <section
+                key={m.key}
+                style={{ borderTop: "1px solid #d5dfd6", padding: "18px 0" }}
+              >
+                <label>
+                  <strong>{labels[m.key]} </strong>
+                  <select
+                    aria-label={labels[m.key]}
+                    value={m.value}
+                    disabled={busy}
+                    style={control}
+                    onChange={(e) =>
+                      void action("correct", {
+                        key: m.key,
+                        value: e.target.value,
+                      })
+                    }
+                  >
+                    {options[m.key]?.map((v) => (
+                      <option key={v}>{v}</option>
+                    ))}
+                  </select>
+                </label>
+                <p style={{ margin: "6px 0" }}>
+                  {" "}
+                  {m.origin === "corrected"
+                    ? "Set by you"
+                    : `Learned from ${m.sourceApp} · ${Math.round(m.confidence * 100)}% confidence`}{" "}
+                  · {new Date(m.observedAt).toLocaleDateString()}
+                </p>
+                <button
+                  style={control}
+                  disabled={busy}
+                  onClick={() => void action("delete", { key: m.key })}
+                >
+                  Forget {labels[m.key].toLowerCase()}
+                </button>
+              </section>
+            ))
+          )}
+          <p role="status">{message}</p>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <a href="/" style={control}>
+              Start shopping with these preferences
+            </a>
+            <button
+              style={control}
+              disabled={busy}
+              onClick={() => void action("forget")}
+            >
+              Forget all & pause
+            </button>
+            <button
+              style={control}
+              disabled={busy}
+              onClick={() => void action("relearn")}
+            >
+              Reset corrections & learn anew
+            </button>
+          </div>
+          <p>
+            <small>
+              Preferences are soft defaults for new conversations, never
+              permission to buy. Current instructions win. Forgotten or
+              corrected fields stay protected from automatic relearning until
+              you reset corrections. Existing conversations keep their context;
+              start a new conversation after changes. Saved preferences expire
+              after 90 days. This connection works on this Mac only.
+            </small>
+          </p>
+        </>
       )}
-      <p role="status" aria-live="polite">
-        {message}
-      </p>
-      <section>
-        <h2>What Along remembers here</h2>
-        {saved.length ? (
-          <ul>{rows(saved)}</ul>
-        ) : (
-          <p>No imported preferences enabled.</p>
-        )}
-      </section>
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-        <a href="/" style={control}>
-          Start a new shopping session
-        </a>
-        <button style={control} onClick={forget}>
-          Forget imported preferences
-        </button>
-      </div>
-      <p>
-        <small>
-          Preferences persist in this browser for up to 90 days and are sent to
-          the Along backend when a new session starts. There is no cross-device
-          sync or automatic AI extraction in this version. Activity metadata and
-          source labels do not prove a preference; you confirm it.
-        </small>
-      </p>
     </main>
   );
 }

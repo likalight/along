@@ -1,0 +1,45 @@
+// Real HTTP + real model check. Use a disposable local profile, never personal history.
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+const directory=process.env.ALONG_CONTEXT_QA_DIRECTORY;
+assert(directory?.startsWith('/tmp/along-context-qa-'),'Disposable QA directory required');
+const {endpoint,token}=JSON.parse(await readFile(`${directory}/connection.json`,'utf8'));
+const base=new URL(endpoint); assert.equal(base.hostname,'127.0.0.1');
+async function request(path,body,headers={}) {
+ const r=await fetch(new URL(path,base),{method:body?'POST':'GET',headers:{origin:base.origin,'content-type':'application/json',...headers},...(body?{body:JSON.stringify(body)}:{})});
+ return {status:r.status,data:await r.json(),cookie:r.headers.get('set-cookie')?.split(';')[0]};
+}
+const native={authorization:`Bearer ${token}`};
+assert.equal((await request('/api/context')).status,401);
+assert.equal((await request('/api/context',{action:'pair',token:'wrong'})).status,400);
+assert.equal((await request('/api/context',{action:'pair',token},{origin:'https://evil.example'})).status,400);
+const pair=await request('/api/context',{action:'pair',token});assert.equal(pair.status,200);const browser={cookie:pair.cookie};
+const activity={id:crypto.randomUUID(),timestamp:new Date().toISOString(),bundleID:'com.apple.TextEdit',excerpt:'I always prefer olive backpacks for my own daily commute. I prefer lightweight bags over extra capacity.'};
+assert.equal((await request('/api/context',{action:'observe',activity},browser)).status,403);
+assert.equal((await request('/api/context',{action:'observe',activity},native)).data.accepted,false);
+assert.equal((await request('/api/context',{action:'resume'},native)).status,200);
+let result=await request('/api/context',{action:'observe',activity},native);
+assert.equal(result.status,200,JSON.stringify(result.data));
+assert(result.data.memories.some(m=>m.key==='color'&&m.value==='olive'),'model must learn explicit color');
+assert(result.data.memories.some(m=>m.key==='shape'&&m.value==='backpack'),'model must learn explicit style');
+assert(result.data.memories.every(m=>m.origin==='inferred'&&!('approvedAt'in m)));
+const learnedIDs=result.data.memories.map(m=>m.id);
+result=await request('/api/context',{action:'observe',activity},native);
+assert.deepEqual(result.data.memories.map(m=>m.id),learnedIDs,'duplicate event idempotent');
+const unpaired=await request('/api/session',{action:'connect'});assert.deepEqual(unpaired.data.preferences,[]);
+const paired=await request('/api/session',{action:'connect'},browser);assert.equal(paired.status,200);assert(paired.data.preferences.some(p=>p.includes('olive')));
+assert(!paired.data.receipt);
+let corrected=await request('/api/context',{action:'correct',key:'color',value:'black'},browser);assert(corrected.data.memories.some(m=>m.value==='black'&&m.origin==='corrected'));
+result=await request('/api/context',{action:'observe',activity:{...activity,id:crypto.randomUUID()}},native);
+assert.equal(result.status,200);assert(result.data.memories.some(m=>m.key==='color'&&m.value==='black'),'automatic learning must not override correction');
+let next=await request('/api/session',{action:'connect'},browser);assert(next.data.preferences.some(p=>p.includes('black')));
+const reconnect=await request('/api/session',{action:'connect',sessionId:paired.data.sessionId},{cookie:`${pair.cookie}; ${paired.cookie}`});assert(reconnect.data.preferences.some(p=>p.includes('olive')),'ongoing session not reseeded');
+assert.equal((await request('/api/context',{action:'correct',key:'color',value:'buy now'},browser)).status,400);
+assert.equal((await request('/api/context',{action:'observe',activity:{...activity,id:crypto.randomUUID(),bundleID:'com.apple.Safari'}},native)).status,400);
+assert.equal((await request('/api/context',{action:'observe',activity:{...activity,id:crypto.randomUUID(),timestamp:'2020-01-01'}},native)).status,400);
+await request('/api/context',{action:'forget'},browser);
+assert.deepEqual((await request('/api/context',null,browser)).data.memories,[]);
+assert.equal((await request('/api/context',{action:'observe',activity:{...activity,id:crypto.randomUUID()}},native)).data.accepted,false);
+assert.deepEqual((await request('/api/session',{action:'connect'},browser)).data.preferences,[]);
+const disk=await readFile(`${directory}/learned-preferences.json`,'utf8');assert(!disk.includes(activity.excerpt),'raw activity not persisted by server');
+console.log(JSON.stringify({realModelExtraction:'passed',automaticSessionPersonalization:'passed',pairingIsolation:'passed',crossOrigin:'rejected',idempotency:'passed',correctionProtection:'passed',forgetAndPause:'passed',rawTextPersistence:false}));

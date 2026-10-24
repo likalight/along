@@ -1,5 +1,7 @@
 # Mac context integration handoff
 
+> Historical PR #26 handoff. Automatic local inference and browser pairing are now implemented; see [AUTOMATIC.md](AUTOMATIC.md) for the current setup, scope, and verification.
+
 ## Scope of this PR
 
 Adds an opt-in native Mac collector and a validated preference import boundary in Along. This is a working foundation, **not automatic AI memory or a completed background-sync feature**. The user chose to use the AI teammate's connection when supplied; this PR creates no provider credentials or model calls.

@@ -1,0 +1,21 @@
+import { mkdir, readFile, writeFile, chmod } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import { randomBytes } from 'node:crypto';
+const directory=join(homedir(),'Library','Application Support','AlongContext');
+await mkdir(directory,{recursive:true,mode:0o700});
+await chmod(directory,0o700);
+const file=join(directory,'connection.json');
+let token;
+try { token=JSON.parse(await readFile(file,'utf8')).token; } catch (error) { if(error.code!=='ENOENT') throw error; }
+if(!token) token=randomBytes(32).toString('hex');
+const endpoint=process.env.ALONG_CONTEXT_URL || 'http://127.0.0.1:4339';
+const url=new URL(endpoint);
+if(url.protocol!=='http:' || url.hostname!=='127.0.0.1') throw new Error('Use a loopback Along URL.');
+await writeFile(file,JSON.stringify({endpoint:url.origin,token}),{mode:0o600}); await chmod(file,0o600);
+const envFile=new URL('../../apps/shopper/.env.local',import.meta.url);
+let env=await readFile(envFile,'utf8').catch(e=>{if(e.code==='ENOENT')return '';throw e;});
+env=env.replace(/^ALONG_CONTEXT_DIRECTORY=.*\n?/gm,'');
+await writeFile(envFile,env.trimEnd()+`\nALONG_CONTEXT_DIRECTORY=${JSON.stringify(directory)}\n`,{mode:0o600});
+await chmod(envFile,0o600);
+console.log('Local companion configured. Restart Along and the companion; open Along from the companion to pair your browser.');
