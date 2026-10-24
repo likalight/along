@@ -1,0 +1,17 @@
+{
+  "name": "coupangchallenge",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @coupang/web",
+    "build": "npm run build -w @coupang/contract && npm run build -w @coupang/agent && npm run build -w @coupang/web",
+    "test": "npm run test -w @coupang/agent",
+    "typecheck": "npm run typecheck -w @coupang/contract && npm run typecheck -w @coupang/agent && npm run typecheck -w @coupang/web"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
