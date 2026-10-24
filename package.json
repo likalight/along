@@ -1,5 +1,5 @@
 {
-  "name": "coupangchallenge",
+  "name": "along",
   "private": true,
   "workspaces": [
     "apps/*",

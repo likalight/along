@@ -15,10 +15,34 @@ export async function POST(request: Request) {
   const { store, orch } = getRuntime();
   try {
     assertOrigin(request);
+    const contentType = request.headers.get("content-type") ?? "";
+    if (!contentType.includes("application/json")) {
+      return NextResponse.json(
+        { error: "JSON body required." },
+        { status: 415 },
+      );
+    }
     const raw = await request.text();
-    if (raw.length > 32768) throw new Error("Turn too large.");
-    const b = JSON.parse(raw),
-      i = b.input;
+    if (raw.length > 32768) {
+      return NextResponse.json(
+        { error: "Turn too large." },
+        { status: 413 },
+      );
+    }
+    let b: Record<string, any>;
+    try {
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return NextResponse.json(
+          { error: "Invalid request shape." },
+          { status: 400 },
+        );
+      }
+      b = parsed;
+    } catch {
+      return NextResponse.json({ error: "Malformed JSON." }, { status: 400 });
+    }
+    const i = b.input;
     id = b.action === "connect" ? b.sessionId : i?.sessionId;
     if (b.action === "connect" && !id) {
       const s = orch.createSession();

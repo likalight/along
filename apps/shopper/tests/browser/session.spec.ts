@@ -376,3 +376,89 @@ test("WebGL unavailability keeps a stable fallback and working text path", async
   await expect(page.locator(".orb-fallback")).toBeVisible();
   await expect(page.locator(".orb-wrap canvas")).toHaveCount(0);
 });
+
+test("typing retains focus while cancellation snapshots reconcile", async ({
+  page,
+}) => {
+  await textMode(page);
+  await say(page, "bag");
+  const input = page.getByRole("textbox", { name: "Your message" });
+  await input.pressSequentially("shape, budget USD 150", { delay: 60 });
+  await expect(input).toBeFocused();
+  await expect(input).toHaveValue("shape, budget USD 150");
+  await input.press("Enter");
+  await expect(page.locator(".stage-card")).toHaveCount(3);
+});
+
+test("removing a reference while its accepted share is delayed clears server state", async ({
+  page,
+}) => {
+  await textMode(page);
+  await page.getByRole("button", { name: "Use prepared image" }).click();
+  await expect(
+    page.getByRole("button", { name: "Share with concierge" }),
+  ).toBeEnabled();
+  let release: (() => void) | undefined;
+  let sessionId = "";
+  await page.route("**/api/session", async (route) => {
+    const body = route.request().postDataJSON();
+    if (body.action === "input" && body.input?.attachmentId) {
+      sessionId = body.input.sessionId;
+      const response = await route.fetch();
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      await route.fulfill({ response }).catch(() => {});
+    } else await route.continue();
+  });
+  await page.getByRole("button", { name: "Share with concierge" }).click();
+  await expect.poll(() => !!release).toBe(true);
+  await page.getByRole("button", { name: "Remove Prepared navy bag" }).click();
+  release!();
+  await expect(
+    page.getByRole("img", { name: "Preview: Prepared navy bag" }),
+  ).toHaveCount(0);
+  await expect
+    .poll(async () => {
+      const response = await page.request.post("/api/session", {
+        data: { action: "connect", sessionId },
+      });
+      return (await response.json()).attachmentIds;
+    })
+    .toEqual([]);
+});
+
+test("a removed pending upload cannot reappear after its response", async ({
+  page,
+}) => {
+  await textMode(page);
+  let release: (() => void) | undefined;
+  await page.route("**/api/attachments", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    const response = await route.fetch();
+    await new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await route.fulfill({ response }).catch(() => {});
+  });
+  await page.getByRole("button", { name: "Use prepared image" }).click();
+  await expect(page.getByText("Preparing image…")).toBeVisible();
+  await expect.poll(() => !!release).toBe(true);
+  await page.getByRole("button", { name: "Remove Prepared navy bag" }).click();
+  release!();
+  await say(page, "bag");
+  await expect(
+    page.getByRole("list", { name: "References" }).getByRole("listitem"),
+  ).toHaveCount(0);
+});
+
+test("WebGL context exceptions preserve the text journey", async ({ page }) => {
+  await page.addInitScript(() => {
+    HTMLCanvasElement.prototype.getContext = () => {
+      throw new Error("GPU unavailable");
+    };
+  });
+  await textMode(page);
+  await say(page, "bag");
+  await expect(page.locator(".orb-fallback")).toBeVisible();
+});

@@ -2,6 +2,7 @@
 import { useRef, useState, type ChangeEvent } from "react";
 import { ImagePlus, Link2, X, LoaderCircle } from "lucide-react";
 import type { Attachment } from "@/lib/session/contract";
+import { IMAGE_TYPES, MAX_IMAGE_BYTES } from "@/lib/attachments/limits";
 type Item = {
   key: string;
   status: "loading" | "ready" | "error";
@@ -9,6 +10,7 @@ type Item = {
   asset?: Attachment;
   preview?: string;
   error?: string;
+  previewFailed?: boolean;
 };
 export function Attachments({
   sessionId,
@@ -77,8 +79,8 @@ export function Attachments({
     event.target.value = "";
     if (!f) return;
     if (
-      !["image/png", "image/jpeg", "image/webp"].includes(f.type) ||
-      f.size > 2 * 1024 * 1024 ||
+      !(IMAGE_TYPES as readonly string[]).includes(f.type) ||
+      f.size > MAX_IMAGE_BYTES ||
       !f.size
     ) {
       setItems((old) => [

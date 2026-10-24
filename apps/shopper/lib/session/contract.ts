@@ -56,6 +56,8 @@ export type Summary = {
   spokenText?: string;
   textHash?: string;
   responseTurnId?: string;
+  /** Fixture shell tracks display ack separately from status. */
+  displayed?: boolean;
   id: string;
   revision: number;
   productId: string;
@@ -119,6 +121,7 @@ export type Lifecycle = Identity & {
   videoId?: string;
   eventId?: string;
   type:
+    | "summary.displayed"
     | "audio.started"
     | "audio.completed"
     | "audio.interrupted"
