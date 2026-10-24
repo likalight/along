@@ -1,28 +1,13 @@
-# Conversational Shopping Concierge — Agent Harness
+# Along — conversational shopping integration
 
-Custom multimodal agent harness for GitHub issues **#10–#13**, aligned to **contract v1** ([#2](https://github.com/likalight/coupangchallenge/issues/2)).
+This integration branch combines the backend (#6–9), catalog package (#6) and custom agent harness (#10–13). Work is in progress; live voice/provider wiring and the final frontend still require rehearsal.
 
-## Architecture
+- `backend/`: authoritative sessions, compatibility/totals, explicit voice/text approval, HTTP/SSE and typed client. Start with `backend/INTEGRATION.md`.
+- `catalog/`: teammate's 24-product source-linked catalog and complete synthetic seller fixtures; `catalog/README.md` documents provenance.
+- `packages/contract`: shared Zod shapes.
+- `packages/agent`: turn orchestration, guided scenario logic and voice adapter. The original fixture store is retained for isolated agent checks; integration will use authoritative backend state.
+- `apps/web`: Next.js harness console and API routes, not the final shopper frontend.
 
-- **`packages/contract`** — Zod schemas for Session, Input, Agent proposals, approval, lifecycle
-- **`packages/agent`** — Custom harness (not Deep Agents): `TurnMachine`, `agentLoop`, scenario routers (audio / bags / bedding), fixture catalog + session store, GPT-Live duplex voice adapter (client delegation) with AFK substitute
-- **`apps/web`** — Next.js App Router UI + API (`/api/session`, `/api/turn`, `/api/lifecycle`, `/api/voice/mint`)
+All purchases are simulated. No payment/merchant calls. Microphone permissions, real model credentials and audible playback are not proven by fixture checks.
 
-Voice is full duplex. Typed / image / link turns use the same state machine and still get **spoken** replies.
-
-## Quick start
-
-```bash
-npm install
-npm run build -w @coupang/contract
-npm test -w @coupang/agent
-npm run dev -w @coupang/web
-```
-
-Optional: set `OPENAI_API_KEY` for live GPT-Live mint intents (WebRTC SDP wiring remains behind the adapter until credentials are confirmed).
-
-## Proposal actions (contract v1)
-
-`clarify` · `set_constraints` · `set_priority` · `shortlist` · `focus` · `compare` · `show_evidence` · `save` · `restore` · `select_offer` · `prepare_summary` · `propose_approval` · `defer` · `cancel`
-
-No `place_order` / receipt tools — backend (#9) owns approval.
+Run package checks using each package README. Combined build/run instructions will be updated after integration verification.
