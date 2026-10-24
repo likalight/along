@@ -19,12 +19,14 @@ export const PRODUCTS: Product[] = c.products.map((p: any) => ({
     size: p.specs.sizeMarket?.toLowerCase(),
     material: p.specs.material ?? p.specs.compositionLabel,
   },
+  // Curated form factors for this bounded catalog. Product titles omit the
+  // form factor for H390/Evolve2 and Wireless ME, so title matching is unsafe.
   solutionType:
     p.category !== "audio-accessories"
       ? undefined
-      : /headset|earpods/i.test(p.title)
+      : ["MIC-001", "MIC-003", "MIC-009"].includes(p.id)
         ? "headset"
-        : /lavalier|clip|lav\b/i.test(p.title)
+        : ["MIC-037", "MIC-038", "MIC-040"].includes(p.id)
           ? "clip_on"
           : "directional_desktop",
   authoredFitScore: p.authoredFit

@@ -9,14 +9,27 @@ import type { BuyingPriority } from "@coupang/contract";
 
 export function audioSolutionTypesProposal(
   base: Omit<AgentProposal, "action" | "payload" | "evidenceIds">,
+  exclusions: string[] = [],
 ): AgentProposal {
+  const choices = [
+    ["headset", "a headset"],
+    ["clip_on", "a clip-on mic"],
+    ["directional_desktop", "a directional desktop mic"],
+  ]
+    .filter(([type]) =>
+      PRODUCTS.some(
+        (p) => p.solutionType === type && !exclusions.includes(p.id),
+      ),
+    )
+    .map(([, label]) => label);
   return {
     ...base,
     action: "clarify",
     evidenceIds: [],
     payload: {
-      question:
-        "For noisy-café dictation, do you prefer a headset, a clip-on mic, or a directional desktop mic?",
+      question: choices.length
+        ? `For noisy-café dictation, do you prefer ${choices.join(" or ")}?`
+        : "All microphone types have been excluded. Which requirement would you like to reconsider?",
       stage: "solution_types",
     },
   };
@@ -118,13 +131,45 @@ function compromise(p: (typeof PRODUCTS)[0]): string {
   return "Desktop mics are less portable for moving between café seats.";
 }
 
-export function parseSolutionType(
-  text: string,
-): "headset" | "clip_on" | "directional_desktop" | undefined {
-  if (/headset/i.test(text)) return "headset";
-  if (/clip/i.test(text)) return "clip_on";
-  if (/desktop|directional|beam/i.test(text)) return "directional_desktop";
-  return undefined;
+type SolutionType = "headset" | "clip_on" | "directional_desktop";
+
+function solutionMentions(text: string) {
+  return [
+    ...text.matchAll(
+      /\b(headsets?|earphones?|lavalier(?:s)?|lapel|clip[- ]?on|desktop|directional|beam)\b/gi,
+    ),
+  ].map((m) => {
+    const prefix = text.slice(0, m.index);
+    const excluded =
+      /\b(?:no|not|without|avoid|exclude|don't want|do not want|don't like|do not like)\s+(?:(?:a|an|any|the|wearing)\s+){0,3}$/i.test(
+        prefix,
+      );
+    const type: SolutionType = /headset|earphone/i.test(m[0])
+      ? "headset"
+      : /lavalier|lapel|clip/i.test(m[0])
+        ? "clip_on"
+        : "directional_desktop";
+    return { type, excluded };
+  });
+}
+
+export function parseExcludedSolutionTypes(text: string): SolutionType[] {
+  return [
+    ...new Set(
+      solutionMentions(text)
+        .filter((m) => m.excluded)
+        .map((m) => m.type),
+    ),
+  ];
+}
+
+export function parseSolutionType(text: string): SolutionType | undefined {
+  const mentions = solutionMentions(text);
+  const excluded = new Set(
+    mentions.filter((m) => m.excluded).map((m) => m.type),
+  );
+  // Conflicting positive/negative mentions require clarification, not guessing.
+  return mentions.find((m) => !m.excluded && !excluded.has(m.type))?.type;
 }
 
 export function parsePriority(text: string): BuyingPriority | undefined {

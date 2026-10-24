@@ -1,4 +1,5 @@
 import { agreedCatalog as catalog } from "@coupang/contract";
+import { getProduct } from "@coupang/agent";
 import { getRuntime } from "./runtime";
 import type { Session, Summary, View } from "../session/contract";
 import type { CanvasData, Category } from "../canvas/contracts";
@@ -26,13 +27,13 @@ export const canvasData: CanvasData = {
     availability: p.sourceAvailability,
     classification: "snapshot",
     solution:
-      p.category !== "audio-accessories"
-        ? undefined
-        : /headset|earpods/i.test(p.title)
-          ? "headset"
-          : /lavalier|clip|lav\b/i.test(p.title)
-            ? "clip"
-            : "desktop",
+      getProduct(p.id)?.solutionType === "headset"
+        ? "headset"
+        : getProduct(p.id)?.solutionType === "clip_on"
+          ? "clip"
+          : getProduct(p.id)?.solutionType === "directional_desktop"
+            ? "desktop"
+            : undefined,
   })),
   evidence: catalog.evidence.map((e: any) => ({
     ...e,
@@ -49,13 +50,14 @@ export const canvasData: CanvasData = {
       ...o,
       otherFeesMinor: o.otherFeesMinor + o.taxMinor,
       // Empty setupHardware → 0; unknown/unpriced audio adapters stay null.
-      requiredSetupMinor: setup.length === 0 || setupPriced
-        ? setup.reduce(
-            (sum: number, h: { priceMinor?: number | null }) =>
-              sum + (h.priceMinor ?? 0),
-            0,
-          )
-        : null,
+      requiredSetupMinor:
+        setup.length === 0 || setupPriced
+          ? setup.reduce(
+              (sum: number, h: { priceMinor?: number | null }) =>
+                sum + (h.priceMinor ?? 0),
+              0,
+            )
+          : null,
       deliveryWindow: {
         latestOffsetDays: Math.round(
           (Date.parse(o.deliveryWindow.latest.slice(0, 10)) -
@@ -77,10 +79,7 @@ function summaryStatus(
   hasReceipt: boolean,
 ): Summary["status"] {
   if (hasReceipt) return "confirmed";
-  if (
-    approvalStatus === "blocked" ||
-    raw?.playback === "interrupted"
-  )
+  if (approvalStatus === "blocked" || raw?.playback === "interrupted")
     return "invalidated";
   if (approvalStatus === "eligible") return "eligible";
   return "presenting";
@@ -190,6 +189,7 @@ export function project(id: string): Session {
   ];
   return {
     ...s,
+    sharedReferenceIds: store.acceptedReferences(id),
     focusedProductId:
       s.focusedProductId ??
       catalog.offers.find((o: any) => o.id === s.selectedOfferId)?.productId ??

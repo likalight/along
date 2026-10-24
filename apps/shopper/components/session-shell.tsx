@@ -299,6 +299,7 @@ export function SessionShell() {
               <Attachments
                 key={`${s.sessionId}:${s.epoch}`}
                 sessionId={s.sessionId}
+                acceptedIds={s.sharedReferenceIds ?? []}
                 onInterrupt={controller.interrupt}
                 onRemove={(a) => {
                   // Always tell the session — even if the share response has not
@@ -526,8 +527,7 @@ function ContentStage({
             <p className="exact-summary-text">{s.summary.spokenText}</p>
           )}
           <p role="status">
-            {s.summary.status === "eligible" ||
-            s.approvalStatus === "eligible"
+            {s.summary.status === "eligible" || s.approvalStatus === "eligible"
               ? "Full summary displayed. Say or type “Confirm this simulated purchase” to approve this exact summary. There is no purchase button."
               : s.summary.status === "invalidated" ||
                   s.approvalStatus === "blocked" ||
@@ -558,7 +558,9 @@ function ContentStage({
               {s.receipt.acceptedOrder.productId} · USD{" "}
               {(s.receipt.acceptedOrder.totalMinor / 100).toFixed(2)}
             </p>
-            <small>Receipt {s.receipt.id} · duplicate confirms reuse this ID</small>
+            <small>
+              Receipt {s.receipt.id} · duplicate confirms reuse this ID
+            </small>
           </div>
         </div>
       )}

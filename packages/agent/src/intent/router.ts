@@ -19,15 +19,21 @@ export type Route =
 
 const STOP = /\b(stop|never ?mind|not now|defer|cancel|quit)\b/i;
 const SAVE = /\b(save( this)?|pin this|bookmark)\b/i;
-const EVIDENCE = /\b(review|reviews|complaint|video|seller|evidence|drawback|rating)\b/i;
+const EVIDENCE =
+  /\b(review|reviews|complaint|video|seller|evidence|drawback|rating)\b/i;
 const PRIORITY =
   /\b(best value|best quality|lowest[- ]cost|cheapest suitable|quality[- ]first|budget[- ]first)\b/i;
-const SOLUTION = /\b(headset|clip[- ]?on|desktop|directional|solution type)\b/i;
+const SOLUTION =
+  /\b(headsets?|lavalier(?:s)?|lapel|clip[- ]?on|desktop|directional|solution type)\b/i;
 const COMPARE = /\b(compare|versus|vs\.?)\b/i;
-const APPROVE = /\b(approve|confirm( the)? (purchase|order)|yes[,.]? (approve|confirm)|place (the )?order)\b/i;
-const ORDINAL = /\b(first|second|third|left|right|top|blue|navy|olive|the \d+(st|nd|rd|th))\b/i;
-const CORRECT = /\b(actually|not the|wrong|i meant|correction|shape|colour|color)\b/i;
-const REVISE = /\b(budget|instead|change|prefer|tomorrow|delivery|need it by)\b/i;
+const APPROVE =
+  /\b(approve|confirm( the)? (purchase|order)|yes[,.]? (approve|confirm)|place (the )?order)\b/i;
+const ORDINAL =
+  /\b(first|second|third|left|right|top|blue|navy|olive|the \d+(st|nd|rd|th))\b/i;
+const CORRECT =
+  /\b(actually|not the|wrong|i meant|correction|shape|colour|color)\b/i;
+const REVISE =
+  /\b(budget|instead|change|prefer|tomorrow|delivery|need it by)\b/i;
 
 export function routeInput(
   input: InputEvent,
@@ -45,20 +51,38 @@ export function routeInput(
   if (STOP.test(text)) return "stop_decline";
   if (SAVE.test(text)) return "save";
   if (APPROVE.test(text) && snapshot.summaryId) return "approve_candidate";
-  if (input.modality === "text" && CORRECT.test(text) && snapshot.imageInferences.length) {
+  if (
+    input.modality === "text" &&
+    CORRECT.test(text) &&
+    snapshot.imageInferences.length
+  ) {
     return "image_correct";
   }
   if (EVIDENCE.test(text)) return "evidence_q";
-  if (PRIORITY.test(text)) return "priority";
-  if (SOLUTION.test(text) && !/\d|usb|tomorrow/i.test(text) && snapshot.scenarioId === "cafe_dictation") return "solution_type";
+  // A priority embedded in a request must not swallow its budget, type or fit.
+  if (
+    PRIORITY.test(text) &&
+    !SOLUTION.test(text) &&
+    !/\d|usb|budget|tomorrow|delivery|under|exclude|without/i.test(text)
+  )
+    return "priority";
+  if (
+    SOLUTION.test(text) &&
+    !/\d|usb|tomorrow/i.test(text) &&
+    snapshot.scenarioId === "cafe_dictation"
+  )
+    return "solution_type";
   if (COMPARE.test(text)) return "compare";
   if (ORDINAL.test(text) && snapshot.displayOrder.length) return "ordinal_ref";
-  if (CORRECT.test(text) && snapshot.imageInferences.length) return "image_correct";
+  if (CORRECT.test(text) && snapshot.imageInferences.length)
+    return "image_correct";
   if (REVISE.test(text) && snapshot.revision > 0) return "revise";
 
   // Strong intent: exact product/model-ish or clear category + constraint
   if (
-    /\b(MIC-\d+|BAG-\d+|BED-\d+|beam pro|citypack|percale|talkclip)\b/i.test(text)
+    /\b(MIC-\d+|BAG-\d+|BED-\d+|beam pro|citypack|percale|talkclip)\b/i.test(
+      text,
+    )
   ) {
     return "strong_intent";
   }
@@ -69,16 +93,21 @@ export function routeInput(
   ) {
     return "cold_start";
   }
-  if (/\b(for|need|want|looking for)\b/i.test(text) && text.split(/\s+/).length <= 8) {
+  if (
+    /\b(for|need|want|looking for)\b/i.test(text) &&
+    text.split(/\s+/).length <= 8
+  ) {
     return "weak_intent";
   }
   if (/\b(café|cafe|dictation|noisy|microphone|headset)\b/i.test(text)) {
-    return snapshot.scenarioStage === "opening" || snapshot.scenarioStage === "understand"
+    return snapshot.scenarioStage === "opening" ||
+      snapshot.scenarioStage === "understand"
       ? "weak_intent"
       : "strong_intent";
   }
   if (/\b(bag|backpack|gym|tote)\b/i.test(text)) return "weak_intent";
-  if (/\b(sheets?|bedding|bedsheet|linen|percale)\b/i.test(text)) return "weak_intent";
+  if (/\b(sheets?|bedding|bedsheet|linen|percale)\b/i.test(text))
+    return "weak_intent";
 
   return snapshot.revision === 0 ? "cold_start" : "weak_intent";
 }
@@ -91,7 +120,8 @@ export function resolveReference(
 ): { productId?: string; ambiguous?: string } {
   const order =
     visibleProductIds.length > 0 ? visibleProductIds : snapshot.displayOrder;
-  if (!order.length) return { ambiguous: "Nothing is on screen to refer to yet." };
+  if (!order.length)
+    return { ambiguous: "Nothing is on screen to refer to yet." };
 
   const lower = text.toLowerCase();
   if (/\b(first|1st|top)\b/.test(lower)) return { productId: order[0] };
@@ -114,9 +144,13 @@ export function resolveReference(
   });
   if (colorHit) return { productId: colorHit };
 
-  const navy = order.filter((id) => /navy|blue/i.test(id) || lower.includes("navy"));
+  const navy = order.filter(
+    (id) => /navy|blue/i.test(id) || lower.includes("navy"),
+  );
   if (/\bnavy\b|\bblue\b/.test(lower)) {
-    const matches = order.filter((id) => id.startsWith("BAG") && (id === "BAG-001" || id === "BAG-006"));
+    const matches = order.filter(
+      (id) => id.startsWith("BAG") && (id === "BAG-001" || id === "BAG-006"),
+    );
     if (matches.length === 1) return { productId: matches[0] };
     if (matches.length > 1) {
       return { ambiguous: "More than one navy option is visible — which one?" };
@@ -124,5 +158,8 @@ export function resolveReference(
   }
 
   void navy;
-  return { ambiguous: "I'm not sure which item you mean — could you say the number or name?" };
+  return {
+    ambiguous:
+      "I'm not sure which item you mean — could you say the number or name?",
+  };
 }

@@ -315,16 +315,22 @@ export function ProductCanvas({
   }, [mediaRequest, s.revision]); // Request identity is shell-owned; never read commands from media content.
   const activeEvidence = data.evidence.find((e) => e.id === videoId);
 
+  function reviewsFor(productId: string) {
+    // Match the subject and evidence kind, not fixture-only IDs or display labels.
+    return data.evidence.find(
+      (e) =>
+        e.subjectType === "product" &&
+        e.subjectId === productId &&
+        (e.sourceType === "review" ||
+          e.sourceType === "Customer review snapshot"),
+    );
+  }
+
   function card(p: Product, index: number, compact = false) {
     const annotation = s.canvas.annotations[p.id];
     const rank = annotation?.rank;
     const isFocused = p.id === s.focusedProductId;
-    const metrics = data.evidence.find(
-      (e) =>
-        e.subjectType === "product" &&
-        e.subjectId === p.id &&
-        e.sourceType === "Customer review snapshot",
-    );
+    const metrics = reviewsFor(p.id);
     return (
       <motion.article
         key={p.id}
@@ -421,12 +427,7 @@ export function ProductCanvas({
     );
   }
   function details(p: Product) {
-    const reviews = data.evidence.find(
-      (e) =>
-        e.subjectType === "product" &&
-        e.subjectId === p.id &&
-        e.sourceType === "Customer review snapshot",
-    );
+    const reviews = reviewsFor(p.id);
     return (
       <section
         className={styles.focusSheet}
@@ -743,9 +744,7 @@ export function ProductCanvas({
                     <tr key={label}>
                       <th scope="row">{label}</th>
                       {products.map((p) => {
-                        const r = data.evidence.find(
-                          (e) => e.id === `${p.id}-reviews`,
-                        );
+                        const r = reviewsFor(p.id);
                         return (
                           <td key={p.id}>
                             {label === "Why it fits"

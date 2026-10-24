@@ -54,6 +54,7 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
   readonly core = new SessionStore(undefined, agreedProfile);
   private metadata = new Map<string, Meta>();
   private tokens = new Map<string, string>();
+  private sharedReferences = new Map<string, Set<string>>();
   override create(
     opts?: Parameters<FixtureSessionStore["create"]>[0],
   ): SessionSnapshot {
@@ -61,6 +62,7 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
     // constraints as assumed consent (INTEGRATION.md). Shopper conversation owns those.
     const { session, accessToken } = this.core.create();
     this.tokens.set(session.id, accessToken);
+    this.sharedReferences.set(session.id, new Set());
     this.metadata.set(session.id, {
       scenarioId: opts?.scenarioId ?? null,
       scenarioStage: "opening",
@@ -176,6 +178,36 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
       ...input,
       ...(input.modality === "link" ? { url: input.text?.trim() } : {}),
     });
+    const reference =
+      input.modality === "image"
+        ? input.attachmentId
+        : input.modality === "link"
+          ? input.text?.trim()
+          : undefined;
+    // Replaying a previously accepted event must not resurrect a removed link.
+    const current = this.core.get(input.sessionId);
+    if (
+      reference &&
+      current.turn?.id === input.turnId &&
+      current.turn.status === "active"
+    )
+      this.sharedReferences.get(input.sessionId)?.add(reference);
+  }
+  acceptedReferences(id: string) {
+    const s = this.core.get(id);
+    return [...(this.sharedReferences.get(id) ?? [])].filter(
+      (ref) => s.attachmentIds.includes(ref) || /^https:\/\//.test(ref),
+    );
+  }
+  removeReference(id: string, expected: number, reference: string) {
+    const result = this.core.removeReference(id, expected, reference);
+    this.sharedReferences.get(id)?.delete(reference);
+    const meta = this.metadata.get(id);
+    if (meta)
+      meta.imageInferences = meta.imageInferences.filter(
+        (x) => x.attachmentId !== reference,
+      );
+    return result;
   }
   override apply(a: AgentProposal): ApplyResult {
     let content = "";
@@ -271,39 +303,28 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
           case "shortlist": {
             const entries = (p.entries ??
               []) as SessionSnapshot["shortlistEntries"];
-            const related = [
-              ...((p.closeMatches as string[]) ?? []),
-              ...((p.relatedDiscoveries as string[]) ?? []),
-            ];
-            // Discovery may show related tiles that are not yet checkout-eligible.
-            // Hard category/incompatibility still drops a product; soft/unknown stays.
-            // HOST_CONNECTION_REQUIRED is soft until the shopper confirms host hardware
-            // (café demo would otherwise land empty after "best value").
-            const soft = (code: string) =>
-              /UNKNOWN|DELIVERY|OVER_BUDGET|SHOE_COMPARTMENT|LAPTOP_FIT|SPECIFICATION_CONFLICT|HOST_CONNECTION_REQUIRED/i.test(
-                code,
-              );
-            const discovery = entries.filter((e) => {
-              const quotes = this.quotes(a.sessionId, e.productId);
-              if (!quotes.length) return related.includes(e.productId);
-              return quotes.some((q) =>
-                q.conflicts.every(
-                  (c) =>
-                    soft(c.code) ||
-                    [
-                      "HOST_UNKNOWN",
-                      "BED_DIMENSIONS_UNKNOWN",
-                      "MATTRESS_DEPTH_UNKNOWN",
-                    ].includes(c.code),
-                ),
-              );
-            });
-            const eligible = discovery.filter((e) =>
-              this.quotes(a.sessionId, e.productId).some((q) => q.eligible),
+            // Discovery can precede user-supplied sizing/connection details, but
+            // never relax a stated budget, delivery deadline, exclusion or fit.
+            const clarificationOnly = new Set([
+              "HOST_CONNECTION_REQUIRED",
+              "BED_MEASUREMENTS_REQUIRED",
+            ]);
+            const discovery = entries.filter((e) =>
+              this.quotes(a.sessionId, e.productId).some((q) =>
+                q.conflicts.every((c) => clarificationOnly.has(c.code)),
+              ),
             );
-            const shown = (
-              eligible.length >= 3 ? eligible : discovery
-            ).slice(0, 5);
+            const pending = new Set(
+              discovery
+                .filter(
+                  (e) =>
+                    !this.quotes(a.sessionId, e.productId).some(
+                      (q) => q.eligible,
+                    ),
+                )
+                .map((e) => e.productId),
+            );
+            const shown = discovery.slice(0, 5);
             proposal.shortlist = shown.map((e) => e.productId);
             proposal.view = {
               stage: "shortlist",
@@ -313,7 +334,9 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
                 role: (s.priority ?? "best-value") as "best-value",
                 rank: (i + 1) as 1 | 2 | 3,
                 reason: e.fitReason,
-                compromise: e.compromise,
+                compromise: pending.has(e.productId)
+                  ? `${e.compromise} Confirm your ${s.constraints.category === "audio-accessories" ? "device connection" : "bed measurements"} before selecting an offer.`
+                  : e.compromise,
                 evidenceIds: getProduct(e.productId)?.evidenceIds ?? [],
               })),
               evidenceIds: [],
@@ -321,9 +344,9 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
             };
             proposal.stage = shown.length ? "shortlist" : "understanding";
             content = shown.length
-              ? eligible.length
-                ? `Here are ${shown.length} candidates. Gold/silver/bronze are contextual ranks for this shortlist — not awards.`
-                : `Here are ${shown.length} discoveries. Some still need a compatibility check before checkout.`
+              ? pending.size
+                ? `Here ${shown.length === 1 ? "is 1 possibility" : `are ${shown.length} possibilities`} within your stated limits. ${pending.size} still ${pending.size === 1 ? "needs" : "need"} your device connection or bed measurements before checkout.`
+                : `Here ${shown.length === 1 ? "is 1 candidate that meets" : `are ${shown.length} candidates that meet`} your stated limits. Ranks are contextual to this shortlist — not awards.`
               : "No checked offer meets the known hard constraints. Which requirement may change?";
             break;
           }
@@ -621,7 +644,11 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
   /** Idempotent drop of a session image/link reference. */
   removeAttachment(sessionId: string, attachmentId: string) {
     const s = this.core.get(sessionId);
-    this.core.removeAttachment(sessionId, s.revision, attachmentId);
+    if (
+      s.attachmentIds.includes(attachmentId) ||
+      this.acceptedReferences(sessionId).includes(attachmentId)
+    )
+      this.removeReference(sessionId, s.revision, attachmentId);
     return this.get(sessionId)!;
   }
 }

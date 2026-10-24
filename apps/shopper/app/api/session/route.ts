@@ -24,10 +24,7 @@ export async function POST(request: Request) {
     }
     const raw = await request.text();
     if (raw.length > 32768) {
-      return NextResponse.json(
-        { error: "Turn too large." },
-        { status: 413 },
-      );
+      return NextResponse.json({ error: "Turn too large." }, { status: 413 });
     }
     let b: Record<string, any>;
     try {
@@ -194,6 +191,35 @@ export async function POST(request: Request) {
       delete input.attachmentId;
     }
     let text = input.text?.trim() ?? "";
+    const removeReference = /^Remove reference (.{1,2048})$/.exec(text);
+    if (removeReference) {
+      const reference = removeReference[1];
+      if (
+        !store.acceptedReferences(sessionId).includes(reference) &&
+        !c.attachmentIds.includes(reference)
+      )
+        throw new Error("Reference is not available in this session.");
+      store.ingestInput(input);
+      store.removeReference(
+        sessionId,
+        store.core.get(sessionId).revision,
+        reference,
+      );
+      messages.set(
+        sessionId,
+        "Reference removed. Your stated requirements remain; review a fresh summary before confirming.",
+      );
+      const snapshot = project(sessionId);
+      return NextResponse.json({
+        sessionId,
+        epoch: snapshot.epoch,
+        turnId: input.turnId,
+        eventId: input.eventId,
+        revision: snapshot.revision,
+        type: "session.updated",
+        snapshot,
+      });
+    }
     const focus =
       c.view?.focusProductId ??
       agreedCatalog.offers.find((o: any) => o.id === c.selection?.offerId)
@@ -251,24 +277,6 @@ export async function POST(request: Request) {
       const picked = ranked[0];
       if (picked?.offer?.id) text = `Select offer ${picked.offer.id}`;
     }
-    const removeReference = text.match(
-      /^Remove reference ([A-Za-z0-9._:-]+)$/i,
-    );
-    if (removeReference) {
-      store.ingestInput({ ...input, text });
-      store.removeAttachment(sessionId, removeReference[1]);
-      messages.set(sessionId, "Removed that reference.");
-      const removed = project(sessionId);
-      return NextResponse.json({
-        sessionId,
-        epoch: removed.epoch,
-        turnId: input.turnId,
-        eventId: input.eventId,
-        revision: removed.revision,
-        type: "session.updated",
-        snapshot: removed,
-      });
-    }
     const exact = text.match(
       /^(Focus|Save|Remove|Show offers for|Show reviews for|(?:Select|Choose) offer) ([A-Z0-9-]+)$/i,
     );
@@ -278,6 +286,14 @@ export async function POST(request: Request) {
       );
     const confirm = /^confirm (?:this )?simulated purchase[.!]?$/i.test(text);
     if (exact || simple || confirm) {
+      // Browser claims about confidence/speaker identity are not provider proof.
+      // Only a server-verified voice channel may invoke store.confirmVoice;
+      // this public JSON route currently has no such channel or event binding.
+      if (confirm && input.modality === "voice") {
+        throw new Error(
+          "Voice approval needs server-verified speech evidence, which is not connected yet. Choose text mode, review a fresh summary, then type Confirm this simulated purchase.",
+        );
+      }
       // Confirmation is validated against stored shopper input, never model-produced text.
       store.ingestInput({
         ...input,
@@ -308,37 +324,14 @@ export async function POST(request: Request) {
           ...input,
           text: "Confirm this simulated purchase",
         };
-        if (input.modality === "voice") {
-          const evidence = b.voiceEvidence;
-          if (
-            !evidence ||
-            typeof evidence !== "object" ||
-            evidence.final !== true ||
-            evidence.source !== "shopper" ||
-            evidence.echoDetected === true ||
-            typeof evidence.confidence !== "number" ||
-            evidence.confidence < 0.9
-          ) {
-            throw new Error(
-              "Voice purchase approval requires trusted live voice evidence (final, non-echo, confidence ≥ 0.9). Choose text mode, review the summary again, then type Confirm this simulated purchase.",
-            );
-          }
-          store.confirmVoice(confirmInput, {
-            transcript: "Confirm this simulated purchase",
-            final: true,
-            confidence: evidence.confidence,
-            source: "shopper",
-            echoDetected: false,
-          });
-        } else if (input.modality === "text") {
+        if (input.modality === "text") {
           store.confirmText(confirmInput);
         } else {
           throw new Error(
             "Only deliberate voice or text confirmation can approve a simulated purchase.",
           );
         }
-      }
-      else if (exact) {
+      } else if (exact) {
         const action = exact[1].toLowerCase(),
           pid = exact[2].toUpperCase();
         if (action === "select offer") {
