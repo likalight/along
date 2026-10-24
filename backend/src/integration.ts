@@ -8,7 +8,7 @@ import type {
   Proposal,
   Quote,
 } from "./contracts.ts";
-import { SessionStore } from "./store.ts";
+import { SessionStore, type InterpretedCheckoutApproval } from "./store.ts";
 import { object, keys, requireThat, strings } from "./validation.ts";
 export const productView = (p: Product) => p.canonical ? structuredClone(p.canonical) : ({
   ...p,
@@ -311,7 +311,7 @@ export function acceptAction(store: SessionStore, id: string, raw: unknown) {
     return store.propose(id, p);
   });
 }
-export function acceptApproval(store: SessionStore, id: string, raw: unknown) {
+export function acceptApproval(store: SessionStore, id: string, raw: unknown, interpretedApproval?: InterpretedCheckoutApproval) {
   object(raw);
   keys(raw, [
     "sessionId",
@@ -336,7 +336,12 @@ export function acceptApproval(store: SessionStore, id: string, raw: unknown) {
     "INVALID_MODE",
     "Only deliberate shopper voice/text can approve.",
   );
-  return store.once(id, raw.epoch as number, raw.eventId as string, raw, () => {
+  const payload = interpretedApproval ? { ...raw, interpretedApproval: {
+    intent: interpretedApproval.intent, transcript: interpretedApproval.transcript,
+    summaryId: interpretedApproval.summaryId, summaryRevision: interpretedApproval.summaryRevision,
+    requiresApprovalQuestion: interpretedApproval.requiresApprovalQuestion,
+  } } : raw;
+  return store.once(id, raw.epoch as number, raw.eventId as string, payload, () => {
     const s = store.get(id);
     requireThat(
       s.turn?.input?.modality === raw.modality,
@@ -385,6 +390,7 @@ export function acceptApproval(store: SessionStore, id: string, raw: unknown) {
         approvalNonce: s.turn?.approvalWindow?.nonce,
       },
       raw.modality === "text",
+      interpretedApproval,
     );
   });
 }

@@ -212,6 +212,26 @@ test("canonical HTTP cannot bypass guarded confirmation through input-less legac
   assert.equal(accepted.receipt.acceptedOrder.totalMinor, 11900);
 });
 
+test("HTTP confirmation cannot accept a caller-supplied semantic authorization", async (t) => {
+  const h = await harness(t);
+  let s = await preparedVoice(h);
+  s = await h.shopper.presentation(s.summary!, "displayed", s);
+  const interpretedApproval = {
+    intent: "approve_order", transcript: "Please handle the purchase for me",
+    summaryId: s.summary!.id, summaryRevision: s.summary!.revision, requiresApprovalQuestion: false,
+  };
+  for (const extra of [{ interpretedApproval }, { semanticApproval: interpretedApproval }, { intent: "approve_order" }]) {
+    const result = await h.post("confirm", {
+      sessionId: s.sessionId, epoch: s.epoch, eventId: randomUUID(), turnId: s.turn!.id,
+      baseRevision: s.revision, summaryId: s.summary!.id, summaryRevision: s.summary!.revision,
+      modality: "text", explicitIntent: "confirm_simulated_purchase", ...extra,
+    }, true);
+    assert.equal(result.body.error.code, "UNKNOWN_FIELD");
+    assert.equal((await h.shopper.snapshot()).revision, s.revision);
+    assert.equal((await h.shopper.snapshot()).receipt, null);
+  }
+});
+
 test("HTTP action shortcuts validate evidence before any save, restore, summary or cancellation", async (t) => {
   const h = await harness(t);
   const s = await h.shopper.input(h.initial, "text", { text: "Show work and gym bags." });

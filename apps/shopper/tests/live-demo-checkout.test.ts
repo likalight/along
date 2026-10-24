@@ -1,8 +1,14 @@
-import { expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { POST } from "@/app/api/session/route";
 import { getRuntime } from "@/lib/integration/runtime";
 import { project } from "@/lib/integration/projection";
 import { completeLiveDemoCheckout } from "@/lib/voice/live-demo-checkout";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+});
 
 async function review(mode: "voice" | "text" = "voice") {
   const connected = await POST(
@@ -104,15 +110,58 @@ it("accepts natural typed confirm through the original exact-summary approval gu
 });
 
 it.each([
-  "Yes I approved this, can we just buy this",
-  "Yes, go ahead and place the order",
-  "Please buy it",
-  "yes please",
-  "sounds good",
+  ["make the purchase", "explicit"],
+  ["Please complete the purchase", "explicit"],
+  ["Let's finish checkout", "explicit"],
+  ["Yes I approved this, can we just buy this", "explicit"],
+  ["Yes, go ahead and place the order", "explicit"],
+  ["Please buy it", "explicit"],
+  ["I'm happy with these details; send it my way.", "explicit"],
+  [
+    "I've looked over the item, seller, quantity, total, and delivery details on this review. I'm satisfied with this exact order and I don't need any further comparison or explanation. Please go ahead and complete this purchase for me now.",
+    "explicit",
+  ],
+  ["yes please", "assent"],
+  ["sounds good", "assent"],
 ])(
-  "accepts a natural response to the displayed order question: %s",
-  async (text) => {
+  "uses semantic intent for a natural response to the displayed order question: %s",
+  async (text, authorization) => {
     const h = await review("text");
+    vi.stubEnv("ALONG_AGENT_MODE", "live");
+    vi.stubEnv("OPENAI_API_KEY", "test-checkout-key");
+    const provider = vi.fn<typeof fetch>(async (url, init) => {
+      expect(String(url)).toBe("https://api.openai.com/v1/responses");
+      const request = JSON.parse(String(init?.body));
+      expect(request.text.format.name).toBe("checkout_intent");
+      const context = JSON.parse(request.input[0].content);
+      expect(context.text).toBe(text);
+      expect(context.review.id).toBe(h.snapshot.summary!.id);
+      expect(context.review.revision).toBe(h.snapshot.summary!.revision);
+      expect(context.approvalPromptActive).toBe(true);
+      expect(context.recentTurns.slice(-2)).toEqual([
+        { role: "assistant", text: h.snapshot.message },
+        { role: "shopper", text },
+      ]);
+      return Response.json({
+        status: "completed",
+        output: [
+          {
+            type: "message",
+            content: [
+              {
+                type: "output_text",
+                text: JSON.stringify({
+                  intent: "approve_order",
+                  authorization,
+                  summaryId: context.review.id,
+                }),
+              },
+            ],
+          },
+        ],
+      });
+    });
+    vi.stubGlobal("fetch", provider);
     const response = await h.send(text);
     expect(response.status).toBe(200);
     const data = await response.json();
@@ -120,8 +169,67 @@ it.each([
     expect(data.snapshot.receipt.acceptedOrder.productId).toBe(
       h.snapshot.summary!.productId,
     );
+    expect(provider).toHaveBeenCalledTimes(1);
+    const accepted = h.store.core.get(h.s.id);
+    expect(accepted.history.at(-1)?.text).toBe(text);
+    expect(accepted.receipt!.completionSource).toBeUndefined();
   },
 );
+
+it("acknowledges an already completed order without placing it again", async () => {
+  const h = await review("text");
+  const completed = await h.send("confirm");
+  expect(completed.status).toBe(200);
+  const accepted = h.store.core.get(h.s.id);
+  Object.assign(h.s, accepted);
+  const visible = project(h.s.id);
+  const text = "Perfect, thanks for sorting that out.";
+  vi.stubEnv("ALONG_AGENT_MODE", "live");
+  vi.stubEnv("OPENAI_API_KEY", "test-checkout-key");
+  const approve = vi.spyOn(h.store.core, "approve");
+  const liveCompletion = vi.spyOn(h.store.core, "completeLiveDemo");
+  const provider = vi.fn<typeof fetch>(async (url, init) => {
+    expect(String(url)).toBe("https://api.openai.com/v1/responses");
+    const request = JSON.parse(String(init?.body));
+    expect(request.text.format.name).toBe("checkout_intent");
+    const context = JSON.parse(request.input[0].content);
+    expect(context.stage).toBe("complete");
+    expect(context.text).toBe(text);
+    expect(context.recentTurns.slice(-2)).toEqual([
+      { role: "assistant", text: visible.message },
+      { role: "shopper", text },
+    ]);
+    return Response.json({
+      status: "completed",
+      output: [
+        {
+          type: "message",
+          content: [
+            {
+              type: "output_text",
+              text: JSON.stringify({
+                intent: "acknowledge_order",
+                authorization: "none",
+                summaryId: null,
+              }),
+            },
+          ],
+        },
+      ],
+    });
+  });
+  vi.stubGlobal("fetch", provider);
+  const response = await h.send(text);
+  expect(response.status).toBe(200);
+  const data = await response.json();
+  expect(data.snapshot.view).toBe("receipt");
+  expect(data.snapshot.receipt.id).toBe(accepted.receipt!.id);
+  expect(data.snapshot.message).toContain("Your order is confirmed");
+  expect(provider).toHaveBeenCalledTimes(1);
+  expect(approve).not.toHaveBeenCalled();
+  expect(liveCompletion).not.toHaveBeenCalled();
+  expect(h.store.core.get(h.s.id)).toEqual(accepted);
+});
 
 it("does not treat yes to an intervening question as order approval", async () => {
   const h = await review("text");

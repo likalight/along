@@ -82,26 +82,13 @@ export function SessionShell() {
     [...(s?.history ?? [])].reverse().find((entry) => entry.role === "user")
       ?.text;
   useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const query = new URL(window.location.href).searchParams;
-      const resume =
-        query.get("discoverySession") ??
-        sessionStorage.getItem("along.sessionId");
-      await controller.connect(
-        resume && /^[A-Za-z0-9_-]{1,100}$/.test(resume) ? resume : undefined,
-      );
-      const sessionId = controller.getSnapshot().snapshot?.sessionId;
-      if (!sessionId || cancelled) return;
-      const { adapter, kind, note } = await createSpeechAdapter(sessionId);
-      if (cancelled) {
-        adapter.dispose();
-        return;
-      }
-      controller.setSpeechAdapter(adapter, kind);
-      setVoiceNote(note ?? null);
-      setVoiceReady(true);
-    })();
+    const query = new URL(window.location.href).searchParams;
+    const resume =
+      query.get("discoverySession") ??
+      sessionStorage.getItem("along.sessionId");
+    void controller.connect(
+      resume && /^[A-Za-z0-9_-]{1,100}$/.test(resume) ? resume : undefined,
+    );
     const offline = () => {
       controller.interrupt();
       controller.pauseListening();
@@ -114,7 +101,6 @@ export function SessionShell() {
     window.addEventListener("online", online);
     window.addEventListener("keydown", key);
     return () => {
-      cancelled = true;
       controller.interrupt();
       controller.closeVoice();
       window.removeEventListener("offline", offline);
@@ -122,6 +108,27 @@ export function SessionShell() {
       window.removeEventListener("keydown", key);
     };
   }, [controller]);
+  useEffect(() => {
+    const sessionId = s?.sessionId;
+    if (!sessionId) return;
+    let cancelled = false;
+    setVoiceReady(false);
+    // A failed saved-session reconnect has no ID at mount. Initialize when a
+    // valid session is accepted later, without starting capture or playback.
+    void (async () => {
+      const { adapter, kind, note } = await createSpeechAdapter(sessionId);
+      if (cancelled) {
+        adapter.dispose();
+        return;
+      }
+      controller.setSpeechAdapter(adapter, kind);
+      setVoiceNote(note ?? null);
+      setVoiceReady(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [controller, s?.sessionId]);
   useEffect(() => {
     if (s?.sessionId) sessionStorage.setItem("along.sessionId", s.sessionId);
   }, [s?.sessionId]);

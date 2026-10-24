@@ -52,9 +52,12 @@ test("real unpacked extension discovers automatically and continues the same con
       .getByRole("textbox", { name: "Your message" })
       .fill("a work and gym bag");
     await page.getByRole("button", { name: "Send message" }).click();
-    await expect(page.getByRole("status").first()).not.toContainText(
-      "Thinking",
-    );
+    await expect(page.locator(".voice-status")).toContainText("Ready");
+    await page
+      .getByRole("textbox", { name: "Your message" })
+      .fill("shape, budget USD 150");
+    await page.getByRole("button", { name: "Send message" }).click();
+    await expect(page.locator(".voice-status")).toContainText("Ready");
     const sessionId = await page.evaluate(() =>
       sessionStorage.getItem("along.sessionId"),
     );
@@ -169,12 +172,13 @@ test("real unpacked extension discovers automatically and continues the same con
     await page
       .getByRole("button", { name: "Check my requirements", exact: true })
       .click();
-    await expect(page.getByRole("status").first()).not.toContainText(
-      "Thinking",
-    );
+    await expect(page.locator(".voice-status")).toContainText("Ready");
     await expect(
       page.getByRole("region", { name: "How this fits your needs" }),
     ).toBeVisible();
+    await expect(
+      page.getByRole("region", { name: "How this fits your needs" }),
+    ).toContainText("150");
     await page.screenshot({
       path: info.outputPath("same-conversation.png"),
       fullPage: true,
@@ -183,9 +187,7 @@ test("real unpacked extension discovers automatically and continues the same con
       .getByRole("textbox", { name: "Your message" })
       .fill("show offers");
     await page.getByRole("button", { name: "Send message" }).click();
-    await expect(page.getByRole("status").first()).not.toContainText(
-      "Thinking",
-    );
+    await expect(page.locator(".voice-status")).toContainText("Ready");
     await expect(
       page.getByRole("article", { name: "Discovery in this conversation" }),
     ).toBeVisible();

@@ -399,8 +399,10 @@ export function ExtensionCompanion({
         <p>
           {pending
             ? `${pending.candidate.title}. Your current conversation stays with you.`
-            : (note ??
-              "Connect Along’s extension once, then discuss the things you discover by voice or text.")}
+            : paired
+              ? "New discoveries return here, with your requirements and conversation intact."
+              : (note ??
+                "Connect Along’s extension once, then discuss the things you discover by voice or text.")}
         </p>
       </div>
       {pending && (
@@ -517,7 +519,9 @@ export function DiscoveryContext({
                   {check.source === "catalog"
                     ? "Demo catalog evidence"
                     : check.source === "listing"
-                      ? "Listing snapshot"
+                      ? mode === "demo"
+                        ? "Demo item price"
+                        : "Listing snapshot"
                       : "More information needed"}
                 </small>
               </li>

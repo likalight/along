@@ -58,7 +58,11 @@ describe("GPT-Live trusted transcript context", () => {
     b.observeOutput({ delta: "It will arrive ", start_ms: 11, end_ms: 20 });
     b.observeOutput({ delta: "within four days.", start_ms: 20, end_ms: 30 });
     b.add({ delta: "Purchase this", start_ms: 31, end_ms: 40 });
-    expect(b.latestRequest(40)).toBe("Purchase this");
+    expect(b.dialogue(40)).toEqual([
+      { role: "shopper", text: "When will it arrive?" },
+      { role: "assistant", text: "It will arrive within four days." },
+      { role: "shopper", text: "Purchase this" },
+    ]);
     expect(b.take(40)).toBe("When will it arrive? Purchase this");
   });
   it.each([
@@ -72,7 +76,14 @@ describe("GPT-Live trusted transcript context", () => {
       b.add({ delta: "Buy it ", start_ms: 1, end_ms: 10 });
       b.observeOutput({ delta, start_ms, end_ms });
       b.add({ delta: "only if it comes tomorrow", start_ms: 21, end_ms: 40 });
-      expect(b.latestRequest(40)).toBe("Buy it only if it comes tomorrow");
+      expect(b.take(40)).toBe("Buy it only if it comes tomorrow");
+      expect(
+        b
+          .dialogue(40)
+          .filter((turn) => turn.role === "shopper")
+          .map((turn) => turn.text)
+          .join(" "),
+      ).toBe("Buy it only if it comes tomorrow");
     },
   );
   it("keeps a late-arriving qualification with its original utterance across response captions", () => {
@@ -84,9 +95,16 @@ describe("GPT-Live trusted transcript context", () => {
       end_ms: 20,
     });
     b.add({ delta: "Only if it arrives tomorrow. ", start_ms: 1, end_ms: 25 });
-    expect(b.latestRequest(40)).toBe(
-      "Only if it arrives tomorrow. Purchase this",
-    );
+    expect(b.take(40)).toBe("Only if it arrives tomorrow. Purchase this");
+  });
+  it("retains a long input's initial condition instead of silently truncating it", () => {
+    const b = new LiveTranscriptBuffer();
+    const text =
+      "Only if the price drops. " +
+      "Some context. ".repeat(400) +
+      "Purchase this";
+    b.add({ delta: text, start_ms: 1, end_ms: 10 });
+    expect(b.take(10)).toBe(text);
   });
   it("keeps backend delegation and purchase authority separate from speech", () => {
     expect(LIVE_INSTRUCTIONS).toContain("<|SpawnThinking|>");
