@@ -1,4 +1,4 @@
-import { PRODUCT_VIDEOS } from "@coupang/contract";
+import { productReview, requestsYouTubeReview } from "@coupang/contract";
 import { z } from "zod";
 import { normalizeHostConnection } from "@concierge/backend/along-catalog";
 import type {
@@ -190,7 +190,7 @@ const definitions = {
   },
   show_product_video: {
     description:
-      "When the shopper asks to watch a product video, request its curated review inside Along. Only MIC-062 (RØDE Wireless PRO) currently has a video. Requires a visible product; no purchase or new conversation. Along pauses voice during the review. Continue conversation closes the player and resumes the same session. Chrome is an optional fallback. This only queues a request; never claim playback has started.",
+      "When the shopper asks to watch a product video, request its curated review inside Along. The available review is RØDE Wireless PRO. Other microphones may use it as a clearly labelled related-model review, without changing the selected product. Explicit YouTube/Chrome requests open through the extension; otherwise play inside Along. Requires a visible product; no purchase or new conversation. Along pauses voice during the review. Continue conversation closes the player and resumes the same session. Chrome is an optional fallback. This only queues a request; never claim playback has started.",
     fields: product,
   },
   focus: { description: "Focus a currently visible product.", fields: product },
@@ -395,11 +395,9 @@ export function executeShoppingTool(opts: {
     if (args.offerId && !getOffer(args.offerId))
       throw new Error("Unknown platform offer ID");
     if (name === "show_product_video") {
-      const video = PRODUCT_VIDEOS.find((v) => v.productId === args.productId);
+      const video = productReview(args.productId);
       if (!video)
-        throw new Error(
-          "No curated video for this exact product. Do not substitute another model's video.",
-        );
+        throw new Error("No available review for this product category.");
       if (!snapshot.displayOrder.includes(args.productId))
         throw new Error("Show the requested product before its video.");
       return finish({
@@ -408,8 +406,11 @@ export function executeShoppingTool(opts: {
         data: {
           productVideoId: video.id,
           ...video,
-          instruction:
-            "REQUEST QUEUED, not opened or playing. Tell the shopper: I will open the Wireless PRO review here in Along. Voice pauses while you watch; choose Continue conversation when finished. Chrome is available as a fallback if the embedded player cannot play. Do not claim playback has started.",
+          requestedProductId: args.productId,
+          destination: requestsYouTubeReview(input.text ?? "")
+            ? "chrome"
+            : "inline",
+          instruction: `REQUEST QUEUED, not playing. ${video.productId !== args.productId ? "This is a RELATED MODEL review of RØDE Wireless PRO, not the selected product; say that clearly and leave the selected product unchanged." : "This review matches the selected product."} ${requestsYouTubeReview(input.text ?? "") ? "The shopper explicitly asked for YouTube/Chrome: open through the Chrome extension; Back to Along returns to the same conversation." : "Open the review inside Along; Continue conversation resumes the same session."} Voice pauses before the video. Never claim playback has started.`,
         },
       });
     }

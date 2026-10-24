@@ -187,15 +187,15 @@ describe("live carousel presentation focus", () => {
     h.controller.dispose();
   });
 
-  it("clears immediately on barge-in and user speech; ignores interrupted tail captions", async () => {
+  it("holds the displayed card through barge-in and ignores interrupted tail captions", async () => {
     const h = await liveHarness();
     h.callbacks.speaking?.(true);
     h.callbacks.caption?.("assistant", "Logitech H390");
     h.callbacks.bargeIn();
-    expect(h.controller.getSnapshot().narrationProductId).toBeNull();
+    expect(h.controller.getSnapshot().narrationProductId).toBe("MIC-003");
     h.callbacks.speaking?.(true);
     h.callbacks.caption?.("assistant", "Logitech H390 or the Shure MV6 Gen 2");
-    expect(h.controller.getSnapshot().narrationProductId).toBeNull();
+    expect(h.controller.getSnapshot().narrationProductId).toBe("MIC-003");
     h.callbacks.caption?.("user", "What about the second option?");
     // Clear the interrupted narration, then honor the shopper's visual request.
     expect(h.controller.getSnapshot().narrationProductId).toBe("MIC-003");
@@ -237,7 +237,7 @@ describe("live carousel presentation focus", () => {
     h.callbacks.caption?.("assistant", "Logitech H390");
     h.callbacks.bargeIn();
     h.callbacks.caption?.("assistant", "Logitech H390 is still old output");
-    expect(h.controller.getSnapshot().narrationProductId).toBeNull();
+    expect(h.controller.getSnapshot().narrationProductId).toBe("MIC-003");
 
     // The adapter signals the guarded output boundary before releasing the
     // first fresh caption, even when transcription missed the shopper's speech.
@@ -350,5 +350,38 @@ it("Chrome voice navigation targets the narrated product once, never checkout", 
   expect(h.controller.getSnapshot().voiceReviewRequest).toBe(request);
   expect(h.controller.getSnapshot().snapshot?.selectedOfferId).toBeNull();
   expect(h.transport.send).not.toHaveBeenCalled();
+  h.controller.dispose();
+});
+
+it("never flashes the first card when a new reply starts after a spoken navigation", async () => {
+  const h = await liveHarness();
+  const frames: (string | null)[] = [];
+  h.callbacks.caption?.("user", "Show the third option");
+  h.controller.subscribe(() =>
+    frames.push(h.controller.getSnapshot().narrationProductId),
+  );
+  h.callbacks.bargeIn();
+  h.callbacks.playbackResumed?.();
+  h.callbacks.speaking?.(true);
+  h.callbacks.caption?.(
+    "assistant",
+    "Unlike the Apple EarPods, this one has a desktop stand.",
+  );
+  h.callbacks.speaking?.(false);
+  h.controller.pauseListening();
+  expect(frames.length).toBeGreaterThan(0);
+  expect(frames.every((id) => id === "MIC-015")).toBe(true);
+  expect(h.controller.getSnapshot().snapshot?.selectedOfferId).toBeNull();
+  h.controller.dispose();
+});
+
+it("routes an explicit watch-on-YouTube voice command to Chrome", async () => {
+  const h = await liveHarness();
+  h.callbacks.caption?.("user", "I want to watch it on YouTube");
+  expect(h.controller.getSnapshot().voiceReviewRequest?.destination).toBe(
+    "chrome",
+  );
+  expect(requestsChromeReview("I want to watch a video review")).toBe(false);
+  expect(requestsChromeReview("Don't open YouTube")).toBe(false);
   h.controller.dispose();
 });

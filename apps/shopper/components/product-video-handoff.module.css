@@ -117,3 +117,9 @@
     flex: 1 0 100%;
   }
 }
+
+.playerLoading {
+  padding: 8px 20px;
+  color: var(--muted);
+  font-size: 13px;
+}

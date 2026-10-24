@@ -709,3 +709,33 @@ test("Wireless PRO review uses the exact visible product and leaves checkout unt
   assert.equal(h.run("show_product_video", { productId: "MIC-040" }).ok, false);
   assert.equal(h.store.core.get(h.input.sessionId).receipt, null);
 });
+
+
+test("related review preserves the visible product and explicit YouTube destination", () => {
+  const h = setup();
+  h.run("shortlist", {
+    entries: [
+      {
+        productId: "MIC-040",
+        fitReason: "Wearable",
+        compromise: "Check host compatibility",
+      },
+    ],
+  });
+  const before = h.store.get(h.input.sessionId)!;
+  h.input.text = "I want to watch it on YouTube";
+  const review = h.run("show_product_video", { productId: "MIC-040" });
+  assert.equal(review.ok, true);
+  assert.equal((review.data as any).destination, "chrome");
+  assert.equal((review.data as any).requestedProductId, "MIC-040");
+  assert.equal((review.data as any).productId, "MIC-062");
+  assert.match((review.data as any).instruction, /RELATED MODEL/);
+  assert.equal(review.snapshot.focusedProductId, before.focusedProductId);
+  assert.equal(review.snapshot.selectedOfferId, before.selectedOfferId);
+  h.input.text = "Show me a video review";
+  assert.equal(
+    (h.run("show_product_video", { productId: "MIC-040" }).data as any)
+      .destination,
+    "inline",
+  );
+});

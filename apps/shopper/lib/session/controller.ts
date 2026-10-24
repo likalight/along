@@ -18,7 +18,11 @@ export type ClientState = {
   snapshot: Session | null;
   narrationProductId: string | null;
   outputMuted: boolean;
-  voiceReviewRequest: { productId: string; requestId: string } | null;
+  voiceReviewRequest: {
+    productId: string;
+    requestId: string;
+    destination: "inline" | "chrome";
+  } | null;
   status: VoiceStatus;
   capturing: boolean;
   mode: "text" | "voice" | null;
@@ -77,6 +81,7 @@ export class SessionController {
   private userNavigationKey: string | null = null;
   private lastPresentedProductId: string | null = null;
   private userReviewHandled = false;
+  private pinnedPresentation: string | null = null;
   private activityTimer: ReturnType<typeof setTimeout> | null = null;
   private delayTimer: ReturnType<typeof setTimeout> | null = null;
   private activityAbort: AbortController | null = null;
@@ -159,11 +164,6 @@ export class SessionController {
     this.state = {
       ...this.state,
       ...patch,
-      ...(patch.status &&
-      patch.status !== "speaking" &&
-      !(this.speech.fullDuplex && patch.status === "listening")
-        ? { narrationProductId: null }
-        : {}),
     };
     this.listeners.forEach((l) => l());
   }
@@ -188,6 +188,12 @@ export class SessionController {
         snapshot.view !== current.view ||
         snapshot.focusedProductId !== current.focusedProductId ||
         snapshot.displayOrder.join("|") !== current.displayOrder.join("|"));
+    const presentationChanged =
+      canvasChanged &&
+      (!current ||
+        snapshot.epoch !== current.epoch ||
+        snapshot.focusedProductId !== current.focusedProductId ||
+        snapshot.displayOrder.join("|") !== current.displayOrder.join("|"));
     const firstProductsArrived =
       canvasChanged &&
       current?.displayOrder.length === 0 &&
@@ -195,11 +201,14 @@ export class SessionController {
       snapshot.epoch === current.epoch;
     if (canvasChanged && !firstProductsArrived && this.speech.fullDuplex) {
       this.liveFocus.clear();
-      this.lastPresentedProductId = snapshot.focusedProductId;
+      if (presentationChanged) {
+        this.pinnedPresentation = null;
+        this.lastPresentedProductId = snapshot.focusedProductId;
+      }
     }
     this.update({
       snapshot,
-      ...(canvasChanged && this.speech.fullDuplex
+      ...(presentationChanged && this.speech.fullDuplex
         ? {
             narrationProductId:
               firstProductsArrived && this.state.status === "speaking"
@@ -353,7 +362,6 @@ export class SessionController {
       this.speech.cancel();
       this.update({
         status: this.state.capturing ? "listening" : "paused",
-        narrationProductId: null,
       });
       return;
     }
@@ -571,7 +579,7 @@ export class SessionController {
         playbackResumed: () => {
           if (!current()) return;
           this.liveFocus.beginOutput();
-          this.update({ narrationProductId: null });
+          // A fresh audio window does not mean a new product. Hold the current card.
         },
         caption: (speaker, text) => {
           if (!current()) return;
@@ -588,7 +596,10 @@ export class SessionController {
               );
             const newNavigation =
               navigation && navigation.key !== this.userNavigationKey;
-            if (newNavigation) this.userNavigationKey = navigation.key;
+            if (newNavigation) {
+              this.userNavigationKey = navigation.key;
+              this.pinnedPresentation = navigation.productId;
+            }
             const review =
               snapshot &&
               !this.state.livePending &&
@@ -607,14 +618,13 @@ export class SessionController {
               requestText: text,
               narrationProductId: newNavigation
                 ? navigation.productId
-                : this.userNavigationKey
-                  ? this.state.narrationProductId
-                  : null,
+                : this.state.narrationProductId,
               ...(review && productId
                 ? {
                     voiceReviewRequest: {
                       productId,
                       requestId: crypto.randomUUID(),
+                      destination: "chrome",
                     },
                   }
                 : {}),
@@ -627,7 +637,9 @@ export class SessionController {
               liveCaption: text,
               narrationProductId:
                 this.state.status === "speaking"
-                  ? productId
+                  ? (this.pinnedPresentation ??
+                    productId ??
+                    this.state.narrationProductId)
                   : this.state.narrationProductId,
             });
           }
@@ -636,7 +648,9 @@ export class SessionController {
           if (current())
             this.update({
               narrationProductId: active
-                ? this.liveFocus.productId
+                ? (this.pinnedPresentation ??
+                  this.liveFocus.productId ??
+                  this.state.narrationProductId)
                 : this.state.narrationProductId,
               status: active
                 ? "speaking"

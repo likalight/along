@@ -645,3 +645,119 @@ test("inline review pauses voice, stops media before resuming, and preserves the
     await page.evaluate(() => sessionStorage.getItem("along.sessionId")),
   ).toBe(sessionId);
 });
+
+test("a related review is labelled and never changes the product being shopped", async ({
+  page,
+}) => {
+  await page.route("https://www.youtube.com/embed/**", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: "<title>Review fixture</title><p>Video fixture</p>",
+    }),
+  );
+  await textMode(page);
+  await say(page, "Show catalog MIC-040");
+  await page
+    .getByRole("button", { name: "Watch related review", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toContainText(
+    "Related model review · RØDE Wireless PRO",
+  );
+  await page.getByRole("button", { name: "Close review", exact: true }).click();
+  await expect(
+    page.getByRole("heading", {
+      name: "Wireless ME (single TX kit)",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(page.locator(".voice-status")).toContainText("Paused");
+});
+
+test("an agent-requested review loads its player without a review-button click", async ({
+  page,
+}) => {
+  await page.route("https://www.youtube.com/embed/**", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: "<!doctype html><title>Automatic review fixture</title><button>Play automatic review</button>",
+    }),
+  );
+  await page.route("**/api/session", async (route) => {
+    const request = route.request().postDataJSON();
+    const response = await route.fetch();
+    if (request.action !== "input") return route.fulfill({ response });
+    const snapshot = await response.json();
+    await route.fulfill({
+      response,
+      json: {
+        ...snapshot,
+        snapshot: {
+          ...snapshot.snapshot,
+          productVideoRequest: {
+            id: "rode-wireless-pro-review",
+            productId: "MIC-062",
+            requestedProductId: "MIC-040",
+            destination: "inline",
+            requestId: "automatic-review-check",
+          },
+        },
+      },
+    });
+  });
+  await textMode(page);
+  await page
+    .getByRole("textbox", { name: "Your message" })
+    .fill("Show catalog MIC-040");
+  await page.getByRole("button", { name: "Send message" }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await expect(
+    page
+      .frameLocator("dialog iframe")
+      .getByRole("button", { name: "Play automatic review" }),
+  ).toBeVisible();
+  await expect(page.locator(".voice-status")).toContainText("Paused");
+  await page.getByRole("button", { name: "Close review", exact: true }).click();
+  await expect(
+    page.getByRole("heading", {
+      name: "Wireless ME (single TX kit)",
+      exact: true,
+    }),
+  ).toBeVisible();
+});
+
+test("a stalled video offers a working play recovery without losing the conversation", async ({
+  page,
+}) => {
+  let loads = 0;
+  await page.route("https://www.youtube.com/embed/**", (route) => {
+    loads++;
+    return route.fulfill({
+      contentType: "text/html",
+      body:
+        loads === 1
+          ? "<title>Stalled player</title>"
+          : '<title>Recovered player</title><button>Recovered video</button><script>parent.postMessage(JSON.stringify({event:"onReady"}),"*")</script>',
+    });
+  });
+  await textMode(page);
+  await say(page, "Show catalog MIC-062");
+  await page.getByRole("button", { name: "Watch review", exact: true }).click();
+  await page.getByRole("button", { name: "Play review", exact: true }).click();
+  await expect(
+    page
+      .frameLocator("dialog iframe")
+      .getByRole("button", { name: "Recovered video" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Play review", exact: true }),
+  ).toHaveCount(0);
+  await expect(page.locator(".voice-status")).toContainText("Paused");
+  expect(loads).toBe(2);
+  await page.getByRole("button", { name: "Close review", exact: true }).click();
+  await expect(
+    page.getByRole("heading", {
+      name: "Wireless PRO (2 TX + RX + 2 Lavalier II mics)",
+      exact: true,
+    }),
+  ).toBeVisible();
+});

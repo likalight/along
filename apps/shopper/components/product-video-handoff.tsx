@@ -2,9 +2,99 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { Play, ArrowUpRight, Volume2, X } from "lucide-react";
-import { PRODUCT_VIDEOS, type ProductVideo } from "@coupang/contract";
+import {
+  PRODUCT_VIDEOS,
+  productReview,
+  type ProductVideo,
+} from "@coupang/contract";
 import type { ClientState, SessionController } from "@/lib/session/controller";
 import styles from "./product-video-handoff.module.css";
+
+/** YouTube can fail to initialize an automatically mounted frame in Chrome.
+ * Confirm readiness through its player protocol, retry once, then offer a real
+ * user-gesture reload instead of leaving an unexplained black rectangle. */
+function ReviewPlayer({ video }: { video: ProductVideo }) {
+  const frame = useRef<HTMLIFrameElement>(null);
+  const [attempt, setAttempt] = useState(0);
+  const [ready, setReady] = useState(false);
+  const [needsPlay, setNeedsPlay] = useState(false);
+  useEffect(() => {
+    let initialized = false;
+    const receive = (event: MessageEvent) => {
+      if (
+        event.source !== frame.current?.contentWindow ||
+        event.origin !== "https://www.youtube.com"
+      )
+        return;
+      let payload;
+      try {
+        payload =
+          typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+      } catch {
+        return;
+      }
+      if (
+        payload?.event === "onReady" ||
+        payload?.event === "initialDelivery"
+      ) {
+        initialized = true;
+        setReady(true);
+        setNeedsPlay(false);
+      }
+    };
+    const subscribe = () =>
+      frame.current?.contentWindow?.postMessage(
+        JSON.stringify({ event: "listening", id: "along-review" }),
+        "https://www.youtube.com",
+      );
+    window.addEventListener("message", receive);
+    const subscription = setInterval(subscribe, 500);
+    const activationHint = setTimeout(() => {
+      if (!initialized) setNeedsPlay(true);
+    }, 1500);
+    const timeout = setTimeout(() => {
+      if (initialized) return;
+      if (attempt === 0) setAttempt(1);
+      else setNeedsPlay(true);
+    }, 6000);
+    return () => {
+      window.removeEventListener("message", receive);
+      clearInterval(subscription);
+      clearTimeout(activationHint);
+      clearTimeout(timeout);
+    };
+  }, [attempt]);
+  return (
+    <>
+      <iframe
+        key={attempt}
+        ref={frame}
+        className={styles.frame}
+        title={video.title}
+        src={`https://www.youtube.com/embed/${new URL(video.url).pathname.split("/").pop()}?autoplay=1&playsinline=1&rel=0&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`}
+        allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+        allowFullScreen
+        referrerPolicy="strict-origin-when-cross-origin"
+      />
+      {!ready && (
+        <div className={styles.playerLoading} role="status">
+          {needsPlay ? (
+            <button
+              onClick={() => {
+                setNeedsPlay(false);
+                setAttempt((a) => a + 1);
+              }}
+            >
+              <Play size={16} aria-hidden="true" /> Play review
+            </button>
+          ) : (
+            "Loading review…"
+          )}
+        </div>
+      )}
+    </>
+  );
+}
 
 export function ProductVideoHandoff({
   controller,
@@ -17,6 +107,7 @@ export function ProductVideoHandoff({
 }) {
   const [video, setVideo] = useState<ProductVideo | null>(null);
   const [inline, setInline] = useState(false);
+  const [playerReady, setPlayerReady] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const [note, setNote] = useState("");
@@ -36,6 +127,7 @@ export function ProductVideoHandoff({
     // Remove the media frame synchronously BEFORE microphone capture can resume.
     flushSync(() => {
       setInline(false);
+      setPlayerReady(false);
       setReturned(true);
     });
   }, []);
@@ -51,17 +143,24 @@ export function ProductVideoHandoff({
       setNote("");
       setReturned(false);
       setFallback(false);
+      setPlayerReady(false);
       setInline(true);
     },
     [controller],
   );
   useEffect(() => {
-    if (inline && !dialog.current?.open) dialog.current?.showModal();
+    if (inline && dialog.current) {
+      if (!dialog.current.open) dialog.current.showModal();
+      // Mount media only after the dialog is in the top layer. A provider-driven
+      // request can otherwise create the iframe in a still-hidden dialog.
+      const frame = requestAnimationFrame(() => setPlayerReady(true));
+      return () => cancelAnimationFrame(frame);
+    }
   }, [inline]);
   const openChrome = useCallback(
     (selected: ProductVideo) => {
       if (pending.current) return;
-      closePlayer();
+      setInline(false);
       setVideo(selected);
       setFallback(false);
       setReturned(false);
@@ -113,7 +212,7 @@ export function ProductVideoHandoff({
         location.origin,
       );
     },
-    [controller, closePlayer],
+    [controller],
   );
   useEffect(() => {
     const receive = (event: MessageEvent) => {
@@ -176,13 +275,15 @@ export function ProductVideoHandoff({
     if (!selected) return;
     seen.current.add(key);
     sessionStorage.setItem("along.watchedVideoRequest", key);
-    open(selected);
+    if (request.destination === "chrome") openChrome(selected);
+    else open(selected);
   }, [
     state.snapshot?.productVideoRequest,
     state.livePending,
     state.status,
     sessionId,
     open,
+    openChrome,
   ]);
   useEffect(() => {
     const request = state.voiceReviewRequest;
@@ -190,11 +291,12 @@ export function ProductVideoHandoff({
     const key = `${sessionId}:voice:${request.requestId}`;
     if (seen.current.has(key)) return;
     seen.current.add(key);
-    const selected = PRODUCT_VIDEOS.find(
-      (item) => item.productId === request.productId,
-    );
-    if (selected) open(selected);
-  }, [state.voiceReviewRequest, sessionId, open]);
+    const selected = productReview(request.productId);
+    if (selected) {
+      if (request.destination === "chrome") openChrome(selected);
+      else open(selected);
+    }
+  }, [state.voiceReviewRequest, sessionId, open, openChrome]);
   // A button remains available for a deterministic rehearsal and accessibility.
   const focused =
     state.narrationProductId ??
@@ -204,7 +306,7 @@ export function ProductVideoHandoff({
     !state.snapshot?.discoveryReference &&
     !state.snapshot?.summary &&
     !state.snapshot?.receipt
-      ? PRODUCT_VIDEOS.find((item) => item.productId === focused)
+      ? productReview(focused)
       : undefined;
   const selected = inline ? video : available;
   if (state.snapshot?.summary || state.snapshot?.receipt || !selected)
@@ -220,7 +322,11 @@ export function ProductVideoHandoff({
         title={`${selected.title} · ${selected.creator}`}
       >
         <Play size={15} aria-hidden="true" />
-        {opening ? "Opening…" : "Watch review"}
+        {opening
+          ? "Opening…"
+          : available?.productId !== focused
+            ? "Watch related review"
+            : "Watch review"}
       </button>
       {canResume && (
         <button className={styles.resume} onClick={resume}>
@@ -244,19 +350,18 @@ export function ProductVideoHandoff({
             <div>
               <h2 id={titleId}>{video.title}</h2>
               <p>{video.creator} · Voice paused</p>
+              {video.productId !== focused && (
+                <p>
+                  Related model review · RØDE Wireless PRO. Your selected
+                  product is unchanged.
+                </p>
+              )}
             </div>
             <button aria-label="Close review" onClick={closePlayer}>
               <X size={20} aria-hidden="true" />
             </button>
           </header>
-          <iframe
-            className={styles.frame}
-            title={video.title}
-            src={`https://www.youtube.com/embed/${new URL(video.url).pathname.split("/").pop()}?autoplay=1&playsinline=1&rel=0`}
-            allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-            allowFullScreen
-            referrerPolicy="strict-origin-when-cross-origin"
-          />
+          {playerReady && <ReviewPlayer video={video} />}
           <div className={styles.playerFooter}>
             <button className={styles.continue} onClick={resume} autoFocus>
               <Volume2 size={17} aria-hidden="true" /> Continue conversation

@@ -216,8 +216,4 @@ export function spokenNavigation(
   return null;
 }
 
-export function requestsChromeReview(text: string) {
-  return /^(?:please |can you |could you )?(?:take me|go|switch|open|return|bring me)(?: back)?(?: to)?(?: the)? (?:chrome|youtube)(?: tab| review| video)?(?: please)?[.!?]*$/i.test(
-    text.trim(),
-  );
-}
+export { requestsYouTubeReview as requestsChromeReview } from "@coupang/contract";

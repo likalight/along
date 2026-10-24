@@ -102,7 +102,16 @@ export class VoiceOrchestrator {
         const video = PRODUCT_VIDEOS.find(
           (v) => v.id === result.productVideoId,
         );
-        if (video) return { ...video, requestId: turnId };
+        if (video)
+          return {
+            ...video,
+            requestId: turnId,
+            requestedProductId:
+              typeof result.requestedProductId === "string"
+                ? result.requestedProductId
+                : video.productId,
+            destination: result.destination === "chrome" ? "chrome" : "inline",
+          };
       } catch {
         /* Ordinary tool summaries are not media commands. */
       }
