@@ -9,6 +9,7 @@ export {
   FixtureVoiceAdapter,
   GptLiveVoiceAdapter,
   type VoiceAdapter,
+  type LiveMintResult,
 } from "./voice/adapter.js";
 export { routeInput, resolveReference, type Route } from "./intent/router.js";
 export {
@@ -29,4 +30,9 @@ export {
   parseBeddingPrefs,
 } from "./scenarios/bedding.js";
 
-export {AuthoritativeSessionStore} from "./session/AuthoritativeSessionStore.js";
+export {
+  AuthoritativeSessionStore,
+  BACKEND_SCENARIO_IDS,
+  type VoiceConfirmEvidence,
+  type PresentationAck,
+} from "./session/AuthoritativeSessionStore.js";

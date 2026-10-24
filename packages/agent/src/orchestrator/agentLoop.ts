@@ -620,10 +620,10 @@ function handleImage(
     ...baseProposal(input, "correct"),
     action: "set_constraints",
     payload: {
-      // corrections update accepted constraints; do not silently overwrite budget unless stated
+      // Shape/colour are preferences only — never hard constraints on the authoritative store.
       hardConstraints: {
-        ...(prefs.shape ? { shape: prefs.shape } : {}),
         ...(prefs.budgetMinor ? { budgetMinor: prefs.budgetMinor } : {}),
+        category: "bags",
       },
       preferences: {
         ...(prefs.color ? { color: prefs.color } : {}),

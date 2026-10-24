@@ -79,21 +79,40 @@ export class FixtureVoiceAdapter implements VoiceAdapter {
   }
 }
 
+export type LiveMintResult =
+  | {
+      mode: "live";
+      model: string;
+      transport: "webrtc";
+      delegation: "client";
+      duplex: true;
+      clientSecret: string;
+      expiresAt: string | null;
+      sessionId: string;
+    }
+  | {
+      mode: "not_connected";
+      note: string;
+      duplex: false;
+    };
+
 /**
- * GPT-Live duplex adapter shell (client delegation).
- * Live WebRTC SDP exchange + sideband events are wired when credentials exist.
- * Until then, methods queue intents that a server route can flush to OpenAI Live APIs.
+ * GPT-Live duplex adapter (client delegation).
+ * `mint()` creates an ephemeral client secret when OPENAI_API_KEY is present;
+ * otherwise returns authenticated `not_connected` (never a silent fake duplex claim).
  */
 export class GptLiveVoiceAdapter implements VoiceAdapter {
   readonly id = VOICE_ADAPTER.id;
   readonly duplex = VOICE_ADAPTER.duplex;
   pending: Array<Record<string, unknown>> = [];
   private fallback = new FixtureVoiceAdapter();
+  private minted = new Map<string, LiveMintResult & { mode: "live" }>();
 
   constructor(private readonly apiKey?: string) {}
 
   async connect(sessionId: string) {
-    if (!this.apiKey) {
+    const minted = await this.mint(sessionId);
+    if (minted.mode !== "live") {
       return this.fallback.connect(sessionId);
     }
     this.pending.push({
@@ -103,7 +122,78 @@ export class GptLiveVoiceAdapter implements VoiceAdapter {
       transport: VOICE_ADAPTER.transport,
       delegation: { type: "client" },
     });
-    return { ok: true, transport: "webrtc-pending" };
+    return { ok: true, transport: "webrtc" };
+  }
+
+  /**
+   * Mint a client-delegated live voice session, or return not_connected.
+   * Does not fabricate duplex capability when the provider call fails.
+   */
+  async mint(sessionId: string): Promise<LiveMintResult> {
+    if (!this.apiKey) {
+      return {
+        mode: "not_connected",
+        duplex: false,
+        note: "OPENAI_API_KEY is not set. Text mode and the browser speech fallback remain available; live duplex is not connected.",
+      };
+    }
+    const cached = this.minted.get(sessionId);
+    if (cached) return cached;
+    try {
+      const res = await fetch("https://api.openai.com/v1/realtime/sessions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+          "OpenAI-Beta": "realtime=v1",
+        },
+        body: JSON.stringify({
+          model: VOICE_ADAPTER.model,
+          // Client delegation: browser holds the WebRTC peer; server uses sideband.
+          voice: "alloy",
+        }),
+      });
+      if (!res.ok) {
+        const detail = await res.text().catch(() => "");
+        return {
+          mode: "not_connected",
+          duplex: false,
+          note: `Live voice mint failed (${res.status}). Text mode remains available. ${detail.slice(0, 180)}`,
+        };
+      }
+      const body = (await res.json()) as {
+        client_secret?: { value?: string; expires_at?: number };
+        id?: string;
+      };
+      const secret = body.client_secret?.value;
+      if (!secret) {
+        return {
+          mode: "not_connected",
+          duplex: false,
+          note: "Live voice mint returned no client secret. Text mode remains available.",
+        };
+      }
+      const live: LiveMintResult & { mode: "live" } = {
+        mode: "live",
+        model: VOICE_ADAPTER.model,
+        transport: "webrtc",
+        delegation: "client",
+        duplex: true,
+        clientSecret: secret,
+        expiresAt: body.client_secret?.expires_at
+          ? new Date(body.client_secret.expires_at * 1000).toISOString()
+          : null,
+        sessionId: body.id ?? sessionId,
+      };
+      this.minted.set(sessionId, live);
+      return live;
+    } catch (e) {
+      return {
+        mode: "not_connected",
+        duplex: false,
+        note: `Live voice mint error: ${e instanceof Error ? e.message : "unknown"}. Text mode remains available.`,
+      };
+    }
   }
 
   async injectUserText(sessionId: string, text: string) {

@@ -68,15 +68,47 @@ export async function POST(request: Request) {
           turnId: m.responseTurnId,
           textHash: m.textHash,
           event: "displayed",
+          epoch: c.epoch,
+          eventId: i.eventId ?? `presented-${m.id}`,
+          expectedRevision: c.revision,
+          summaryRevision: m.revision,
         });
       return NextResponse.json(project(sessionId));
     }
     if (b.action === "lifecycle") {
+      const type = i.type as string;
+      if (type === "video.started" || type === "video.stopped") {
+        store.lifecycle(sessionId, {
+          sessionId,
+          epoch: i.epoch,
+          eventId: i.eventId ?? crypto.randomUUID(),
+          turnId: i.turnId,
+          revision: i.revision ?? c.revision,
+          type,
+          playbackId: i.playbackId,
+          videoId: i.videoId,
+        });
+        return NextResponse.json(project(sessionId));
+      }
+      if (type === "turn.cancelled") {
+        store.lifecycle(sessionId, {
+          sessionId,
+          epoch: i.epoch,
+          eventId: i.eventId ?? crypto.randomUUID(),
+          turnId: i.turnId,
+          revision: i.revision ?? c.revision,
+          type,
+          playbackId: i.playbackId ?? "cancel",
+        });
+        return NextResponse.json(project(sessionId));
+      }
       const m = c.summary;
       if (!m || !i.summaryId) return NextResponse.json(project(sessionId));
       if (m.id !== i.summaryId || m.responseTurnId !== i.turnId)
         throw new Error("Stale playback.");
-      if (i.type === "audio.started")
+      if (!i.playbackId || typeof i.playbackId !== "string")
+        throw new Error("Playback identity required.");
+      if (type === "audio.started")
         playbacks.set(sessionId, {
           summaryId: m.id,
           turnId: i.turnId,
@@ -91,21 +123,18 @@ export async function POST(request: Request) {
         active.epoch !== c.epoch
       )
         throw new Error("Unknown playback.");
-      const event = (
-        {
-          "audio.started": "playback_started",
-          "audio.completed": "playback_completed",
-          "audio.interrupted": "playback_interrupted",
-        } as Record<string, string>
-      )[i.type];
-      if (!event) throw new Error("Unknown playback event.");
-      store.acknowledge(sessionId, {
+      store.lifecycle(sessionId, {
+        sessionId,
+        epoch: i.epoch,
+        eventId: i.eventId ?? crypto.randomUUID(),
+        turnId: i.turnId,
+        revision: i.revision ?? c.revision,
+        type,
+        playbackId: i.playbackId,
         summaryId: m.id,
-        turnId: m.responseTurnId,
-        textHash: m.textHash,
-        event,
+        summaryRevision: m.revision,
       });
-      if (i.type !== "audio.started") playbacks.delete(sessionId);
+      if (type !== "audio.started") playbacks.delete(sessionId);
       return NextResponse.json(project(sessionId));
     }
     if (b.action !== "input") throw new Error("Unsupported action.");
@@ -158,11 +187,7 @@ export async function POST(request: Request) {
       );
     const confirm = /^confirm (?:this )?simulated purchase[.!]?$/i.test(text);
     if (exact || simple || confirm) {
-      // Typed confirmation is validated against stored input, not model-produced text.
-      if (confirm && input.modality !== "text")
-        throw new Error(
-          "Voice purchase approval awaits the trusted live voice adapter. Choose text mode, review summary again, then type Confirm this simulated purchase.",
-        );
+      // Confirmation is validated against stored shopper input, never model-produced text.
       store.ingestInput({
         ...input,
         text: confirm ? "Confirm this simulated purchase" : text,
@@ -187,11 +212,41 @@ export async function POST(request: Request) {
           turnId: input.turnId,
           ...p,
         });
-      if (confirm)
-        store.confirmText({
+      if (confirm) {
+        const confirmInput = {
           ...input,
           text: "Confirm this simulated purchase",
-        });
+        };
+        if (input.modality === "voice") {
+          const evidence = b.voiceEvidence;
+          if (
+            !evidence ||
+            typeof evidence !== "object" ||
+            evidence.final !== true ||
+            evidence.source !== "shopper" ||
+            evidence.echoDetected === true ||
+            typeof evidence.confidence !== "number" ||
+            evidence.confidence < 0.9
+          ) {
+            throw new Error(
+              "Voice purchase approval requires trusted live voice evidence (final, non-echo, confidence ≥ 0.9). Choose text mode, review the summary again, then type Confirm this simulated purchase.",
+            );
+          }
+          store.confirmVoice(confirmInput, {
+            transcript: "Confirm this simulated purchase",
+            final: true,
+            confidence: evidence.confidence,
+            source: "shopper",
+            echoDetected: false,
+          });
+        } else if (input.modality === "text") {
+          store.confirmText(confirmInput);
+        } else {
+          throw new Error(
+            "Only deliberate voice or text confirmation can approve a simulated purchase.",
+          );
+        }
+      }
       else if (exact) {
         const action = exact[1].toLowerCase(),
           pid = exact[2].toUpperCase();

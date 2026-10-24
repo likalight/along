@@ -52,6 +52,25 @@ export const canvasData: CanvasData = {
   })),
 };
 export const messages = new Map<string, string>();
+
+function summaryStatus(
+  approvalStatus: Session["approvalStatus"],
+  raw: {
+    playback?: string;
+    displayed?: boolean;
+  } | null,
+  hasReceipt: boolean,
+): Summary["status"] {
+  if (hasReceipt) return "confirmed";
+  if (
+    approvalStatus === "blocked" ||
+    raw?.playback === "interrupted"
+  )
+    return "invalidated";
+  if (approvalStatus === "eligible") return "eligible";
+  return "presenting";
+}
+
 export function project(id: string): Session {
   const { store } = getRuntime(),
     c = store.core.get(id),
@@ -84,7 +103,11 @@ export function project(id: string): Session {
         conditions: raw.conditions!,
         uncertainties: raw.uncertainties!,
         presentationMode: raw.presentationMode!,
-        status: s.approvalStatus === "eligible" ? "eligible" : "presenting",
+        status: summaryStatus(
+          s.approvalStatus as Session["approvalStatus"],
+          raw,
+          Boolean(c.receipt),
+        ),
         spokenText: raw.spokenText,
         textHash: raw.textHash,
         responseTurnId: raw.responseTurnId,
@@ -92,12 +115,20 @@ export function project(id: string): Session {
     : null;
   // Cancellation/interrupt invalidates the summary without discarding the shortlist.
   // Never leave the shopper on an empty confirmation screen for a missing summary.
-  const view: View =
+  let view: View =
     s.view === "summary" && !summary
       ? s.displayOrder.length
         ? "shortlist"
         : "understanding"
       : (s.view as View);
+  if (
+    (c.lastOutcome === "summary_interrupted" ||
+      s.approvalStatus === "blocked") &&
+    !c.receipt &&
+    view === "summary"
+  ) {
+    view = "recovery";
+  }
   const heading: Record<string, string> = {
     opening: "A little conversation.\nA better choice.",
     understanding: "Let’s get the details right.",
@@ -110,16 +141,19 @@ export function project(id: string): Session {
     saved_choice: "Keep a good idea.",
     summary: "Your choice, clearly.",
     receipt: "A choice made with confidence.",
+    recovery: "Let’s pick up where you left off.",
   };
   const message =
-    c.lastOutcome === "cancelled" && !c.receipt
-      ? "Stopped. No purchase was made. Your choices are still here when you’re ready."
-      : view === "summary" && summary
-        ? summary.spokenText!
-        : view === "receipt"
-          ? "Simulated purchase complete. No payment or real order."
-          : (messages.get(id) ??
-            "Tell me what you’re looking for, or start with a problem you’d like to solve.");
+    view === "recovery"
+      ? "Narration or confirmation was interrupted. Your selection is still here. Review the summary again, or explicitly choose text mode for a fresh confirmation."
+      : c.lastOutcome === "cancelled" && !c.receipt
+        ? "Stopped. No purchase was made. Your choices are still here when you’re ready."
+        : view === "summary" && summary
+          ? summary.spokenText!
+          : view === "receipt"
+            ? "SIMULATED purchase complete. No payment or real order was placed."
+            : (messages.get(id) ??
+              "Tell me what you’re looking for, or start with a problem you’d like to solve.");
   const constraints: Record<string, string> = Object.fromEntries(
     Object.entries(c.constraints).map(([k, v]) => [
       k,
@@ -129,14 +163,24 @@ export function project(id: string): Session {
   if (c.constraints.deliveryWithinDays !== undefined)
     constraints.deadlineDays = String(c.constraints.deliveryWithinDays);
   const quotes = new Map(store.quotes(id).map((q) => [q.offer.id, q]));
+  const assistantNote = messages.get(id);
+  const history: Session["history"] = [
+    ...c.history.map((h) => ({
+      role: "user" as const,
+      text: h.text ?? `Shared ${h.modality} reference`,
+    })),
+    ...(assistantNote
+      ? [{ role: "assistant" as const, text: assistantNote }]
+      : []),
+  ];
   return {
     ...s,
     focusedProductId:
       s.focusedProductId ??
       catalog.offers.find((o: any) => o.id === s.selectedOfferId)?.productId ??
       null,
-    approvalStatus:
-      s.approvalStatus === "blocked" ? "not_prepared" : s.approvalStatus,
+    // Preserve blocked so the shell can show invalidated eligibility — do not collapse to not_prepared.
+    approvalStatus: s.approvalStatus as Session["approvalStatus"],
     needs: c.needs,
     hardConstraints: constraints,
     preferences: c.preferences.map((p) => {
@@ -147,10 +191,7 @@ export function project(id: string): Session {
         return p;
       }
     }),
-    history: c.history.map((h) => ({
-      role: "user" as const,
-      text: h.text ?? `Shared ${h.modality} reference`,
-    })),
+    history,
     savedItems: s.savedItems.map((x) => ({
       id: x.productId,
       rationale: x.rationale,
@@ -168,7 +209,11 @@ export function project(id: string): Session {
     summary,
     receipt:
       c.receipt && summary
-        ? { id: c.receipt.id, simulated: true, acceptedOrder: summary }
+        ? {
+            id: c.receipt.id,
+            simulated: true,
+            acceptedOrder: { ...summary, status: "confirmed" },
+          }
         : null,
     canvas: {
       heading: heading[view] ?? "Let’s explore.",

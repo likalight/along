@@ -34,10 +34,17 @@ export class SessionController {
   private cancellation: Promise<unknown> = Promise.resolve();
   private mediaEvents: Promise<unknown> = Promise.resolve();
   private playback: Playback | null = null;
+  speechKind: "live" | "browser" = "browser";
   constructor(
     private transport: SessionTransport,
     private speech: SpeechAdapter,
   ) {}
+  /** Swap speech implementation after mint (live vs labeled browser fallback). */
+  setSpeechAdapter(adapter: SpeechAdapter, kind: "live" | "browser" = "browser") {
+    this.speech.dispose();
+    this.speech = adapter;
+    this.speechKind = kind;
+  }
   getSnapshot = () => this.state;
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -153,7 +160,17 @@ export class SessionController {
     this.update({ capturing: false, status: "paused", partial: "" });
   };
   draftChanged = () => {
-    if (this.state.status !== "paused") this.interrupt();
+    // Ordinary draft edits must not cancel an already presented summary.
+    // Only interrupt in-flight thinking/speaking — never a quiescent presented summary.
+    const view = this.state.snapshot?.view;
+    if (view === "summary" || view === "receipt" || view === "recovery") return;
+    if (
+      this.state.status === "thinking" ||
+      this.state.status === "speaking" ||
+      this.state.status === "listening"
+    ) {
+      this.interrupt();
+    }
   };
   async chooseMode(mode: "text" | "voice") {
     if (!this.state.snapshot) return;
@@ -365,16 +382,53 @@ export class SessionController {
             .catch(() => {});
         }
         if (type === "audio.interrupted") {
+          this.playback = null;
           this.update({
-            status: "error",
+            status: "paused",
             error:
-              "Narration was interrupted. Review the summary again or explicitly choose text mode.",
+              "Narration was interrupted. Your selection is preserved — review the summary again or explicitly choose text mode.",
             capturing: false,
+            mode: this.state.mode,
           });
         }
       });
     } catch (e) {
       this.fail(e);
+    }
+  }
+  /** Trusted canvas video lifecycle — pauses/resumes narration via the store. */
+  async handleMediaEvent(event: {
+    sessionId: string;
+    epoch: number;
+    turnId: string;
+    revision: number;
+    playbackId: string;
+    type: "video.started" | "video.stopped";
+    videoId?: string;
+    takeaway?: string;
+  }) {
+    const generation = this.generation;
+    try {
+      if (event.type === "video.started") this.speech.cancel();
+      const snapshot = await this.transport.lifecycle({
+        sessionId: event.sessionId,
+        epoch: event.epoch,
+        turnId: event.turnId,
+        revision: event.revision,
+        playbackId: event.playbackId,
+        type: event.type,
+        videoId: event.videoId,
+        eventId: crypto.randomUUID(),
+      });
+      if (generation === this.generation) this.acceptSnapshot(snapshot);
+      if (event.type === "video.stopped" && event.takeaway) {
+        this.update({
+          status: "ready",
+          error: null,
+        });
+      }
+    } catch (e) {
+      if (generation === this.generation) this.fail(e);
     }
   }
   async presentSummary() {

@@ -26,6 +26,7 @@ import {
 import { SessionController } from "@/lib/session/controller";
 import { httpTransport } from "@/lib/session/http-transport";
 import { BrowserSpeechAdapter } from "@/lib/voice/browser-adapter";
+import { createSpeechAdapter } from "@/lib/voice/create-speech-adapter";
 import { ProductCanvas } from "./canvas/ProductCanvas";
 import { VoiceOrb } from "./voice-orb";
 import { Attachments } from "./attachments";
@@ -49,6 +50,7 @@ export function SessionShell() {
     controller.getSnapshot,
   );
   const [draft, setDraft] = useState("");
+  const [voiceNote, setVoiceNote] = useState<string | null>(null);
   const reduced = useReducedMotion();
   const stageRef = useRef<HTMLElement>(null);
   const acknowledgeSummary = useCallback(() => {
@@ -57,7 +59,19 @@ export function SessionShell() {
   const s = state.snapshot,
     opening = !s || s.view === "opening";
   useEffect(() => {
-    void controller.connect();
+    let cancelled = false;
+    void (async () => {
+      await controller.connect();
+      const sessionId = controller.getSnapshot().snapshot?.sessionId;
+      if (!sessionId || cancelled) return;
+      const { adapter, kind, note } = await createSpeechAdapter(sessionId);
+      if (cancelled) {
+        adapter.dispose();
+        return;
+      }
+      controller.setSpeechAdapter(adapter, kind);
+      setVoiceNote(note ?? (kind === "live" ? null : null));
+    })();
     const offline = () => controller.interrupt();
     const online = () => void controller.reconnect();
     const key = (e: KeyboardEvent) => {
@@ -67,6 +81,7 @@ export function SessionShell() {
     window.addEventListener("online", online);
     window.addEventListener("keydown", key);
     return () => {
+      cancelled = true;
       controller.interrupt();
       window.removeEventListener("offline", offline);
       window.removeEventListener("online", online);
@@ -143,17 +158,24 @@ export function SessionShell() {
                   {opening
                     ? "YOUR NEXT GOOD FIND"
                     : s?.view === "receipt"
-                      ? "SIMULATION COMPLETE"
-                      : `THE CONVERSATION / ${s?.view.replaceAll("_", " ")}`}
+                      ? "SIMULATED RECEIPT"
+                      : s?.view === "recovery"
+                        ? "RECOVERY"
+                        : `THE CONVERSATION / ${s?.view.replaceAll("_", " ")}`}
                 </p>
                 {(!s?.canvas ||
-                  ["opening", "summary", "receipt"].includes(s.view)) && (
+                  ["opening", "summary", "receipt", "recovery"].includes(
+                    s.view,
+                  )) && (
                   <h1 aria-live="polite" aria-atomic="true">
                     {s?.heading ?? "A little conversation.\nA better choice."}
                   </h1>
                 )}
                 {s?.view !== "summary" &&
-                  (!s?.canvas || opening || s.view === "receipt") && (
+                  (!s?.canvas ||
+                    opening ||
+                    s.view === "receipt" ||
+                    s.view === "recovery") && (
                     <p className="stage-message">
                       {s?.message ??
                         "Tell me what you’re looking for, or start with a problem you’d like to solve."}
@@ -170,6 +192,10 @@ export function SessionShell() {
                     session={s}
                     busy={state.status === "thinking"}
                     onSummaryDisplayed={acknowledgeSummary}
+                    onChooseText={() => void controller.chooseMode("text")}
+                    onMediaEvent={(event) =>
+                      void controller.handleMediaEvent(event)
+                    }
                     onCommand={(command) =>
                       void controller.send(command, "text")
                     }
@@ -260,9 +286,14 @@ export function SessionShell() {
               </form>
             )}
             <p className="voice-help">
-              {state.mode === "voice"
-                ? "Browser voice preview · microphone pauses during narration. Interrupt with the control or Esc, then speak."
-                : "Start Chat asks for microphone access. Typing is always optional."}
+              {controller.speechKind === "live"
+                ? state.mode === "voice"
+                  ? "GPT-Live duplex connected · barge-in cancels stale narration. Interrupt with the control or Esc."
+                  : "Start Chat activates GPT-Live. Typing still receives spoken replies."
+                : state.mode === "voice"
+                  ? "Browser speech fallback · half duplex, microphone pauses during narration. Interrupt with the control or Esc."
+                  : "Start Chat asks for microphone access. Typing is always optional."}
+              {voiceNote ? ` ${voiceNote}` : ""}
             </p>
             {s && (
               <Attachments
@@ -314,11 +345,24 @@ function ContentStage({
   session: s,
   onCommand,
   onSummaryDisplayed,
+  onChooseText,
+  onMediaEvent,
   busy,
 }: {
   session: Session;
   onCommand: (text: string) => void;
   onSummaryDisplayed: () => void;
+  onChooseText: () => void;
+  onMediaEvent: (event: {
+    sessionId: string;
+    epoch: number;
+    turnId: string;
+    revision: number;
+    playbackId: string;
+    type: "video.started" | "video.stopped";
+    videoId?: string;
+    takeaway?: string;
+  }) => void;
   busy: boolean;
 }) {
   const reduced = useReducedMotion();
@@ -351,14 +395,22 @@ function ContentStage({
       )}
       {s.canvas &&
         s.catalog &&
-        !["opening", "summary", "receipt"].includes(s.view) && (
+        !["opening", "summary", "receipt", "recovery"].includes(s.view) && (
           <ProductCanvas
             busy={busy}
             snapshot={{ ...s, canvas: s.canvas }}
             data={s.catalog}
-            onMediaEvent={() => {
-              /* Canonical catalog contains no playable media. */
-            }}
+            onMediaEvent={(event) =>
+              onMediaEvent({
+                sessionId: event.sessionId,
+                epoch: event.epoch,
+                turnId: event.turnId,
+                revision: event.revision,
+                playbackId: event.playbackId,
+                type: event.type,
+                takeaway: event.takeaway,
+              })
+            }
             onIntent={(intent) => onCommand(intent.text)}
           />
         )}
@@ -418,14 +470,23 @@ function ContentStage({
           )}
         </div>
       )}
-      {s.view === "summary" && s.summary && (
+      {(s.view === "summary" || s.view === "recovery") && s.summary && (
         <article
           className="order-summary"
           aria-label="Complete current order summary"
           data-summary-id={s.summary.id}
+          data-summary-status={s.summary.status}
         >
           <p className="summary-label">
             SIMULATED ORDER ·{" "}
+            {s.summary.status === "invalidated"
+              ? "INVALIDATED"
+              : s.summary.status === "eligible"
+                ? "ELIGIBLE"
+                : s.summary.status === "confirmed"
+                  ? "CONFIRMED"
+                  : "PRESENTING"}{" "}
+            ·{" "}
             {s.summary.presentationMode === "text"
               ? "TEXT CONFIRMATION"
               : "VOICE CONFIRMATION"}
@@ -464,33 +525,51 @@ function ContentStage({
             <p className="exact-summary-text">{s.summary.spokenText}</p>
           )}
           <p role="status">
-            {s.approvalStatus === "eligible"
-              ? "Full summary displayed. Say or type “Confirm this simulated purchase” to approve this exact summary."
-              : s.approvalStatus === "presenting"
-                ? "Listen to the complete summary before approving, or choose text confirmation."
-                : "Approval was invalidated. Say or type “review summary” to present it again."}
+            {s.summary.status === "eligible" ||
+            s.approvalStatus === "eligible"
+              ? "Full summary displayed. Say or type “Confirm this simulated purchase” to approve this exact summary. There is no purchase button."
+              : s.summary.status === "invalidated" ||
+                  s.approvalStatus === "blocked" ||
+                  s.view === "recovery"
+                ? "Approval was invalidated. Say or type “review summary” for a fresh presentation, or explicitly choose text mode."
+                : "Listen to the complete summary before approving, or choose text confirmation."}
           </p>
+          {(s.view === "recovery" || s.summary.status === "invalidated") && (
+            <div className="priority-choices">
+              <button onClick={() => onCommand("Review summary")}>
+                Review summary again
+                <ArrowRight size={16} />
+              </button>
+              <button onClick={onChooseText}>
+                Switch to text confirmation
+                <ArrowRight size={16} />
+              </button>
+            </div>
+          )}
         </article>
       )}
       {s.view === "receipt" && s.receipt && (
-        <div className="receipt">
+        <div className="receipt" data-simulated="true">
           <Check size={24} />
           <div>
-            <strong>Simulated receipt</strong>
+            <strong>SIMULATED receipt — no payment, no real order</strong>
             <p>
               {s.receipt.acceptedOrder.productId} · USD{" "}
               {(s.receipt.acceptedOrder.totalMinor / 100).toFixed(2)}
             </p>
-            <small>Receipt {s.receipt.id}</small>
+            <small>Receipt {s.receipt.id} · duplicate confirms reuse this ID</small>
           </div>
         </div>
       )}
-      {s.view !== "opening" && s.view !== "summary" && s.view !== "receipt" && (
-        <p className="stage-hint">
-          Keep talking, or type your next thought. “Show options”, “compare”,
-          “show offers”, and “save for later” all work.
-        </p>
-      )}
+      {s.view !== "opening" &&
+        s.view !== "summary" &&
+        s.view !== "receipt" &&
+        s.view !== "recovery" && (
+          <p className="stage-hint">
+            Keep talking, or type your next thought. “Show options”, “compare”,
+            “show offers”, and “save for later” all work.
+          </p>
+        )}
     </>
   );
 }

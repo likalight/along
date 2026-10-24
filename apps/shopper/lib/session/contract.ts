@@ -71,7 +71,7 @@ export type Summary = {
   conditions: string[];
   uncertainties: string[];
   presentationMode: "voice" | "text";
-  status: "presenting" | "eligible" | "invalidated";
+  status: "presenting" | "eligible" | "invalidated" | "confirmed";
 };
 export type Session = {
   canvas?: Presentation;
@@ -94,7 +94,12 @@ export type Session = {
   evidenceIds: string[];
   attachmentIds: string[];
   summaryId: string | null;
-  approvalStatus: "not_prepared" | "presenting" | "eligible" | "approved";
+  approvalStatus:
+    | "not_prepared"
+    | "presenting"
+    | "eligible"
+    | "approved"
+    | "blocked";
   heading: string;
   message: string;
   cards: StageCard[];
@@ -110,11 +115,16 @@ export type Accepted = Identity & {
 export type Lifecycle = Identity & {
   playbackId: string;
   summaryId?: string;
+  summaryRevision?: number;
+  videoId?: string;
+  eventId?: string;
   type:
     | "audio.started"
     | "audio.completed"
     | "audio.interrupted"
-    | "turn.cancelled";
+    | "turn.cancelled"
+    | "video.started"
+    | "video.stopped";
 };
 export interface SessionTransport {
   connect(sessionId?: string): Promise<Session>;

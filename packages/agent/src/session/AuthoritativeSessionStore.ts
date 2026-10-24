@@ -21,10 +21,34 @@ const priorities = {
   best_supported_quality: "best-quality",
   lowest_cost_suitable: "lowest-cost-suitable",
 } as const;
+/** Narrative agent scenario IDs → canonical backend scenario seeds. */
+export const BACKEND_SCENARIO_IDS = {
+  cafe_dictation: "cafe-dictation",
+  bag_inspiration: "work-gym",
+  warm_bedding: "warm-room",
+} as const;
 type Meta = Pick<
   SessionSnapshot,
   "scenarioId" | "scenarioStage" | "imageInferences"
 >;
+export type VoiceConfirmEvidence = {
+  transcript: string;
+  final: boolean;
+  confidence: number;
+  source: "shopper";
+  echoDetected: boolean;
+};
+export type PresentationAck = {
+  summaryId: string;
+  turnId: string;
+  textHash: string;
+  event: string;
+  epoch?: number;
+  eventId?: string;
+  expectedRevision?: number;
+  summaryRevision?: number;
+  playbackId?: string;
+};
 /** Production-facing adapter. Only the backend may accept state or issue receipts. */
 export class AuthoritativeSessionStore extends FixtureSessionStore {
   readonly core = new SessionStore(undefined, agreedProfile);
@@ -33,7 +57,10 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
   override create(
     opts?: Parameters<FixtureSessionStore["create"]>[0],
   ): SessionSnapshot {
-    const { session, accessToken } = this.core.create();
+    const backendScenario = opts?.scenarioId
+      ? BACKEND_SCENARIO_IDS[opts.scenarioId]
+      : undefined;
+    const { session, accessToken } = this.core.create(backendScenario);
     this.tokens.set(session.id, accessToken);
     this.metadata.set(session.id, {
       scenarioId: opts?.scenarioId ?? null,
@@ -112,11 +139,13 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
       summaryId: summary?.id ?? null,
       approvalStatus: s.receipt
         ? "approved"
-        : summary?.approvalNonce
-          ? "eligible"
-          : summary
-            ? "presenting"
-            : "not_prepared",
+        : summary?.playback === "interrupted"
+          ? "blocked"
+          : summary?.approvalNonce
+            ? "eligible"
+            : summary
+              ? "presenting"
+              : "not_prepared",
       buyingPriority:
         Object.entries(priorities).find(([, v]) => v === s.priority)?.[0] ??
         null,
@@ -174,9 +203,17 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
               constraints.deliveryWithinDays = hard.maxDeliveryDays;
             if (hard.deliveryWithinDays !== undefined)
               constraints.deliveryWithinDays = hard.deliveryWithinDays;
-            if (hard.category)
-              constraints.category =
-                hard.category === "audio" ? "audio-accessories" : hard.category;
+            if (hard.category) {
+              const mapped =
+                hard.category === "audio"
+                  ? "audio-accessories"
+                  : hard.category === "bags"
+                    ? "everyday-bags"
+                    : hard.category === "bedding"
+                      ? "bedsheet-sets"
+                      : hard.category;
+              constraints.category = mapped;
+            }
             if (hard.compatibility)
               constraints.compatibility = hard.compatibility;
             if (hard.requiredSpecifications)
@@ -446,14 +483,47 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
           spokenText: s.summary.spokenText,
           textHash: s.summary.textHash,
           responseTurnId: s.summary.responseTurnId,
+          playback: s.summary.playback,
+          displayed: s.summary.displayed,
         }
       : null;
   }
-  acknowledge(
+  /**
+   * Presentation ack with the same identity guards as the HTTP lifecycle bridge.
+   * Always includes epoch/eventId/revision so races cannot loosely promote eligibility.
+   */
+  acknowledge(id: string, raw: PresentationAck) {
+    const s = this.core.get(id);
+    this.core.presentation(id, {
+      summaryId: raw.summaryId,
+      turnId: raw.turnId,
+      textHash: raw.textHash,
+      event: raw.event,
+      epoch: raw.epoch ?? s.epoch,
+      eventId: raw.eventId ?? `present-${raw.event}-${crypto.randomUUID()}`,
+      expectedRevision: raw.expectedRevision ?? s.revision,
+      summaryRevision: raw.summaryRevision ?? s.summary?.revision,
+      ...(raw.playbackId ? { playbackId: raw.playbackId } : {}),
+    });
+    return this.get(id)!;
+  }
+  /** Trusted audio/video lifecycle → backend store (not a loose presentation shortcut). */
+  lifecycle(
     id: string,
-    raw: { summaryId: string; turnId: string; textHash: string; event: string },
+    raw: {
+      sessionId: string;
+      epoch: number;
+      eventId: string;
+      turnId: string;
+      revision: number;
+      type: string;
+      playbackId: string;
+      summaryId?: string;
+      summaryRevision?: number;
+      videoId?: string;
+    },
   ) {
-    this.core.presentation(id, raw);
+    this.core.lifecycle(id, raw);
     return this.get(id)!;
   }
   confirmText(input: InputEvent) {
@@ -472,6 +542,37 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
       explicitIntent: "confirm_simulated_purchase",
     });
     return result;
+  }
+  /**
+   * Voice purchase confirmation. Requires a prior ingestInput of the same voice turn
+   * plus trusted final/non-echo shopper evidence. Model tools cannot call this.
+   */
+  confirmVoice(input: InputEvent, evidence: VoiceConfirmEvidence) {
+    const s = this.core.get(input.sessionId);
+    if (input.modality !== "voice" || !s.summary)
+      throw new Error("Current voice summary required");
+    if (
+      !evidence.final ||
+      evidence.source !== "shopper" ||
+      evidence.echoDetected ||
+      evidence.confidence < 0.9
+    ) {
+      throw new Error(
+        "Voice confirmation requires a trusted final shopper utterance (confidence ≥ 0.9, non-echo).",
+      );
+    }
+    return acceptApproval(this.core, input.sessionId, {
+      sessionId: input.sessionId,
+      epoch: input.epoch,
+      eventId: `confirm-${input.eventId}`,
+      turnId: input.turnId,
+      baseRevision: s.revision,
+      summaryId: s.summary.id,
+      summaryRevision: s.summary.revision,
+      modality: "voice",
+      explicitIntent: "confirm_simulated_purchase",
+      voiceEvidence: evidence,
+    });
   }
   override tryApprove(
     _input: Parameters<FixtureSessionStore["tryApprove"]>[0],
