@@ -1,0 +1,8 @@
+.next
+node_modules
+package-lock.json
+components/ui/orb.tsx
+components/ui/elevenlabs-LICENSE.md
+public
+playwright-report
+test-results
