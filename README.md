@@ -167,7 +167,7 @@ npm run test:e2e
 npm run test:canvas
 ```
 
-Root `npm test` runs only agent tests. Let Playwright start its own server on a free port: its managed server clears `OPENAI_API_KEY` so speech mocks exercise the fallback, while a reused server can have different settings. On Linux CI, browser installation also uses `--with-deps`.
+Root `npm test` runs only agent tests. Playwright starts its own development server on a free port (`PLAYWRIGHT_PORT`, default 3000), using `.next-e2e` build output. It clears `OPENAI_API_KEY` and explicitly selects the offline fixture agent so browser journeys and speech mocks do not call paid providers. It never reuses a running live demo; production does not accept fixture mode. On Linux CI, browser installation also uses `--with-deps`.
 
 Catalog and backend acceptance have their own checks:
 

@@ -39,12 +39,16 @@ function modelOverrides(): Pick<
   if (effort && !allowed.includes(effort))
     throw new Error("invalid_agent_reasoning_effort");
   const serviceTier = process.env.ALONG_AGENT_SERVICE_TIER?.trim();
-  if (serviceTier && !["auto", "default", "fast", "priority"].includes(serviceTier))
+  if (
+    serviceTier &&
+    !["auto", "default", "fast", "priority"].includes(serviceTier)
+  )
     throw new Error("invalid_agent_service_tier");
   return {
     model: process.env.ALONG_AGENT_MODEL?.trim() || undefined,
     reasoningEffort: effort as OpenEndedAgentConfig["reasoningEffort"],
-    serviceTier: (serviceTier || undefined) as OpenEndedAgentConfig["serviceTier"],
+    serviceTier: (serviceTier ||
+      undefined) as OpenEndedAgentConfig["serviceTier"],
   };
 }
 
@@ -57,7 +61,13 @@ export function getRuntime() {
     globalForAgent.__alongShopperOrch = new VoiceOrchestrator(
       globalForAgent.__alongShopperStore,
       globalForAgent.__alongShopperVoice,
-      process.env.NODE_ENV === "test" && process.env.ALONG_AGENT_MODE !== "live"
+      // Browser regressions run a real development server with an explicit
+      // fixture mode. Never infer offline mode from a missing provider key,
+      // and never enable it in a production server.
+      (process.env.NODE_ENV === "test" &&
+        process.env.ALONG_AGENT_MODE !== "live") ||
+        (process.env.NODE_ENV === "development" &&
+          process.env.ALONG_AGENT_MODE === "fixture")
         ? undefined
         : {
             agent: {

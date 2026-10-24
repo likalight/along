@@ -88,19 +88,68 @@ describe("open-ended agent HTTP integration", () => {
     vi.unstubAllEnvs();
   });
 
+  it("runs an explicitly selected development fixture journey without a provider", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("ALONG_AGENT_MODE", "fixture");
+    vi.stubEnv("OPENAI_API_KEY", "");
+    const provider = vi.fn();
+    vi.stubGlobal("fetch", provider);
+    const client = await session();
+    const result = await client.send("a work and gym bag");
+    expect(result.status).toBe(200);
+    const choices = await client.send("shape, budget USD 150");
+    expect(choices.status).toBe(200);
+    expect(choices.data.snapshot.category).toBe("bags");
+    expect(choices.data.snapshot.displayOrder.length).toBeGreaterThan(0);
+    expect(provider).not.toHaveBeenCalled();
+  });
+
+  it.each(["development", "production"])(
+    "keeps %s live without an explicit test fixture mode",
+    async (environment) => {
+      vi.stubEnv("NODE_ENV", environment);
+      vi.stubEnv(
+        "ALONG_AGENT_MODE",
+        environment === "production" ? "fixture" : "",
+      );
+      const provider = vi.fn(async () => answer("The live model answered."));
+      vi.stubGlobal("fetch", provider);
+      const client = await session();
+      const result = await client.send("a work and gym bag");
+      expect(result.status).toBe(200);
+      expect(result.data.snapshot.message).toBe("The live model answered.");
+      expect(provider).toHaveBeenCalledOnce();
+    },
+  );
+
   it("shows direction cards first, then resolves a numbered direction into product choices", async () => {
-    const call = (name: string, args: unknown) => new Response(JSON.stringify({
-      output: [{ type: "function_call", name, arguments: JSON.stringify(args), call_id: crypto.randomUUID() }],
-    }), { status: 200 });
+    const call = (name: string, args: unknown) =>
+      new Response(
+        JSON.stringify({
+          output: [
+            {
+              type: "function_call",
+              name,
+              arguments: JSON.stringify(args),
+              call_id: crypto.randomUUID(),
+            },
+          ],
+        }),
+        { status: 200 },
+      );
     let providerRequests = 0;
     let clipId = "";
     const provider = vi.fn(async (_url: unknown, init: RequestInit) => {
       providerRequests++;
       const body = JSON.parse(String(init.body));
       if (providerRequests === 1)
-        return call("show_solution_types", { question: "Will you stay at your desk, or move around?" });
+        return call("show_solution_types", {
+          question: "Will you stay at your desk, or move around?",
+        });
       if (providerRequests === 2)
-        return answer("A headset stays near your mouth; a lavalier moves with you; a desk mic needs close placement. Which suits your day?");
+        return answer(
+          "A headset stays near your mouth; a lavalier moves with you; a desk mic needs close placement. Which suits your day?",
+        );
       if (providerRequests === 3) {
         expect(JSON.stringify(body.input)).toContain("Show me the second one");
         expect(JSON.stringify(body.input)).toContain("solution_types");
@@ -109,13 +158,27 @@ describe("open-ended agent HTTP integration", () => {
       if (providerRequests === 4)
         return call("search_catalog", { category: "audio", query: "lavalier" });
       if (providerRequests === 5)
-        return call("shortlist", { entries: [{ productId: clipId, fitReason: "A portable clip-on microphone", compromise: "Check its receiver connection" }] });
-      return answer("Here is a clip-on microphone. Check that the receiver works with your device.");
+        return call("shortlist", {
+          entries: [
+            {
+              productId: clipId,
+              fitReason: "A portable clip-on microphone",
+              compromise: "Check its receiver connection",
+            },
+          ],
+        });
+      return answer(
+        "Here is a clip-on microphone. Check that the receiver works with your device.",
+      );
     });
     vi.stubGlobal("fetch", provider);
     const client = await session();
-    clipId = getRuntime().store.listProducts("audio").find((product) => product.solutionType === "clip_on")!.id;
-    const directions = await client.send("My calls sound unclear in a noisy room. Help me find a mic.");
+    clipId = getRuntime()
+      .store.listProducts("audio")
+      .find((product) => product.solutionType === "clip_on")!.id;
+    const directions = await client.send(
+      "My calls sound unclear in a noisy room. Help me find a mic.",
+    );
     expect(directions.status).toBe(200);
     expect(directions.data.snapshot.view).toBe("solution_types");
     expect(directions.data.snapshot.category).toBe("audio");

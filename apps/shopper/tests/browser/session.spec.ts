@@ -99,8 +99,27 @@ async function textMode(page: Page) {
 }
 async function say(page: Page, text: string) {
   await page.getByRole("textbox", { name: "Your message" }).fill(text);
+  const submitted = page.waitForResponse((response) => {
+    if (
+      !response.url().endsWith("/api/session") ||
+      response.request().method() !== "POST"
+    )
+      return false;
+    const body = response.request().postDataJSON();
+    return body.action === "input" && body.input?.text === text;
+  });
   await page.getByRole("button", { name: "Send message" }).click();
-  await expect(page.getByRole("status").first()).not.toContainText("Thinking");
+  await submitted;
+  await expect(page.locator(".voice-status")).toContainText("Ready");
+}
+async function openSettings(page: Page) {
+  await page
+    .locator("summary")
+    .filter({ hasText: /^Settings$/ })
+    .click();
+}
+function confirmation(page: Page) {
+  return page.getByRole("region", { name: "Order confirmation" });
 }
 /** ProductCanvas discovery tiles — Option N product cards (not offer/evidence articles). */
 function canvasArticles(page: Page) {
@@ -109,61 +128,67 @@ function canvasArticles(page: Page) {
     .locator("article")
     .filter({ hasText: /^Option\s+\d+/ });
 }
+function carouselChoices(page: Page) {
+  return page
+    .getByRole("region", { name: "Product choices" })
+    .getByRole("button", { name: /^Focus option \d+:/ });
+}
 const preparedImage = "Prepared blue tote illustration";
 test("shopper opening and complete text journey, without presenter controls or unrelated products", async ({
   page,
 }) => {
   await textMode(page);
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
-    "A little conversation",
+    "What are you looking for?",
   );
   await expect(page.getByText("Play demo")).toHaveCount(0);
   await expect(canvasArticles(page)).toHaveCount(0);
   await say(page, "a work and gym bag");
   await say(page, "shape, budget USD 150");
-  await expect(canvasArticles(page)).toHaveCount(3);
+  await expect(carouselChoices(page)).toHaveCount(3);
+  await expect(canvasArticles(page)).toHaveCount(1);
   await say(page, "compare");
   await expect(canvasArticles(page)).toHaveCount(2);
   await say(page, "show evidence");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText(
-    "Look a little closer",
-  );
   await expect(
     page.getByRole("heading", { name: "What supports this choice?" }),
   ).toBeVisible();
   await say(page, "show offers");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText(
-    "complete cost",
-  );
   await expect(
-    page.getByText(/Review this offer|Selected for comparison/i).first(),
+    page.getByText("Offers for this product", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/Review this offer|Selected offer/i).first(),
   ).toBeVisible();
   await say(page, "choose faster offer");
   await expect(
     page.getByRole("article", { name: "Complete current order summary" }),
   ).toContainText(/USD \d+\.\d{2}/);
-  await say(page, "looks good");
-  await expect(
-    page.getByText("Simulated receipt", { exact: true }),
-  ).toHaveCount(0);
+  await say(page, "Not yet, I want to review the summary");
+  await expect(confirmation(page)).toHaveCount(0);
   await say(page, "review summary");
-  await say(page, "confirm simulated purchase");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText(
-    "choice made with confidence",
-  );
-  await expect(page.getByText(/SIMULATED/i).first()).toBeVisible();
+  await expect(
+    page.getByRole("article", { name: "Complete current order summary" }),
+  ).toHaveAttribute("data-summary-status", "eligible");
+  await say(page, "Yes I approved this, can we just buy this");
+  await expect(confirmation(page)).toContainText("Order confirmed");
+  await expect(confirmation(page)).toContainText(/USD \d+\.\d{2}/);
+  await expect(
+    confirmation(page).getByRole("heading", { name: "You’re all set." }),
+  ).toBeVisible();
 });
 test("photo and link validation, preparation, preview, removal and resolution failure", async ({
   page,
 }) => {
   await textMode(page);
+  await openSettings(page);
   await page.getByRole("button", { name: "Use prepared image" }).click();
   await expect(
     page.getByRole("img", { name: `Preview: ${preparedImage}` }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Share with concierge" }).click();
   await expect
-    .poll(async () => page.getByRole("heading", { level: 1 }).innerText())
+    .poll(async () => page.locator(".assistant-reply").innerText())
     .toMatch(
       /caught your eye|get the details right|thoughtful choices|direction|shape|colour|illustration/i,
     );
@@ -213,8 +238,8 @@ test("microphone denial permits explicit text mode, no inactive listening animat
   await expect(page.locator(".orb-wrap")).not.toHaveClass(/capturing/);
   await page.getByRole("button", { name: "Type instead" }).click();
   await say(page, "bedsheets for a warm room");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText(
-    /details right|comfortable fit|thoughtful choices/i,
+  await expect(page.locator(".assistant-reply")).toContainText(
+    /bed dimensions or size/i,
   );
 });
 test("narrow mobile, reduced motion and keyboard access", async ({ page }) => {
@@ -231,9 +256,9 @@ test("narrow mobile, reduced motion and keyboard access", async ({ page }) => {
   await page.getByRole("textbox", { name: "Your message" }).focus();
   await page.keyboard.type("choose headset");
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText(
-    "What matters most",
-  );
+  await expect(
+    page.getByRole("region", { name: "Choose a buying priority" }),
+  ).toBeVisible();
   await page.screenshot({ path: "test-results/mobile.png", fullPage: true });
 });
 test("presenter preview clearly separates controls and disconnected mail placeholders", async ({
@@ -300,18 +325,16 @@ test("voice adapter completes the shopping path and never captures assistant nar
   await voiceSay("choose faster offer");
   await expect(
     page.getByRole("article", { name: "Complete current order summary" }),
-  ).toContainText(/Listen to the complete summary|Full summary displayed/i);
+  ).toContainText(/Review the details|Ready to confirm/i);
   await finish();
   await expect(
     page.getByRole("article", { name: "Complete current order summary" }),
-  ).toContainText("Full summary displayed");
+  ).toHaveAttribute("data-summary-status", "eligible");
   // Voice purchase approval needs trusted duplex evidence; finish via text.
   await page.getByRole("button", { name: "Type instead" }).click();
   await say(page, "review summary");
-  await say(page, "confirm simulated purchase");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText(
-    /choice made with confidence|Your choice, clearly/i,
-  );
+  await say(page, "Yes please");
+  await expect(confirmation(page)).toContainText("Order confirmed");
 });
 
 test("switching from interrupted voice summary requires fresh text confirmation", async ({
@@ -347,6 +370,7 @@ test("switching from interrupted voice summary requires fresh text confirmation"
     name: "Complete current order summary",
   });
   await expect(summary).toBeVisible();
+  const initialSummaryId = await summary.getAttribute("data-summary-id");
   // Interrupt while a follow-up voice turn is speaking over the summary.
   await page.evaluate(() =>
     (
@@ -354,25 +378,27 @@ test("switching from interrupted voice summary requires fresh text confirmation"
     ).__voice.say("review summary"),
   );
   await expect(page.locator(".voice-status")).toContainText("Speaking");
-  await page.getByRole("button", { name: "Interrupt response" }).click();
+  await page.getByRole("button", { name: "Stop speaking" }).click();
   await page.getByRole("button", { name: "Type instead" }).click();
   await expect(
-    page.getByText(/interrupted|text mode|review the summary/i).first(),
+    page.getByRole("textbox", { name: "Your message" }),
   ).toBeVisible();
+  await expect(confirmation(page)).toHaveCount(0);
   await say(page, "review summary");
-  await expect(summary).toContainText(
-    /TEXT CONFIRMATION|Full summary displayed/i,
+  await expect(summary).toHaveAttribute("data-summary-status", "eligible");
+  await expect(summary).not.toHaveAttribute(
+    "data-summary-id",
+    initialSummaryId!,
   );
-  await say(page, "confirm simulated purchase");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText(
-    /choice made with confidence|Your choice, clearly/i,
-  );
+  await say(page, "Please place the order");
+  await expect(confirmation(page)).toContainText("Order confirmed");
 });
 
 test("upload loading and network failure remain visible and removable", async ({
   page,
 }) => {
   await textMode(page);
+  await openSettings(page);
   let failUpload: (() => Promise<void>) | undefined;
   await page.route(
     "**/api/attachments",
@@ -427,13 +453,14 @@ test("typing retains focus while cancellation snapshots reconcile", async ({
   await expect(input).toBeFocused();
   await expect(input).toHaveValue("shape, budget USD 150");
   await input.press("Enter");
-  await expect(canvasArticles(page)).toHaveCount(3);
+  await expect(carouselChoices(page)).toHaveCount(3);
 });
 
 test("removing a reference while its accepted share is delayed clears server state", async ({
   page,
 }) => {
   await textMode(page);
+  await openSettings(page);
   await page.getByRole("button", { name: "Use prepared image" }).click();
   await expect(
     page.getByRole("button", { name: "Share with concierge" }),
@@ -472,6 +499,7 @@ test("a removed pending upload cannot reappear after its response", async ({
   page,
 }) => {
   await textMode(page);
+  await openSettings(page);
   let release: (() => void) | undefined;
   await page.route("**/api/attachments", async (route) => {
     if (route.request().method() !== "POST") return route.continue();

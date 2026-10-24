@@ -19,11 +19,13 @@ export default defineConfig({
   webServer: {
     command: `npm run dev -- --port ${port}`,
     url: `http://127.0.0.1:${port}`,
-    reuseExistingServer: !process.env.CI,
-    // Browser speech mocks need the labeled fallback — live mint would race the fakes.
+    reuseExistingServer: false,
+    // Own an isolated offline server; never reuse a shopper's live demo.
     env: {
       ...process.env,
       OPENAI_API_KEY: "",
+      ALONG_AGENT_MODE: "fixture",
+      ALONG_E2E: "1",
     },
   },
   reporter: "list",

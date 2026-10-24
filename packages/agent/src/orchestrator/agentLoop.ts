@@ -300,13 +300,14 @@ export async function agentLoop(opts: {
         (e) => e.subjectType === "product" && e.subjectId === productId,
       );
       const offer = offersForProduct(productId)[0];
-      const sellerEv = offer
-        ? EVIDENCE.filter(
-            (e) => e.subjectType === "seller" && e.subjectId === offer.sellerId,
-          )
-        : [];
-      // Progressive: synthesis ids first
-      const evidenceIds = [...productEv, ...sellerEv].map((e) => e.id);
+      // Shared sellers have evidence for many unrelated offers. Follow this
+      // offer's references so the panel stays relevant and within backend bounds.
+      const evidenceIds = [
+        ...new Set([
+          ...productEv.map((e) => e.id),
+          ...(offer?.evidenceIds ?? []),
+        ]),
+      ];
       push({
         ...baseProposal(input, "focus"),
         action: "focus",
