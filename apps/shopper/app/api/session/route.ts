@@ -15,7 +15,10 @@ import { authorize, assertOrigin } from "@/lib/integration/access";
 import { project, messages } from "@/lib/integration/projection";
 import type { Input } from "@/lib/session/contract";
 import { consumeVoiceEvidence } from "@/lib/voice/server";
-import { classifyCheckoutReply, isLiveDemoConfirmation } from "@concierge/backend/store";
+import {
+  classifyCheckoutReply,
+  isLiveDemoConfirmation,
+} from "@concierge/backend/store";
 export const runtime = "nodejs";
 const playbacks = new Map<
   string,
@@ -233,18 +236,34 @@ export async function POST(request: Request) {
         ? await consumeVoiceEvidence(sessionId, b.voiceEvidence, text)
         : null;
     const checkoutReply = classifyCheckoutReply(text);
+    // A retained review is not the current referent after navigation. In
+    // particular, "buy this" on another product must not approve the old order.
+    const reviewInView = Boolean(c.summary && c.stage === "summary");
+    const selectedProductId = agreedCatalog.offers.find(
+      (offer: any) => offer.id === c.selection?.offerId,
+    )?.productId;
+    const focus = c.view?.focusProductId ?? selectedProductId ?? c.shortlist[0];
     // A short assent answers the order question only on that summary's own
     // response turn. A later discussion cannot borrow its approval context.
     const orderQuestionActive = Boolean(
+      reviewInView &&
       c.summary?.displayed &&
       c.summary.presentationMode === "text" &&
       c.summary.responseTurnId === c.turn?.id &&
       input.modality === "text",
     );
-    const confirm = isLiveDemoConfirmation(text, orderQuestionActive);
+    // A purchase request advances the current checkout stage. Before a review
+    // exists it means "prepare this order", not an invalid approval attempt.
+    const confirm =
+      reviewInView && isLiveDemoConfirmation(text, orderQuestionActive);
+    const prepareCheckout =
+      checkoutReply === "approve" &&
+      !reviewInView &&
+      Boolean(c.selection?.offerId) &&
+      selectedProductId === focus;
     const confirmationAttempt =
       confirm ||
-      (Boolean(c.summary) &&
+      (reviewInView &&
         (checkoutReply === "assent" || /\bconfirm(?:ation)?\b/i.test(text)));
     if (confirmationAttempt) {
       // Validate before ingestInput: beginning an unready voice turn invalidates
@@ -280,11 +299,6 @@ export async function POST(request: Request) {
     // Never send compound shopping instructions through this shortcut.
     if (navigation)
       text = `Focus ${resolveProductNavigation(store.get(sessionId)!, navigation)}`;
-    const focus =
-      c.view?.focusProductId ??
-      agreedCatalog.offers.find((o: any) => o.id === c.selection?.offerId)
-        ?.productId ??
-      c.shortlist[0];
     if (/^show offers$/i.test(text) && focus) text = `Show offers for ${focus}`;
     if (/^(compare|compare them)$/i.test(text)) text = "Compare the first two";
     if (/^save for later$/i.test(text) && focus) text = `Save ${focus}`;
@@ -370,7 +384,7 @@ export async function POST(request: Request) {
       /^(Compare the first two|Back to shortlist|Restore shortlist|Show saved choices|Review summary|Prepare summary)$/i.test(
         text,
       );
-    if (exact || simple || confirm) {
+    if (exact || simple || confirm || prepareCheckout) {
       // Confirmation is validated against stored shopper input, never model-produced text.
       store.ingestInput({
         ...input,
@@ -397,7 +411,9 @@ export async function POST(request: Request) {
           turnId: input.turnId,
           ...p,
         });
-      if (confirm) {
+      if (prepareCheckout) {
+        apply("prepare_summary");
+      } else if (confirm) {
         const confirmInput = {
           ...input,
           text: "Confirm this simulated purchase",
@@ -508,12 +524,15 @@ export async function POST(request: Request) {
     }
     // Only the owning turn may publish its final heading or progress.
     const currentTurn = store.core.get(sessionId).turn?.id;
-    if (currentTurn === input.turnId && (exact || simple || confirm)) {
+    if (
+      currentTurn === input.turnId &&
+      (exact || simple || confirm || prepareCheckout)
+    ) {
       const actionHeading = confirm
-        ? "Your simulated purchase is complete."
+        ? "Your order is confirmed."
         : /^compare/i.test(text)
           ? "Your options, side by side."
-          : /summary|offer/i.test(text)
+          : prepareCheckout || /summary|offer/i.test(text)
             ? "Let’s check the details."
             : /^save/i.test(text)
               ? "Saved for later."

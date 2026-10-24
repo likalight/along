@@ -25,6 +25,10 @@ function review(displayed = true, classification: "proxy" | "real" = "proxy") {
   return { store, s, input };
 }
 const code = (value: string) => (error: unknown) => (error as {code?: string}).code === value;
+const voiceInput = (store: SessionStore, s: ReturnType<SessionStore["get"]>, text: string) =>
+  store.input(s.id, { sessionId: s.id, epoch: s.epoch, eventId: randomUUID(),
+    turnId: randomUUID(), baseRevision: s.revision, modality: "voice", text,
+    visibleRevision: s.revision, visibleProductIds: s.displayOrder });
 
 test("Live rehearsal completes only a displayed proxy summary and returns one immutable receipt", () => {
   const { store, s, input } = review();
@@ -125,4 +129,105 @@ test("natural purchase commands cannot create an order without a current review"
     assert.deepEqual(store.get(s.id), s);
     assert.equal(store.get(s.id).receipt, null);
   }
+});
+
+test("opted-in Live review survives a delivery discussion and completes the same reviewed order", () => {
+  const { store, s: reviewed, input } = review();
+  store.enableLiveDemoCheckout(reviewed.id);
+  let s = voiceInput(store, reviewed, "When does it arrive?");
+  assert.notEqual(s.turn!.id, input.responseTurnId);
+  assert.deepEqual(s.summary, reviewed.summary);
+  assert.equal(s.turn!.approvalWindow, null);
+  // A read-only answer may advance the session revision but not the order.
+  s = store.propose(s.id, { expectedRevision: s.revision, turnId: s.turn!.id,
+    needs: ["Delivery timing explained"] }, { includeOffers: false }).session;
+  const first = store.completeLiveDemo(s.id, { ...input, expectedRevision: s.revision,
+    transcript: "I want to place the order" });
+  assert.equal(first.receipt.summaryId, reviewed.summary!.id);
+  assert.deepEqual(first.receipt.quote, reviewed.summary!.quote);
+  assert.equal(first.session.summary!.approvalNonce, null);
+  assert.throws(() => store.propose(s.id, { expectedRevision: first.session.revision,
+    turnId: s.turn!.id, constraints: { budgetMinor: 5000 } }), code("ORDER_COMPLETE"));
+});
+
+test("Live can approve the displayed order after interrupting its narration without enabling strict approval", () => {
+  const { store, s: reviewed, input } = review();
+  store.enableLiveDemoCheckout(reviewed.id);
+  const playback = (s: ReturnType<SessionStore["get"]>, type: string) => ({
+    sessionId: s.id, epoch: s.epoch, eventId: randomUUID(), revision: s.revision,
+    turnId: s.turn!.id, type, playbackId: "interrupted-review",
+    summaryId: s.summary!.id, summaryRevision: s.summary!.revision,
+  });
+  let s = store.lifecycle(reviewed.id, playback(reviewed, "audio.started"));
+  s = store.lifecycle(s.id, playback(s, "audio.interrupted"));
+  assert.equal(s.summary!.playback, "interrupted");
+  s = voiceInput(store, s, "Confirm this simulated purchase");
+  assert.equal(s.summary!.id, input.summaryId);
+  assert.equal(s.summary!.approvalNonce, null);
+  assert.equal(s.turn!.approvalWindow, null);
+  assert.throws(() => store.approve(s.id, { expectedRevision: s.revision,
+    summaryId: input.summaryId, turnId: s.turn!.id, transcript: s.turn!.input!.text,
+    final: true, confidence: 1, source: "shopper", echoDetected: false }), code("APPROVAL_NOT_READY"));
+  const accepted = store.completeLiveDemo(s.id, { ...input, expectedRevision: s.revision,
+    transcript: "I want to place the order" });
+  assert.equal(accepted.receipt.summaryId, input.summaryId);
+  assert.equal(accepted.session.summary!.playback, "interrupted");
+});
+
+test("Live opt-in never retains an undisplayed or real-offer review across a new turn", () => {
+  for (const { store, s, input } of [review(false), review(true, "real")]) {
+    store.enableLiveDemoCheckout(s.id);
+    const next = voiceInput(store, s, "When does it arrive?");
+    assert.equal(next.summary, null);
+    assert.throws(() => store.completeLiveDemo(s.id, { ...input,
+      expectedRevision: next.revision }), code("STALE_SUMMARY"));
+  }
+});
+
+test("material order changes invalidate a retained Live review", () => {
+  for (const change of [
+    { constraints: { budgetMinor: 12000 } },
+    { constraints: { budgetMinor: 20000 }, selection: { offerId: "commuter-tote-express", quantity: 2 } },
+    { destination: "A different delivery destination" },
+  ]) {
+    const { store, s: reviewed, input } = review();
+    store.enableLiveDemoCheckout(reviewed.id);
+    let s = voiceInput(store, reviewed, "Change the order details");
+    s = store.propose(s.id, { expectedRevision: s.revision, turnId: s.turn!.id,
+      ...change }, { includeOffers: false }).session;
+    assert.equal(s.summary, null);
+    assert.throws(() => store.completeLiveDemo(s.id, { ...input,
+      expectedRevision: s.revision }), code("STALE_SUMMARY"));
+    assert.equal(store.get(s.id).receipt, null);
+  }
+});
+
+test("explicit cancellation and switching modes still revoke a Live review", () => {
+  for (const action of ["cancel", "spoken-cancel", "text-mode"] as const) {
+    const { store, s: reviewed, input } = review();
+    store.enableLiveDemoCheckout(reviewed.id);
+    const s = action === "cancel"
+      ? store.cancel(reviewed.id, reviewed.turn!.id)
+      : action === "spoken-cancel"
+        ? voiceInput(store, reviewed, "cancel purchase")
+        : store.switchMode(reviewed.id, reviewed.revision, "text");
+    assert.equal(s.summary, null);
+    assert.throws(() => store.completeLiveDemo(s.id, { ...input,
+      expectedRevision: s.revision }), code("STALE_SUMMARY"));
+    assert.equal(store.get(s.id).receipt, null);
+  }
+});
+
+test("retained Live review still checks its quote and cannot cross a session reset", () => {
+  const { store, s: reviewed, input } = review();
+  store.enableLiveDemoCheckout(reviewed.id);
+  let s = voiceInput(store, reviewed, "Explain the delivery estimate");
+  store.profile.catalog.offers.find((offer) => offer.id === "commuter-tote-express")!.unitPrice += 100;
+  assert.throws(() => store.completeLiveDemo(s.id, { ...input,
+    expectedRevision: s.revision }), code("STALE_QUOTE"));
+  s = store.reset(s.id, s.revision);
+  assert.throws(() => store.completeLiveDemo(s.id, { ...input,
+    expectedRevision: s.revision }), code("STALE_EPOCH"));
+  assert.equal(store.get(s.id).summary, null);
+  assert.equal(store.get(s.id).receipt, null);
 });

@@ -33,6 +33,7 @@ vi.mock("@/lib/integration/runtime", () => ({
             : null,
         }),
         completeLiveDemo: state.complete,
+        enableLiveDemoCheckout: vi.fn(),
       },
     },
     orch: { bargeIn: state.barge },
@@ -603,6 +604,52 @@ describe("GPT-Live task ownership", () => {
         .text,
     ).toBe("Can you explain returns? yes please");
   });
+  it.each([
+    ["It should arrive within four days.", 60],
+    ["It should arrive within", 110],
+  ])(
+    "orders after a delivery answer, including an interrupted answer: %s",
+    async (answer, end) => {
+      reviewedOrder();
+      const c = await connect("delivery-then-order");
+      transcript(c.socket, "input", "When will it arrive? ", 1, 20);
+      transcript(c.socket, "output", answer, 30, end);
+      delegate(
+        c.socket,
+        "I want to place the order",
+        "order-after-delivery",
+        100,
+      );
+      await vi.advanceTimersByTimeAsync(50);
+      expect(state.complete).toHaveBeenCalledWith(
+        "delivery-then-order",
+        expect.objectContaining({ transcript: "I want to place the order" }),
+      );
+      expect(state.post).not.toHaveBeenCalled();
+      expect(state.view).toBe("receipt");
+    },
+  );
+  it("accepts explicit approval during the offer readout before the order question is spoken", async () => {
+    reviewedOrder();
+    const c = await connect("interrupt-offer");
+    transcript(
+      c.socket,
+      "output",
+      "Here's the microphone, for a total of",
+      1,
+      70,
+    );
+    await controlGptLive("interrupt-offer", c.callId, "stop-speaking");
+    delegate(c.socket, "I want to place the order", "interrupt-buy", 100);
+    await vi.advanceTimersByTimeAsync(50);
+    expect(state.complete).toHaveBeenCalledTimes(1);
+    expect(state.complete.mock.calls[0][1]).not.toHaveProperty(
+      "affirmationSummaryId",
+    );
+    expect(state.post).not.toHaveBeenCalled();
+    expect(state.barge).not.toHaveBeenCalled();
+    expect(state.view).toBe("receipt");
+  });
   it("does not reuse approval context for a changed order summary", async () => {
     reviewedOrder();
     const c = await connect("changed-summary");
@@ -614,21 +661,22 @@ describe("GPT-Live task ownership", () => {
     expect(state.post).not.toHaveBeenCalled();
     expect(c.socket.sent.join(" ")).toContain(ORDER_APPROVAL_QUESTION);
   });
-  it("asks for a fresh review rather than an impossible approval of an older turn", async () => {
+  it("keeps approval bound to an unchanged displayed order across a conversational turn", async () => {
     reviewedOrder();
     const c = await connect("stale-review-turn");
     transcript(c.socket, "output", ORDER_APPROVAL_QUESTION, 1, 20);
     state.turn = "intervening-turn";
     delegate(c.socket, "yes", "stale-assent", 100);
     await vi.advanceTimersByTimeAsync(50);
-    expect(state.complete).not.toHaveBeenCalled();
+    expect(state.complete).toHaveBeenCalledWith(
+      "stale-review-turn",
+      expect.objectContaining({
+        summaryId: "summary-1",
+        responseTurnId: "summary-turn",
+      }),
+    );
     expect(state.post).not.toHaveBeenCalled();
-    const commentary = c.socket.sent
-      .map((raw) => JSON.parse(raw))
-      .filter((event) => event.type === "session.commentary.append");
-    expect(commentary).toHaveLength(1);
-    expect(commentary[0].content).toContain("fresh review");
-    expect(commentary[0].content).not.toContain(ORDER_APPROVAL_QUESTION);
+    expect(state.view).toBe("receipt");
   });
   it.each([
     "Yes, but change it to two",

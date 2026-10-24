@@ -128,6 +128,10 @@ function validImage(bytes: Buffer, contentType: string): boolean {
   } catch { return false; }
 }
 export class SessionStore {
+  // Set only by the authenticated Live server, never by input or model tools.
+  // Its no-payment checkout review survives conversation while strict spoken
+  // approval keeps the existing turn/playback requirements.
+  private liveDemoCheckoutSessions = new Set<string>();
   private playback = new Map<string, { epoch: number; turnId: string; playbackId: string; summaryId: string | null; summaryRevision: number | null; kind: "assistant" | "video"; videoId?: string }>();
   private attachments = new Map<
     string,
@@ -138,6 +142,7 @@ export class SessionStore {
     { fingerprint: string; result: unknown }
   >();
   private clearSessionData(id: string) {
+    this.liveDemoCheckoutSessions.delete(id);
     this.playback.delete(id);
     for (const [key, asset] of this.attachments)
       if (asset.sessionId === id) this.attachments.delete(key);
@@ -244,6 +249,11 @@ export class SessionStore {
   get(id: string) {
     return clone(this.record(id).state);
   }
+  /** Authenticated Live sideband opt-in; it grants no real purchase authority. */
+  enableLiveDemoCheckout(id: string) {
+    this.record(id);
+    this.liveDemoCheckoutSessions.add(id);
+  }
   private commit(next: Session) {
     const r = this.record(next.id);
     next.revision = r.state.revision + 1;
@@ -291,7 +301,13 @@ export class SessionStore {
     const s = this.get(id);
     this.revision(s, expected);
     this.mutable(s);
-    if (s.summary && !(s.summary.approvalNonce && s.summary.displayed))
+    const keepLiveReview =
+      this.liveDemoCheckoutSessions.has(id) &&
+      s.summary?.displayed &&
+      s.summary.presentationMode === "voice" &&
+      s.summary.quote.offer.classification === "proxy" &&
+      (!input || input.modality === "voice");
+    if (s.summary && !(s.summary.approvalNonce && s.summary.displayed) && !keepLiveReview)
       this.invalidate(s);
     if (input) {
       if (input.modality === "image" || input.modality === "link") this.invalidate(s);
@@ -942,7 +958,10 @@ export class SessionStore {
       const s = this.get(id);
       this.revision(s, expectedRevision);
       this.mutable(s);
-      this.active(s, raw.responseTurnId);
+      // Live's displayed order belongs to its immutable review identity, not
+      // the narration/research turn that happened to prepare it. A later
+      // question or interrupted readback cannot revoke that unchanged review.
+      if (!this.liveDemoCheckoutSessions.has(id)) this.active(s, raw.responseTurnId);
       const m = s.summary;
       requireThat(
         m && m.id === raw.summaryId && m.revision === raw.summaryRevision &&

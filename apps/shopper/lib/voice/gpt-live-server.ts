@@ -42,12 +42,13 @@ Generate <|SpawnThinking|> when showing requested choices, recording a direction
 The Along shopping harness can show choices, remember preferences, retrieve and filter products, compare, navigate and prepare checkout. Backend results are authoritative. Once a direction is clear, prefer three qualifying products; do not pad results. Name each product when moving to it, then relate its useful difference to the shopper's needs. Avoid reciting a templated pros-and-cons script. Reuse verified results and explain material uncertainty in plain language.
 
 ## Purchase policy
-You cannot approve a purchase yourself. When the shopper has chosen a product and says proceed or continue, delegate preparation of its order review using the accepted selection and known requirements. Ask only for a missing fact needed to choose an eligible offer. After they answer that question, carry their request to proceed forward; do not ask them to choose the product again or offer another comparison unless they request it. Final approval is still required after the order review. Briefly review the current order, then ask "Would you like me to place this order?" Accept natural replies: generate <|SpawnThinking|> for a purchase request such as "please buy it", or "yes please" answering that order question. Never require a special word or ask the shopper to repeat an understood approval. A yes answering a different question, a conditional response or a requested change is not approval. Delegate the actual words and wait for the result. Only the server can complete the order. If approval is rejected, keep the order in view and explain the next step; do not return to recommendations. After a confirmed receipt say warmly that the order is confirmed, give the accepted delivery estimate, and add a short encouragement suited to the purchase. For example: "You're all set. It's expected by Friday. Hope your next call sounds much clearer." After that, ordinary acknowledgments such as "that's good" or "thanks" need only a natural conversational reply, never delegation, another checkout attempt or a repeated receipt announcement. Never say shipped, on its way, or arriving tomorrow unless the receipt actually supports it. Keep simulated, hypothetical, demo and no-payment wording out of spoken dialogue. Do not invent reviews or treat fictional ratings as customer evidence.`;
+You cannot approve a purchase yourself. When the shopper has chosen a product and says proceed or continue, delegate preparation of its order review using the accepted selection and known requirements. Ask only for a missing fact needed to choose an eligible offer. After they answer that question, carry their request to proceed forward; do not ask them to choose the product again or offer another comparison unless they request it. Once the order details are on screen, an explicit purchase instruction is approval even if the shopper interrupts your readout. Immediately generate <|SpawnThinking|>; do not finish reciting the offer, repeat delivery details, or ask for approval again. If no order review exists yet, delegate preparation and ask for approval once the details are displayed. Otherwise briefly review the current order, then ask "Would you like me to place this order?" Accept natural replies: generate <|SpawnThinking|> for a purchase request such as "please buy it", or "yes please" answering that order question. Never require a special word or ask the shopper to repeat an understood approval. A yes answering a different question, a conditional response or a requested change is not approval. Delegate the actual words and wait for the result. Only the server can complete the order. If approval is rejected, keep the order in view and explain the next step; do not return to recommendations. After a confirmed receipt say warmly that the order is confirmed, give the accepted delivery estimate, and add a short encouragement suited to the purchase. For example: "You're all set. It's expected by Friday. Hope your next call sounds much clearer." After that, ordinary acknowledgments such as "that's good" or "thanks" need only a natural conversational reply, never delegation, another checkout attempt or a repeated receipt announcement. Never say shipped, on its way, or arriving tomorrow unless the receipt actually supports it. Keep simulated, hypothetical, demo and no-payment wording out of spoken dialogue. Do not invent reviews or treat fictional ratings as customer evidence.`;
 
 export type LiveFragment = { delta: string; start_ms: number; end_ms: number };
 /** Provider timestamps, not browser text or arrival silence, delimit delegated input. */
 export class LiveTranscriptBuffer {
   private fragments: LiveFragment[] = [];
+  private responses: LiveFragment[] = [];
   private consumed = -1;
   private seen = new Set<string>();
   add(event: Record<string, any>) {
@@ -85,6 +86,73 @@ export class LiveTranscriptBuffer {
     const preview = this.peek(offset);
     this.consumed = Math.max(this.consumed, preview.endMs);
     return preview.text;
+  }
+  observeOutput(event: Record<string, any>) {
+    if (
+      typeof event.delta !== "string" ||
+      !Number.isFinite(event.start_ms) ||
+      !Number.isFinite(event.end_ms)
+    )
+      return;
+    this.responses.push({
+      delta: event.delta,
+      start_ms: event.start_ms,
+      end_ms: event.end_ms,
+    });
+    this.responses = this.responses.slice(-512);
+  }
+  /** Isolate a new request after a substantive assistant response. An answer
+   * to a question may itself be cut off mid-sentence. Keep the complete batch
+   * for shopping context; never use a pause or backchannel as a boundary. */
+  latestRequest(offset: number) {
+    const pieces = this.fragments
+      .filter((part) => part.end_ms > this.consumed && part.start_ms <= offset)
+      .sort((a, b) => a.start_ms - b.start_ms);
+    let start = 0;
+    for (let index = 1; index < pieces.length; index++) {
+      const previousEnd = Math.max(
+        ...pieces.slice(0, index).map((part) => part.end_ms),
+      );
+      const responseParts = this.responses
+        .filter(
+          (part) =>
+            part.start_ms >= previousEnd &&
+            part.start_ms < pieces[index].start_ms,
+        )
+        .sort((a, b) => a.start_ms - b.start_ms);
+      const response = responseParts
+        .map((part) => part.delta)
+        .join("")
+        .trim();
+      const previousText = pieces
+        .slice(start, index)
+        .map((part) => part.delta)
+        .join("")
+        .trim();
+      const answeredQuestion =
+        /^(?:when|what|how|where|why|can|could|would|will|is|are|does|do)\b/i.test(
+          previousText,
+        );
+      const completedResponse =
+        /[.!?]$/.test(response) &&
+        responseParts.every((part) => part.end_ms <= pieces[index].start_ms);
+      // A dangling condition must not disappear when the assistant talks over
+      // it. A new explicit command after a separately answered question can.
+      const openCondition =
+        /\b(?:if|unless|provided|as long as|only when)\b/i.test(previousText);
+      if (
+        !openCondition &&
+        (completedResponse || answeredQuestion) &&
+        response.split(/\s+/).length >= 4
+      )
+        start = index;
+    }
+    return pieces
+      .slice(start)
+      .map((part) => part.delta)
+      .join("")
+      .trim()
+      .slice(-4000);
   }
 }
 
@@ -131,10 +199,14 @@ function append(
   );
   return true;
 }
-function spokenUpdate(s: ReturnType<typeof project>) {
+function spokenUpdate(
+  s: ReturnType<typeof project>,
+  previousSummaryId?: string,
+) {
   if (
     s.view === "summary" &&
     s.summary &&
+    s.summary.id !== previousSummaryId &&
     Number.isFinite(s.summary.totalMinor)
   ) {
     const product = s.catalog?.products.find(
@@ -159,7 +231,7 @@ function stateContext(sessionId: string, s = project(sessionId)) {
             status: "review_order",
             summaryId: s.summary.id,
             instruction:
-              "Keep this order in view. Ask: Would you like me to place this order? Delegate natural purchase requests or assent to that question; never require a special word.",
+              "The order details are displayed. Immediately delegate an explicit purchase request, including an interruption mid-review; do not finish the readout or ask again. For an ambiguous reply ask: Would you like me to place this order?",
           }
         : { status: "not_confirmed" },
     message: spokenUpdate(s)?.slice(0, 450),
@@ -191,10 +263,12 @@ function approvalContext(call: Call) {
 }
 function approvalSummary(call: Call, snapshot = project(call.sessionId)) {
   const summary = snapshot.summary;
+  const stored = getRuntime().store.core.get(call.sessionId).summary;
   return ["summary", "recovery"].includes(snapshot.view) &&
     summary &&
-    summary.responseTurnId ===
-      getRuntime().store.core.get(call.sessionId).turn?.id
+    stored?.displayed &&
+    stored.id === summary.id &&
+    stored.revision === summary.revision
     ? summary
     : null;
 }
@@ -281,18 +355,22 @@ async function delegate(call: Call, id: string, offset: number) {
       unchangedSince = Date.now();
     preview = next;
   }
+  const latestRequest = call.transcripts.latestRequest(offset);
   const text = call.transcripts.take(offset);
+  // Only an explicit, complete purchase request can stand on its own after
+  // a separately answered question. A bare assent retains its full context.
+  const checkoutText =
+    classifyCheckoutReply(latestRequest) === "approve" ? latestRequest : text;
   const generation = ++call.generation;
   const { store, orch } = getRuntime();
-  const checkoutReply = classifyCheckoutReply(text);
+  const checkoutReply = classifyCheckoutReply(checkoutText);
   const before = project(call.sessionId);
   const review = approvalSummary(call, before);
   const currentSession = store.core.get(call.sessionId);
-  // The review may already be displayed while its model turn is finishing.
-  // Cancelling that owner would invalidate the very order being approved.
-  // Keep its accepted summary; generation ownership suppresses its late reply.
+  // A displayed review outlives narration and read-only discussion. Do not
+  // cancel its order state just to stop a model turn; the next input cancels
+  // old work, and generation ownership suppresses its late reply.
   const preserveReview =
-    checkoutReply !== "other" &&
     review &&
     currentSession.summary?.displayed &&
     currentSession.summary.id === review.id &&
@@ -345,7 +423,8 @@ async function delegate(call: Call, id: string, offset: number) {
   // This separate server-only path is limited to the displayed demo order and
   // can issue only its synthetic receipt, never a payment or merchant order.
   if (
-    (isLiveDemoConfirmation(text, approvalPromptActive) && summaryInView) ||
+    (isLiveDemoConfirmation(checkoutText, approvalPromptActive) &&
+      summaryInView) ||
     (s.receipt && checkoutReply === "approve")
   ) {
     call.pending = false;
@@ -371,7 +450,7 @@ async function delegate(call: Call, id: string, offset: number) {
           summaryRevision: summary.revision,
           responseTurnId: summary.responseTurnId,
           delegationId: `${call.callId}_${id}`,
-          transcript: text,
+          transcript: checkoutText,
           ...(checkoutReply === "assent"
             ? { affirmationSummaryId: summary.id }
             : {}),
@@ -408,7 +487,7 @@ async function delegate(call: Call, id: string, offset: number) {
       eventId: crypto.randomUUID(),
       baseRevision: s.revision,
       modality: "voice",
-      text,
+      text: checkoutReply === "approve" ? checkoutText : text,
       visibleRevision: s.revision,
       visibleProductIds: s.displayOrder,
     });
@@ -421,7 +500,7 @@ async function delegate(call: Call, id: string, offset: number) {
       return;
     call.pending = false;
     const content =
-      (result.snapshot && spokenUpdate(result.snapshot)) ||
+      (result.snapshot && spokenUpdate(result.snapshot, before.summary?.id)) ||
       "The shopping view has been updated.";
     const sent = append(call, "commentary", content, id);
     if (sent && asksForOrderApproval(content))
@@ -571,8 +650,10 @@ export async function connectGptLive(
       call.transcripts.add(event);
       approvalContext(call).observeInput(event);
     }
-    if (event.type === "session.output_transcript.delta")
+    if (event.type === "session.output_transcript.delta") {
+      call.transcripts.observeOutput(event);
       approvalContext(call).observeOutput(event, approvalSummary(call));
+    }
     if (
       event.type === "session.delegation.created" &&
       event.delegation?.target === "client" &&
@@ -616,6 +697,7 @@ export async function connectGptLive(
     throw error;
   }
   calls.set(body.sessionId, call);
+  getRuntime().store.core.enableLiveDemoCheckout(body.sessionId);
   approvalContext(call).expect(approvalSummary(call));
   return { sdp: result.transport.sdp, callId: call.callId };
 }
@@ -628,6 +710,7 @@ function current(sessionId: string, callId: unknown) {
     throw new Error("Live voice expired. Start voice again.");
   }
   call.touchedAt = Date.now();
+  getRuntime().store.core.enableLiveDemoCheckout(sessionId);
   return call;
 }
 export function gptLiveState(sessionId: string, callId: unknown) {

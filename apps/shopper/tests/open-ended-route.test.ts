@@ -267,13 +267,136 @@ describe("open-ended agent HTTP integration", () => {
     expect(provider).toHaveBeenCalledTimes(1);
   });
 
-  it("rejects confirmation before a summary is presented without consulting the model", async () => {
+  it("prepares a selected offer on a purchase request, then completes only after its review is shown", async () => {
     const provider = vi.fn();
     vi.stubGlobal("fetch", provider);
     const client = await session();
-    const result = await client.send("Confirm this simulated purchase");
-    expect(result.status).toBe(409);
+    const { store } = getRuntime();
+    const { revision: _revision, ...input } = client.input("I like this bag");
+    let current = store.core.input(input.sessionId, input);
+    current = store.core.propose(input.sessionId, {
+      expectedRevision: current.revision,
+      turnId: input.turnId,
+      selection: { offerId: "BAG-001-B", quantity: 1 },
+    }).session;
+    await client.request({ action: "connect", sessionId: input.sessionId });
+
+    const prepared = await client.send("I want to place the order");
+    expect(prepared.status, prepared.data.error).toBe(200);
+    expect(prepared.data.snapshot.view).toBe("summary");
+    expect(prepared.data.snapshot.receipt).toBeNull();
+    const summary = store.core.get(input.sessionId).summary!;
+    expect(summary.quote.offer.id).toBe("BAG-001-B");
+
+    const premature = await client.send("Please buy it");
+    expect(premature.status).toBe(409);
+    expect(store.core.get(input.sessionId).summary!.id).toBe(summary.id);
+    expect(premature.data.snapshot.receipt).toBeNull();
+    await client.request({
+      action: "presented",
+      input: { ...client.identity(), turnId: summary.responseTurnId },
+      summaryId: summary.id,
+      textHash: summary.textHash,
+    });
+    const completed = await client.send("I want to place the order");
+    expect(completed.status, completed.data.error).toBe(200);
+    expect(completed.data.snapshot.view).toBe("receipt");
+    expect(provider).not.toHaveBeenCalled();
+  });
+
+  it("resolves the product or offer when a purchase request has no selection yet", async () => {
+    const provider = vi.fn(async () =>
+      answer("Which bag would you like to order?"),
+    );
+    vi.stubGlobal("fetch", provider);
+    const client = await session();
+    const result = await client.send("I want to place the order");
+    expect(result.status).toBe(200);
+    expect(result.data.snapshot.message).toBe(
+      "Which bag would you like to order?",
+    );
     expect(result.data.snapshot.receipt).toBeFalsy();
+    expect(provider).toHaveBeenCalledOnce();
+  });
+
+  it.each(["text", "voice"])(
+    "does not approve a hidden previous order when %s requests buy this on another product",
+    async (modality) => {
+      const provider = vi.fn(async () =>
+        answer("Let's check the offer for this bag."),
+      );
+      vi.stubGlobal("fetch", provider);
+      const client = await session();
+      const send = (text: string) =>
+        client.request({
+          action: "input",
+          input: { ...client.input(text), modality },
+        });
+      const { store } = getRuntime();
+      if (modality === "voice")
+        store.core.enableLiveDemoCheckout(client.snapshot().sessionId);
+      const selected = await send("Select offer BAG-001-B");
+      expect(selected.status, selected.data.error).toBe(200);
+      let current = store.core.get(client.snapshot().sessionId);
+      const summary = current.summary!;
+      await client.request({
+        action: "presented",
+        input: { ...client.identity(), turnId: summary.responseTurnId },
+        summaryId: summary.id,
+        textHash: summary.textHash,
+      });
+      current = store.core.get(current.id);
+      store.core.propose(current.id, {
+        expectedRevision: current.revision,
+        turnId: current.turn!.id,
+        shortlist: ["BAG-001", "BAG-002"],
+      });
+      await client.request({ action: "connect", sessionId: current.id });
+      const focused = await send("Focus BAG-002");
+      expect(focused.status, focused.data.error).toBe(200);
+      expect(focused.data.snapshot.view).toBe("shortlist");
+      expect(focused.data.snapshot.summary.id).toBe(summary.id);
+
+      const result = await send("Please buy this");
+      expect(result.status, result.data.error).toBe(200);
+      expect(result.data.snapshot.receipt).toBeNull();
+      expect(result.data.snapshot.message).toBe(
+        "Let's check the offer for this bag.",
+      );
+      expect(provider).toHaveBeenCalledOnce();
+    },
+  );
+
+  it("prepares a fresh review when returning to the same selected product", async () => {
+    const provider = vi.fn();
+    vi.stubGlobal("fetch", provider);
+    const client = await session();
+    await client.send("Select offer BAG-001-B");
+    const { store } = getRuntime();
+    const current = store.core.get(client.snapshot().sessionId);
+    const summary = current.summary!;
+    await client.request({
+      action: "presented",
+      input: { ...client.identity(), turnId: summary.responseTurnId },
+      summaryId: summary.id,
+      textHash: summary.textHash,
+    });
+    const displayed = store.core.get(current.id);
+    store.core.propose(current.id, {
+      expectedRevision: displayed.revision,
+      turnId: displayed.turn!.id,
+      shortlist: ["BAG-001"],
+    });
+    await client.request({ action: "connect", sessionId: current.id });
+    const offers = await client.send("Show offers for BAG-001");
+    expect(offers.status, offers.data.error).toBe(200);
+    expect(offers.data.snapshot.view).toBe("offers");
+    const result = await client.send("Please buy this");
+    expect(result.status, result.data.error).toBe(200);
+    expect(result.data.snapshot.view).toBe("summary");
+    expect(result.data.snapshot.summary.id).not.toBe(summary.id);
+    expect(result.data.snapshot.summary.offerId).toBe("BAG-001-B");
+    expect(result.data.snapshot.receipt).toBeNull();
     expect(provider).not.toHaveBeenCalled();
   });
 
