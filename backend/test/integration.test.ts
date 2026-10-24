@@ -167,6 +167,17 @@ test("contract #2: three category constraints reject unavailable, missing hardwa
 test("contract #2: typed display + fresh exact confirmation creates one receipt; input/action retries do not duplicate mutations", async (t) => {
   const h = await harness(t);
   let s = h.initial;
+  const publicClient = new IntegrationClient(
+    h.base.replace("/v1/integration", ""),
+    { sessionId: h.id, accessToken: h.token },
+  );
+  const stream = publicClient.events();
+  const first = await stream.next();
+  assert.equal(first.value?.type, "session.updated");
+  if (first.value?.type === "session.updated")
+    assert.equal(first.value.snapshot.sessionId, h.id);
+  await stream.return(undefined);
+  assert.equal((await publicClient.catalog()).products.length, 24);
   const i = input(s, "Show bags");
   const a = await h.post("inputs", i),
     b = await h.post("inputs", i);
