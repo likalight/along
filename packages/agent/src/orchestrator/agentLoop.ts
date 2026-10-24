@@ -10,6 +10,7 @@ import {
   audioSolutionTypesProposal,
   buildAudioShortlist,
   parsePriority,
+  parseExcludedSolutionTypes,
   parseSolutionType,
 } from "../scenarios/audio.js";
 import {
@@ -28,6 +29,7 @@ import {
   KNOWN_LINKS,
   offersForProduct,
   PREPARED_ATTACHMENTS,
+  PRODUCTS,
 } from "../fixtures/catalog.js";
 import { type Route, resolveReference } from "../intent/router.js";
 import type { FixtureSessionStore } from "../session/FixtureSessionStore.js";
@@ -179,22 +181,6 @@ export async function agentLoop(opts: {
       patchScenario(store, input.sessionId, scenario.id);
       break;
     }
-    case "solution_type": {
-      const st = parseSolutionType(input.text ?? "");
-      push({
-        ...baseProposal(input, "set"),
-        action: "set_constraints",
-        payload: {
-          preferences: { solutionType: st },
-          needs: ["café dictation mic"],
-          hardConstraints: { compatibility: parseCompatibility(input.text ?? "") },
-        },
-        evidenceIds: [],
-      });
-      push(audioPriorityProposal(baseProposal(input, "ask-priority")));
-      patchStage(store, input.sessionId, "buying_priorities");
-      break;
-    }
     case "priority": {
       const priority = parsePriority(input.text ?? "") ?? "best_value";
       const removeHardBudget =
@@ -218,6 +204,7 @@ export async function agentLoop(opts: {
       });
       break;
     }
+    case "solution_type":
     case "strong_intent":
     case "weak_intent":
     case "revise": {
@@ -393,10 +380,14 @@ function runGuidedNeed(
   const scenario = snapshot.scenarioId ?? inferScenario(text, snapshot).id;
 
   if (scenario === "cafe_dictation") {
+    const excludedTypes = parseExcludedSolutionTypes(text);
+    const previousType = snapshot.preferences["solutionType"] as
+      "headset" | "clip_on" | "directional_desktop" | undefined;
     const st =
       parseSolutionType(text) ??
-      (snapshot.preferences["solutionType"] as
-        "headset" | "clip_on" | "directional_desktop" | undefined);
+      (previousType && !excludedTypes.includes(previousType)
+        ? previousType
+        : undefined);
     const budget = parseBudget(text);
     const hard: Record<string, unknown> = {
       category: "audio",
@@ -411,16 +402,26 @@ function runGuidedNeed(
       payload: {
         needs: ["noisy café dictation"],
         hardConstraints: hard,
-        preferences: st ? { solutionType: st } : {},
-        exclusions: /remove |not the |exclude /i.test(text)
-          ? extractExclusion(text, snapshot)
-          : [],
+        preferences: { solutionType: st ?? null },
+        exclusions: [
+          ...PRODUCTS.filter(
+            (p) => p.solutionType && excludedTypes.includes(p.solutionType),
+          ).map((p) => p.id),
+          ...(/remove |not the |exclude /i.test(text)
+            ? extractExclusion(text, snapshot)
+            : []),
+        ],
       },
       evidenceIds: [],
     });
 
     if (!st && route !== "strong_intent") {
-      push(audioSolutionTypesProposal(baseProposal(input, "ask-type")));
+      push(
+        audioSolutionTypesProposal(
+          baseProposal(input, "ask-type"),
+          store.get(input.sessionId)!.exclusions,
+        ),
+      );
       patchScenario(store, input.sessionId, "cafe_dictation");
       return;
     }

@@ -117,4 +117,50 @@ describe("authoritative discovery retains shopper constraints", () => {
       ).toBe(true);
     }
   });
+  it("keeps a lavalier request and headset exclusion through a priority change", async () => {
+    const user = shopper();
+    await user.say("I need a microphone for cafe dictation");
+    await user.say(
+      "I want a discreet lavalier, no headset, best value under 200 dollars for USB-C",
+    );
+    expect(user.state().constraints.budgetMinor).toBe(20000);
+    expect(user.state().constraints.compatibility?.hostConnection).toBe(
+      "usb-c",
+    );
+    expect(user.state().excludedProductIds).toEqual(
+      expect.arrayContaining(["MIC-001", "MIC-003", "MIC-009"]),
+    );
+    expect(getRuntime().store.get(user.id)?.preferences.solutionType).toBe(
+      "clip_on",
+    );
+    expect(user.state().shortlist.length).toBeGreaterThan(0);
+    expect(user.state().shortlist).toContain("MIC-040");
+    expect(
+      user.state().shortlist.every((id) => ["MIC-037", "MIC-040"].includes(id)),
+    ).toBe(true);
+    await user.say("best quality");
+    expect(user.state().constraints.budgetMinor).toBe(20000);
+    expect(user.state().excludedProductIds).toEqual(
+      expect.arrayContaining(["MIC-001", "MIC-003", "MIC-009"]),
+    );
+    expect(
+      user.state().shortlist.every((id) => ["MIC-037", "MIC-040"].includes(id)),
+    ).toBe(true);
+  });
+  it("asks for an alternative after rejecting a previously selected headset", async () => {
+    const user = shopper();
+    await user.say("I need a microphone for cafe dictation");
+    await user.say("choose headset");
+    await user.say("I do not want a headset");
+    expect(
+      getRuntime().store.get(user.id)?.preferences.solutionType,
+    ).toBeNull();
+    expect(user.state().excludedProductIds).toEqual(
+      expect.arrayContaining(["MIC-001", "MIC-003", "MIC-009"]),
+    );
+    await user.say("choose lapel");
+    expect(getRuntime().store.get(user.id)?.preferences.solutionType).toBe(
+      "clip_on",
+    );
+  });
 });
