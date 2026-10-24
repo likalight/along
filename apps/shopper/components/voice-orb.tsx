@@ -49,7 +49,9 @@ export function VoiceOrb({
     }
     return () => element?.removeEventListener("webglcontextlost", lost, true);
   }, []);
-  const active = capturing || status === "thinking" || status === "speaking";
+  // Keep the ElevenLabs orb mounted whenever WebGL is available — idle still
+  // shows the blue orb (agentState null). CSS fallback is only for reduced
+  // motion / no WebGL / boundary failure, not for "not currently talking".
   return (
     <div
       ref={wrapper}
@@ -57,7 +59,7 @@ export function VoiceOrb({
       aria-hidden="true"
       data-status={status}
     >
-      {webgl && !reduced && active ? (
+      {webgl && !reduced ? (
         <OrbBoundary>
           <div className="orb-canvas">
             <Orb

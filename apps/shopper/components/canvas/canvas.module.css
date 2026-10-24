@@ -256,8 +256,11 @@
   align-items: start;
 }
 .discovery {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 18px;
+}
+.offersStrip {
+  margin-bottom: 18px;
 }
 .card {
   position: relative;
@@ -268,10 +271,6 @@
   overflow: hidden;
   min-width: 0;
   transform-style: preserve-3d;
-}
-.card:hover,
-.card:focus-within {
-  animation-play-state: paused !important;
 }
 .focused {
   outline: 3px solid #4380d0;
@@ -710,11 +709,18 @@
   font-size: 12px;
 }
 @media (min-width: 1050px) {
-  .discovery .card:nth-child(n + 3) {
-    margin-top: 28px;
+  /* Airy Along offsets for 2–5 tile discovery — not only 5-up grids. */
+  .discovery .card:nth-child(1) {
+    margin-top: 0;
   }
   .discovery .card:nth-child(2) {
-    margin-top: 10px;
+    margin-top: 18px;
+  }
+  .discovery .card:nth-child(3) {
+    margin-top: 8px;
+  }
+  .discovery .card:nth-child(n + 4) {
+    margin-top: 28px;
   }
 }
 @media (max-width: 1050px) {

@@ -501,6 +501,8 @@ function runGuidedNeed(
     });
     const snap = store.get(input.sessionId)!;
     const discovery = buildBagDiscovery(snap);
+    // Land on shortlist so the demo shows flying tiles + ranks. Offers come
+    // from a deliberate next turn (“show offers” / select), not auto-jump.
     push({
       ...baseProposal(input, "shortlist"),
       action: "shortlist",
@@ -511,22 +513,6 @@ function runGuidedNeed(
       },
       evidenceIds: [],
     });
-    if (
-      prefs.needTomorrow &&
-      store.get(input.sessionId)!.shortlistIds.includes("BAG-001")
-    ) {
-      const fast = offersForProduct("BAG-001").find(
-        (o) => o.deliveryWindow?.latestOffsetDays === 1,
-      );
-      if (fast) {
-        push({
-          ...baseProposal(input, "offer"),
-          action: "select_offer",
-          payload: { offerId: fast.id },
-          evidenceIds: [],
-        });
-      }
-    }
     patchScenario(store, input.sessionId, "bag_inspiration");
     return;
   }

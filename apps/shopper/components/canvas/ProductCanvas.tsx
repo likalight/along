@@ -144,10 +144,18 @@ export function ProductCanvas({
     return p ? [p] : [];
   });
   const focused = data.products.find((p) => p.id === s.focusedProductId);
+  // Discovery entrance must not depend on busy/thinking — cards often mount
+  // while status is still "thinking", which previously suppressed the fly-in.
+  // Keep settles for compare/evidence/offers/spatial/video/reduced-motion.
+  const discoveryView = [
+    "shortlist",
+    "solution_types",
+    "buying_priorities",
+    "understanding",
+  ].includes(s.view);
   const stable =
     interpretingSpatialReference ||
-    busy ||
-    !["shortlist", "solution_types", "buying_priorities"].includes(s.view) ||
+    !discoveryView ||
     Boolean(videoId) ||
     Boolean(reduced);
   const intent = (text: string) =>
@@ -608,12 +616,14 @@ export function ProductCanvas({
                   </button>
                 </div>
               </div>
-              {s.view !== "evidence" && s.view !== "offers" && (
+              {s.view !== "evidence" && (
                 <div
-                  className={`${styles.products} ${products.length > 3 ? styles.discovery : ""}`}
+                  className={`${styles.products} ${products.length >= 2 ? styles.discovery : ""} ${s.view === "offers" ? styles.offersStrip : ""}`}
                   data-stable={stable}
                 >
-                  {products.map((p, i) => card(p, i))}
+                  {products.map((p, i) =>
+                    card(p, i, s.view === "offers" || products.length > 3),
+                  )}
                 </div>
               )}
             </>

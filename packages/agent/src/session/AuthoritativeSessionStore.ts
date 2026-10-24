@@ -57,16 +57,20 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
   override create(
     opts?: Parameters<FixtureSessionStore["create"]>[0],
   ): SessionSnapshot {
-    const backendScenario = opts?.scenarioId
-      ? BACKEND_SCENARIO_IDS[opts.scenarioId]
-      : undefined;
-    const { session, accessToken } = this.core.create(backendScenario);
+    // Narrative scenario IDs are session metadata only — never seed budget/host/bed
+    // constraints as assumed consent (INTEGRATION.md). Shopper conversation owns those.
+    const { session, accessToken } = this.core.create();
     this.tokens.set(session.id, accessToken);
     this.metadata.set(session.id, {
       scenarioId: opts?.scenarioId ?? null,
       scenarioStage: "opening",
       imageInferences: [],
     });
+    // Record mapped backend scenario id for rehearsal scripts without applying its constraints.
+    if (opts?.scenarioId) {
+      const mapped = BACKEND_SCENARIO_IDS[opts.scenarioId];
+      if (mapped) this.core.get(session.id).scenarioId = mapped;
+    }
     if (opts?.preparedAttachmentId)
       this.core.usePreparedImage(
         session.id,
@@ -267,23 +271,44 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
           case "shortlist": {
             const entries = (p.entries ??
               []) as SessionSnapshot["shortlistEntries"];
-            // Unknown compatibility may remain a discovery candidate; known conflicts may not.
-            const valid = entries.filter((e) =>
-              this.quotes(a.sessionId, e.productId).some((q) =>
-                q.conflicts.every((c) =>
-                  [
-                    "HOST_UNKNOWN",
-                    "BED_DIMENSIONS_UNKNOWN",
-                    "MATTRESS_DEPTH_UNKNOWN",
-                  ].includes(c.code),
+            const related = [
+              ...((p.closeMatches as string[]) ?? []),
+              ...((p.relatedDiscoveries as string[]) ?? []),
+            ];
+            // Discovery may show related tiles that are not yet checkout-eligible.
+            // Hard category/incompatibility still drops a product; soft/unknown stays.
+            // HOST_CONNECTION_REQUIRED is soft until the shopper confirms host hardware
+            // (café demo would otherwise land empty after "best value").
+            const soft = (code: string) =>
+              /UNKNOWN|DELIVERY|OVER_BUDGET|SHOE_COMPARTMENT|LAPTOP_FIT|SPECIFICATION_CONFLICT|HOST_CONNECTION_REQUIRED/i.test(
+                code,
+              );
+            const discovery = entries.filter((e) => {
+              const quotes = this.quotes(a.sessionId, e.productId);
+              if (!quotes.length) return related.includes(e.productId);
+              return quotes.some((q) =>
+                q.conflicts.every(
+                  (c) =>
+                    soft(c.code) ||
+                    [
+                      "HOST_UNKNOWN",
+                      "BED_DIMENSIONS_UNKNOWN",
+                      "MATTRESS_DEPTH_UNKNOWN",
+                    ].includes(c.code),
                 ),
-              ),
+              );
+            });
+            const eligible = discovery.filter((e) =>
+              this.quotes(a.sessionId, e.productId).some((q) => q.eligible),
             );
-            proposal.shortlist = valid.slice(0, 3).map((e) => e.productId);
+            const shown = (
+              eligible.length >= 3 ? eligible : discovery
+            ).slice(0, 5);
+            proposal.shortlist = shown.map((e) => e.productId);
             proposal.view = {
               stage: "shortlist",
               focusProductId: null,
-              cards: valid.slice(0, 3).map((e, i) => ({
+              cards: shown.map((e, i) => ({
                 productId: e.productId,
                 role: (s.priority ?? "best-value") as "best-value",
                 rank: (i + 1) as 1 | 2 | 3,
@@ -294,9 +319,11 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
               evidenceIds: [],
               activeVideoId: null,
             };
-            proposal.stage = valid.length ? "shortlist" : "understanding";
-            content = valid.length
-              ? `Here are ${valid.length} candidates. Confirm missing compatibility details before checkout.`
+            proposal.stage = shown.length ? "shortlist" : "understanding";
+            content = shown.length
+              ? eligible.length
+                ? `Here are ${shown.length} candidates. Gold/silver/bronze are contextual ranks for this shortlist — not awards.`
+                : `Here are ${shown.length} discoveries. Some still need a compatibility check before checkout.`
               : "No checked offer meets the known hard constraints. Which requirement may change?";
             break;
           }

@@ -325,8 +325,18 @@ export class SessionController {
         );
       this.pending = null;
       this.identity = { ...this.identity!, revision: accepted.revision };
-      if (!this.acceptSnapshot(accepted.snapshot)) return;
-      this.update({ status: "ready" });
+      // Apply snapshot + ready in one update so ProductCanvas mounts with
+      // discovery entrance (not under a lingering "thinking"/busy frame).
+      const current = this.state.snapshot;
+      if (
+        current &&
+        (accepted.snapshot.sessionId !== current.sessionId ||
+          accepted.snapshot.epoch < current.epoch ||
+          (accepted.snapshot.epoch === current.epoch &&
+            accepted.snapshot.revision < current.revision))
+      )
+        return;
+      this.update({ snapshot: accepted.snapshot, status: "ready", error: null });
       if (modality === "voice") this.narrate(accepted.snapshot);
     } catch (e) {
       if (generation !== this.generation) return;
