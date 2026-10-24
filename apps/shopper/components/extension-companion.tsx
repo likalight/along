@@ -44,10 +44,14 @@ export function ExtensionCompanion({
   controller,
   state,
   hasDraft,
+  onConnectionChange,
 }: {
   controller: SessionController;
   state: ClientState;
   hasDraft: boolean;
+  onConnectionChange?: (
+    value: "unavailable" | "available" | "connected",
+  ) => void;
 }) {
   const [extensionId, setExtensionId] = useState<string | null>(null);
   const [pairedWith, setPairedWith] = useState<PairIdentity | null>(null);
@@ -70,6 +74,12 @@ export function ExtensionCompanion({
     pairedWith.sessionId === sessionId &&
     pairedWith.epoch === epoch &&
     pairedWith.extensionId === extensionId;
+
+  useEffect(() => {
+    onConnectionChange?.(
+      paired ? "connected" : extensionId ? "available" : "unavailable",
+    );
+  }, [paired, extensionId, onConnectionChange]);
 
   const currentAttempt = (value: PairAttempt) =>
     attempt.current === value &&

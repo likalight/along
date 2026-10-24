@@ -1,5 +1,5 @@
 export const DEFAULTS = Object.freeze({
-  backendOrigin: 'http://127.0.0.1:4324', enabledOrigins: [], paused: false,
+  backendOrigin: 'http://127.0.0.1:4339', enabledOrigins: [], paused: false,
   demo: false, visual: false, consentVersion: 0,
 });
 export const SITES = Object.freeze([

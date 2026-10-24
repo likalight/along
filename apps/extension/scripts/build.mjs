@@ -48,3 +48,7 @@ for (const file of files.sort()) {
 const directory = Buffer.concat(central); const end = Buffer.alloc(22); end.writeUInt32LE(0x06054b50); end.writeUInt16LE(files.length, 8); end.writeUInt16LE(files.length, 10); end.writeUInt32LE(directory.length, 12); end.writeUInt32LE(offset, 16);
 await writeFile(path.join(dist, 'along-extension.zip'), Buffer.concat([...bodies, directory, end]));
 console.log(`Built ${files.length} packaged files.\nUnpacked: ${unpacked}\nZIP: ${path.join(dist, 'along-extension.zip')}`);
+
+const downloads = path.resolve(root, '../shopper/public/downloads');
+await mkdir(downloads, {recursive:true});
+await copyFile(path.join(dist, 'along-extension.zip'), path.join(downloads, 'along-extension.zip'));

@@ -19,6 +19,11 @@ export default function ExtensionGuide() {
       </p>
       <section className={styles.card}>
         <h2>Connect your Chrome companion</h2>
+        <p>
+          <Link href="/setup">
+            Connect Mac preferences and Chrome together →
+          </Link>
+        </p>
         <ol>
           <li>
             <strong>Load the extension.</strong>
@@ -94,9 +99,10 @@ export default function ExtensionGuide() {
       </div>
       <p className={styles.small}>
         Recognition can suggest a Coupang search without Partners API access.
-        Optional web search can add public product links; prices and availability
-        are checked on Coupang. Visual recognition needs a separately enabled
-        image provider. Direct Partners results require approved credentials.
+        Optional web search can add public product links; prices and
+        availability are checked on Coupang. Visual recognition needs a
+        separately enabled image provider. Direct Partners results require
+        approved credentials.
       </p>
     </main>
   );

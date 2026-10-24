@@ -681,30 +681,39 @@ export async function connectGptLive(
         delegation: { type: "client" },
         instructions: LIVE_INSTRUCTIONS,
         audio: { output: { voice } },
+        // Live startup history permits one text part per message.
         input: [
-          {
-            type: "message",
-            role: "developer",
-            content: [
-              {
-                type: "input_text",
-                text: `Current verified shopping state: ${stateContext(body.sessionId)}`,
-              },
-              ...liveDiscoveryContext(project(body.sessionId)).map((text) => ({
-                type: "input_text",
-                text,
-              })),
-            ],
-          },
-        ],
+          `Current verified shopping state: ${stateContext(body.sessionId)}`,
+          ...liveDiscoveryContext(project(body.sessionId)),
+        ].map((text) => ({
+          type: "message",
+          role: "developer",
+          content: [{ type: "input_text", text }],
+        })),
       },
       transport: { type: "webrtc", sdp: body.sdp },
     }),
   });
-  if (!response.ok)
+  if (!response.ok) {
+    const failure = await response.json().catch(() => null);
+    // Keep diagnostics on the server; never log the SDP, headers or shopping context.
+    const safe = (value: unknown) =>
+      typeof value === "string"
+        ? value
+            .replace(/sk-[A-Za-z0-9_-]+|Bearer\s+\S+/gi, "[redacted]")
+            .slice(0, 350)
+        : undefined;
+    console.error("GPT-Live session rejected", {
+      status: response.status,
+      code: safe(failure?.error?.code),
+      parameter: safe(failure?.error?.param),
+      message: safe(failure?.error?.message),
+      requestId: response.headers.get("x-request-id"),
+    });
     throw new Error(
       `GPT-Live could not start (${response.status}). Text shopping remains available.`,
     );
+  }
   const result = await response.json();
   if (
     typeof result.session?.id !== "string" ||

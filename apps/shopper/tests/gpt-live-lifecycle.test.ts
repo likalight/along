@@ -199,12 +199,30 @@ describe("GPT-Live task ownership", () => {
     });
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        Response.json({
+      vi.fn(async (_url, init) => {
+        // Match the provider boundary that rejected the merged discovery payload:
+        // every initial message must contain exactly one text part.
+        const body = JSON.parse(String(init.body));
+        if (
+          body.session.input.some(
+            (message: { content: unknown[] }) => message.content.length !== 1,
+          )
+        ) {
+          return Response.json(
+            {
+              error: {
+                code: "array_above_max_length",
+                param: "session.input[0].content",
+              },
+            },
+            { status: 400 },
+          );
+        }
+        return Response.json({
           session: { id: crypto.randomUUID() },
           transport: { sdp: "answer" },
-        }),
-      ),
+        });
+      }),
     );
   });
   afterEach(() => {
@@ -277,8 +295,9 @@ describe("GPT-Live task ownership", () => {
     state.discoveryReference = reference();
     await connect("discovery-on-start");
     const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string);
-    const inputs = body.session.input[0].content.map(
-      (item: { text: string }) => item.text,
+    const inputs = body.session.input.flatMap(
+      (message: { content: { text: string }[] }) =>
+        message.content.map((item) => item.text),
     );
     expect(
       inputs.some((text: string) =>

@@ -4,7 +4,7 @@ import { cp, mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-test("real unpacked extension discovers automatically and continues the same conversation", async ({
+test("Mac preferences and the installed Chrome extension share one shopping journey", async ({
   baseURL,
 }, info) => {
   const packaged = fileURLToPath(
@@ -46,7 +46,57 @@ test("real unpacked extension discovers automatically and continues the same con
       (await context.waitForEvent("serviceworker", { timeout: 15000 }));
     const id = new URL(worker.url()).host;
     const page = await context.newPage();
-    await page.goto(baseURL!);
+    // Model-free fixture represents a previously learned, explicitly synthetic
+    // Mac preference. This tests the real browser pairing and session injection.
+    const memoryDirectory = process.env.ALONG_E2E_CONTEXT!;
+    const pairing = JSON.parse(
+      await readFile(path.join(memoryDirectory, "connection.json"), "utf8"),
+    );
+    const now = new Date().toISOString();
+    await writeFile(
+      path.join(memoryDirectory, "learned-preferences.json"),
+      JSON.stringify({
+        enabled: false,
+        generation: 0,
+        seen: [],
+        suppressed: [],
+        status: "Paused",
+        lastSyncedAt: now,
+        memories: [
+          {
+            id: "synthetic-weight",
+            key: "bagPriority",
+            value: "weight",
+            confidence: 0.95,
+            sourceApp: "TextEdit (synthetic demo)",
+            sourceEventID: "synthetic-event",
+            observedAt: now,
+            learnedAt: now,
+            expiresAt: new Date(Date.now() + 86400000).toISOString(),
+            origin: "inferred",
+          },
+        ],
+      }),
+      { mode: 0o600 },
+    );
+    await page.goto(`${baseURL}/context#pair=${pairing.token}`);
+    await expect(
+      page.getByText("TextEdit (synthetic demo)", { exact: false }),
+    ).toBeVisible();
+    await page
+      .getByRole("link", { name: "Start shopping with these preferences" })
+      .click();
+    await page.locator("summary").filter({ hasText: "Your context" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Learning paused" }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("In this conversation", { exact: false }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Priority: lightweight", { exact: true }),
+    ).toHaveCount(2);
+    await page.locator("summary").filter({ hasText: "Your context" }).click();
     await page.getByRole("button", { name: "Type instead" }).click();
     await page
       .getByRole("textbox", { name: "Your message" })
@@ -232,6 +282,8 @@ test("real unpacked extension discovers automatically and continues the same con
     await expect(review).toContainText("Daylite Large Tote Pack");
     await expect(review).toHaveAttribute("data-summary-status", "eligible");
     const completed = await send("Yes, go ahead and place the order");
+    // The explicit "shape" request supersedes the remembered weight preference.
+    expect(completed.snapshot.preferences).toContain("bagPriority: shape");
     expect(completed.snapshot.receipt.simulated).toBe(true);
     expect(completed.snapshot.receipt.acceptedOrder.productId).toBe("BAG-001");
     await expect(
@@ -270,8 +322,49 @@ test("real unpacked extension discovers automatically and continues the same con
     expect(
       await page.evaluate(() => sessionStorage.getItem("along.sessionId")),
     ).toBe(sessionId);
+    // Starting over keeps the paired Mac memory but not the old order or
+    // extension session. The same extension must pair with the new session.
+    await page.locator("summary").filter({ hasText: "Your context" }).click();
+    await page
+      .getByRole("button", { name: "New conversation", exact: true })
+      .click();
+    await expect(
+      page.getByRole("button", { name: "Start talking" }),
+    ).toBeEnabled();
+    const freshId = await page.evaluate(() =>
+      sessionStorage.getItem("along.sessionId"),
+    );
+    expect(freshId).toBeTruthy();
+    expect(freshId).not.toBe(sessionId);
+    await expect(
+      page.getByRole("region", { name: "Order confirmation" }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByText("Your Chrome companion is connected"),
+    ).toHaveCount(0);
+    await page.locator("summary").filter({ hasText: "Your context" }).click();
+    await expect(
+      page.getByText("Priority: lightweight", { exact: true }),
+    ).toHaveCount(2);
+    await page
+      .getByRole("button", { name: /^(Re)?connect extension$/i })
+      .click();
+    await expect(
+      page.getByText("Your Chrome companion is connected"),
+    ).toBeVisible();
+    await page.screenshot({
+      path: info.outputPath("unified-context.png"),
+      fullPage: true,
+    });
   } finally {
     await context.close();
+    const memoryDirectory = process.env.ALONG_E2E_CONTEXT;
+    if (
+      memoryDirectory &&
+      path.dirname(memoryDirectory) === path.resolve(tmpdir()) &&
+      path.basename(memoryDirectory).startsWith("along-context-e2e-")
+    )
+      await rm(memoryDirectory, { recursive: true, force: true });
     if (
       path.dirname(extension) !== path.resolve(tmpdir()) ||
       !path.basename(extension).startsWith("along-e2e-")

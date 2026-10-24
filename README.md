@@ -28,6 +28,10 @@ Shopping rarely follows a straight line. A review changes your mind, your budget
 
 Built for the Coupang challenge. The shopper interface, authoritative session backend, open-ended text shopping and GPT-Live voice conversation run today. A server-side OpenAI API key is required for conversational shopping. See [project status](#project-status) for the current boundaries.
 
+## Unified Mac + Chrome demo
+
+For the judging walkthrough, build once with `npm run build`, then run `npm run demo`. Open [Along setup](http://127.0.0.1:4339/setup) in desktop Chrome. This uses the Mac companion’s saved preferences and the Chrome extension in one shopping conversation. See the [seven-minute demo and permission checklist](docs/unified-demo.md).
+
 ## Quickstart
 
 Clone the repository, then choose Docker or native Node.js:

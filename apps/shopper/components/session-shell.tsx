@@ -34,6 +34,7 @@ import {
   customerNotes,
   customerSellerLabel,
 } from "@/lib/canvas/customer-copy";
+import { ContextOverview } from "./context-overview";
 import { VoiceOrb } from "./voice-orb";
 import { Attachments } from "./attachments";
 import { ExtensionCompanion, DiscoveryContext } from "./extension-companion";
@@ -56,6 +57,9 @@ export function SessionShell() {
     controller.getSnapshot,
     controller.getSnapshot,
   );
+  const [chrome, setChrome] = useState<
+    "unavailable" | "available" | "connected"
+  >("unavailable");
   const [draft, setDraft] = useState("");
   const [voiceNote, setVoiceNote] = useState<string | null>(null);
   const [voiceReady, setVoiceReady] = useState(false);
@@ -83,9 +87,16 @@ export function SessionShell() {
       ?.text;
   useEffect(() => {
     const query = new URL(window.location.href).searchParams;
+    if (query.get("fresh") === "1") {
+      sessionStorage.removeItem("along.sessionId");
+      sessionStorage.removeItem("along.extensionConnection");
+      history.replaceState(null, "", "/");
+    }
     const resume =
-      query.get("discoverySession") ??
-      sessionStorage.getItem("along.sessionId");
+      query.get("fresh") === "1"
+        ? null
+        : (query.get("discoverySession") ??
+          sessionStorage.getItem("along.sessionId"));
     void controller.connect(
       resume && /^[A-Za-z0-9_-]{1,100}$/.test(resume) ? resume : undefined,
     );
@@ -137,6 +148,10 @@ export function SessionShell() {
     if (s?.view && document.activeElement === document.body)
       stageRef.current?.focus({ preventScroll: true });
   }, [s?.view]);
+  function newConversation() {
+    controller.closeVoice();
+    window.location.assign("/?fresh=1");
+  }
   async function submit() {
     if (!draft.trim()) return;
     const text = draft;
@@ -153,17 +168,23 @@ export function SessionShell() {
           </a>
           <a
             className="private-note"
-            href="/extension"
+            href="/setup"
             target="_blank"
             rel="noopener noreferrer"
           >
-            Chrome companion <ArrowUpRight size={12} />
+            Connect Along <ArrowUpRight size={12} />
           </a>
         </header>
         <p className="catalog-notice" role="note">
           Demo catalog · simulated offers and orders
         </p>
+        <ContextOverview
+          session={s}
+          chrome={chrome}
+          onNewConversation={newConversation}
+        />
         <ExtensionCompanion
+          onConnectionChange={setChrome}
           controller={controller}
           state={state}
           hasDraft={Boolean(draft.trim())}
@@ -315,7 +336,11 @@ export function SessionShell() {
             {state.error && (
               <div className="error-banner" role="alert">
                 <p>{state.error}</p>
-                <button onClick={() => void controller.reconnect()}>
+                <button
+                  onClick={() =>
+                    void (s ? controller.reconnect() : newConversation())
+                  }
+                >
                   <RotateCcw size={14} /> Reconnect
                 </button>
               </div>

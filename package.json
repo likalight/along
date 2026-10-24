@@ -21,7 +21,8 @@
     "build:extension": "npm run build -w @along/extension",
     "test:extension": "npm run test -w @along/extension && npm run check -w @along/extension",
     "test:extension:media": "node --test apps/extension/test/media.browser.mjs",
-    "test:extension:e2e": "npm exec -w @along/shopper -- playwright test --config playwright.extension.config.ts"
+    "test:extension:e2e": "npm exec -w @along/shopper -- playwright test --config playwright.extension.config.ts",
+    "demo": "node scripts/demo.mjs"
   },
   "engines": {
     "node": ">=22.18"
