@@ -145,7 +145,7 @@ const conflictMessages: Record<string, string> = {
   INCOMPLETE_TOTAL: "A mandatory price, fee or tax is missing or inconsistent; checkout is blocked.",
 };
 
-/** Canonical validation is authoritative; legacy aliases may never weaken it. */
+/** Canonical validation is authoritative; an explicit shopper choice can cover routine USB cabling for a proxy offer. */
 export function quoteAlongOffer(offerId: string, quantity: number, constraints: Constraints, excluded: string[], data: CatalogData, destination: string): Quote {
   const canonical = data.canonical!;
   const offer = data.offers.find(o => o.id === offerId);
@@ -180,6 +180,16 @@ export function quoteAlongOffer(offerId: string, quantity: number, constraints: 
     bedLengthIn: constraints.bedLengthIn ?? fit.bedLengthInches,
     mattressDepthIn: constraints.mattressDepthIn ?? fit.mattressDepthInches,
   };
+  // A shopper can take care of ordinary USB cabling without identifying each
+  // connector. This does not assert manufacturer compatibility or rewrite the
+  // known host, and cannot bypass an analogue/Bluetooth mismatch or setup cost.
+  const shopperHandlesUsbConnection =
+    sourceOffer.classification === "proxy" &&
+    sourceProduct.category === "audio-accessories" &&
+    constraints.shopperHandledConnectionFor?.includes(sourceProduct.id) &&
+    expectedProduct.compatibility?.hostConnections?.some(connection => connection === "usb-a" || connection === "usb-c") &&
+    [host(constraints.hostConnection), host(fit.hostConnection)]
+      .every(connection => connection === undefined || connection === "usb-a" || connection === "usb-c");
   for (const [flat, nested] of [[constraints.hostConnection && host(constraints.hostConnection), fit.hostConnection && host(fit.hostConnection)],
     [constraints.laptopInches, fit.laptopInches], [constraints.bedWidthIn, fit.bedWidthInches],
     [constraints.bedLengthIn, fit.bedLengthInches], [constraints.mattressDepthIn, fit.mattressDepthInches]])
@@ -196,7 +206,10 @@ export function quoteAlongOffer(offerId: string, quantity: number, constraints: 
   try {
     const result = quoteCanonical(canonical, offerId, mapped, { destination, quantity });
     total = result.totalMinor;
-    result.conflicts.forEach(code => conflict(code));
+    result.conflicts.forEach(code => {
+      if (shopperHandlesUsbConnection && (code === "HOST_CONNECTION_REQUIRED" || code === "INCOMPATIBLE_HARDWARE")) return;
+      conflict(code);
+    });
   } catch (error) {
     conflict(error instanceof Error ? error.message : "INVALID_CATALOG", "The offer has an invalid product/variant reference or incomplete compatibility data.");
   }

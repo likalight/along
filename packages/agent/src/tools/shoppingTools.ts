@@ -122,6 +122,11 @@ const definitions = {
       "Read exact product facts, evidence, and current authoritative offer quotes. Unknown facts remain unknown.",
     fields: product,
   },
+  remember_connection_setup: {
+    description:
+      "Accept the shopper's statement that they have or will handle a cable, dongle or adapter for this exact product. A natural answer such as 'I've got a dongle, no worries' is enough; do not demand connector names, cable models or repeated proof. handled=true records that ordinary USB cabling is their responsibility, not a verified manufacturer fact or purchase approval. Use only for the product being discussed and only when the shopper actually says the setup is handled, never for a question, uncertain guess or your own assumption. Use handled=false if they retract this or say they need help with the connection. After acceptance, continue their existing checkout request in the same turn.",
+    fields: { ...product, handled: boolean },
+  },
   remember_requirements: {
     description:
       "Remember only shopper-stated needs and preferences. Null means leave unchanged. Existing hard requirements and exclusions are preserved. Apply a clear budget correction in this same turn, before searching or shortlisting. budgetMinor is integer cents: fifty dollars is 5000. Budget increases require the shopper to explicitly state the new amount this turn; spoken number words are valid.",
@@ -200,8 +205,11 @@ const definitions = {
   },
   prepare_summary: {
     description:
-      "Prepare the server's exact purchase review when the shopper wants to proceed. Pass an exact offerId to validate and select that offer and prepare its review in this single call; use null to review the already selected offer. This ends the turn with the exact server text. Never approves or purchases.",
-    fields: { offerId: { ...nullable(id), schema: id.schema.nullable().default(null) } },
+      "Prepare the server's exact purchase review when the shopper wants to proceed. Pass productId with offerId null to automatically choose its lowest complete-cost eligible offer and prepare the review now. If delivery, returns or seller evidence create a meaningful unresolved tradeoff, resolve only that tradeoff first. Pass offerId for an explicit offer choice; both null reviews the already selected offer. Do not ask permission to prepare checkout. This ends the turn with the exact server text and never approves or purchases.",
+    fields: {
+      offerId: { ...nullable(id), schema: id.schema.nullable().default(null) },
+      productId: { ...nullable(id), schema: id.schema.nullable().default(null) },
+    },
   },
 } satisfies Record<
   string,
@@ -369,6 +377,26 @@ export function executeShoppingTool(opts: {
       throw new Error("Unknown platform evidence ID");
     if (args.offerId && !getOffer(args.offerId))
       throw new Error("Unknown platform offer ID");
+    if (name === "prepare_summary" && args.productId) {
+      if (args.offerId && getOffer(args.offerId)?.productId !== args.productId)
+        throw new Error("The offer does not belong to the requested product.");
+      if (!args.offerId) {
+        if (!(store instanceof AuthoritativeSessionStore))
+          throw new Error("An authoritative offer quote is required to choose an offer.");
+        const candidates = store.quotes(input.sessionId, args.productId);
+        const eligible = candidates.filter((quote) => quote.eligible && quote.total !== null)
+          .sort((a, b) => a.total! - b.total! ||
+            (a.offer.deliveryDays ?? Infinity) - (b.offer.deliveryDays ?? Infinity) ||
+            a.offer.id.localeCompare(b.offer.id));
+        if (!eligible.length)
+          return finish({ ok: false, snapshot, reason: "No offer meets the current requirements.", data: {
+            productId: args.productId,
+            offers: candidates.map((quote) => ({ offerId: quote.offer.id, conflicts: quote.conflicts })),
+            nextStep: "Resolve the listed blocker without restarting discovery. If the shopper says the adapter or cable is handled, remember_connection_setup can record that for this product before retrying. Do not change their budget or other firm requirements.",
+          } });
+        args.offerId = eligible[0]!.offer.id;
+      }
+    }
     // Selection and summary use the same authoritative guards as the separate
     // tools. Combining them removes an inference round trip, not a validation.
     if (name === "prepare_summary" && args.offerId) {
@@ -504,6 +532,19 @@ export function executeShoppingTool(opts: {
     }
     let action = name as AgentProposal["action"];
     let payload: Record<string, unknown> = args;
+    if (name === "remember_connection_setup") {
+      if (getProduct(args.productId)?.category !== "audio")
+        throw new Error("Connection setup applies only to an audio product.");
+      action = "set_constraints";
+      const handled = new Set(
+        (snapshot.hardConstraints.shopperHandledConnectionFor as string[] | undefined) ?? [],
+      );
+      if (args.handled) handled.add(args.productId);
+      else handled.delete(args.productId);
+      payload = {
+        hardConstraints: { ...snapshot.hardConstraints, shopperHandledConnectionFor: [...handled] },
+      };
+    }
     if (name === "show_solution_types") {
       action = "clarify";
       payload = { question: args.question, stage: "solution_types" };
@@ -672,7 +713,7 @@ export function executeShoppingTool(opts: {
           supportedHostConnections: quote.product.compatibility?.hostConnections ?? [],
           needsHostConnection: missingHost,
           nextStep: missingHost
-            ? "Ask once for the computer's specific connector. When the shopper answers, remember it and retry this requested offer without asking whether they still want to buy."
+            ? "If the shopper already said they have or will handle the adapter/cable, use remember_connection_setup for this product and retry the review now. Otherwise ask one brief practical connection question; accept their reassurance without demanding connector names. Never ask whether they still want to buy."
             : hostConnection
               ? "The shopper's connector is already known. Reuse it; do not ask for it again or invent a different port, cable, or adapter. Explain the actual conflict and resolve only the missing fact or supported alternative. Once eligible, continue the requested order review; approval still belongs to the shopper."
               : "Explain the listed conflict and resolve only the missing fact. Continue the requested order review when eligible; approval still belongs to the shopper.",

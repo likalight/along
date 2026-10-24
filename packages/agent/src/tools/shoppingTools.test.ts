@@ -53,6 +53,55 @@ const remember = (overrides: Record<string, unknown> = {}) => ({
   },
   ...overrides,
 });
+test("a shopper handling the dongle reaches review without naming a host or authorizing purchase", () => {
+  const { run, input, store } = setup();
+  input.text = "I want the RODE NT-USB Mini. I've got a dongle, no worries.";
+  assert.equal(run("prepare_summary", { productId: "MIC-022" }).ok, false);
+  const saved = run("remember_connection_setup", { productId: "MIC-022", handled: true });
+  assert.equal(saved.ok, true, saved.reason);
+  assert.equal((saved.snapshot.hardConstraints.compatibility as { hostConnection?: string } | undefined)?.hostConnection, undefined);
+  assert.deepEqual(saved.snapshot.hardConstraints.shopperHandledConnectionFor, ["MIC-022"]);
+  assert.equal(run("remember_requirements", remember({ preferences: [{ key: "use", value: "podcasts" }] })).ok, true);
+  const review = run("prepare_summary", { productId: "MIC-022" });
+  assert.equal(review.ok, true, review.reason);
+  assert.equal(review.snapshot.selectedOfferId, "MIC-022-A");
+  assert.ok(review.snapshot.summaryId);
+  assert.equal(store.core.get(input.sessionId).receipt, null);
+  assert.equal(store.quotes(input.sessionId, "MIC-003").some((quote) => quote.eligible), false, "reassurance is specific to the chosen product");
+});
+
+test("retracting setup reassurance closes the review without inventing a port", () => {
+  const { run, input } = setup();
+  input.text = "I've got an adapter for the RODE";
+  assert.equal(run("remember_connection_setup", { productId: "MIC-022", handled: true }).ok, true);
+  assert.equal(run("prepare_summary", { productId: "MIC-022" }).ok, true);
+  input.text = "Actually I don't have the adapter. Help me connect it.";
+  const retracted = run("remember_connection_setup", { productId: "MIC-022", handled: false });
+  assert.equal(retracted.ok, true, retracted.reason);
+  assert.equal(retracted.snapshot.summaryId, null);
+  assert.equal(run("prepare_summary", { productId: "MIC-022" }).ok, false);
+});
+
+test("automatic offer selection uses complete eligible totals and preserves firm requirements", () => {
+  const { run, input, store } = setup();
+  input.text = "My laptop has USB-C; I want the RODE NT-USB Mini";
+  assert.equal(run("remember_requirements", remember({ compatibility: { ...remember().compatibility, hostConnection: "usb-c" } })).ok, true);
+  const candidates = store.quotes(input.sessionId, "MIC-022").filter((quote) => quote.eligible);
+  assert.ok(candidates.length > 1);
+  const review = run("prepare_summary", { productId: "MIC-022" });
+  assert.equal(review.ok, true, review.reason);
+  const selected = candidates.find((quote) => quote.offer.id === review.snapshot.selectedOfferId)!;
+  assert.equal(selected.total, Math.min(...candidates.map((quote) => quote.total!)));
+  assert.equal(run("prepare_summary", { productId: "MIC-022", offerId: "MIC-003-A" }).ok, false);
+  input.text = "My limit is fifty dollars";
+  assert.equal(run("remember_requirements", remember({ budgetMinor: 5000 })).ok, true);
+  assert.equal(run("remember_connection_setup", { productId: "MIC-022", handled: true }).ok, true);
+  const blocked = run("prepare_summary", { productId: "MIC-022" });
+  assert.equal(blocked.ok, false);
+  assert.equal(blocked.snapshot.hardConstraints.budgetMinor, 5000);
+  assert.equal(store.core.get(input.sessionId).receipt, null);
+});
+
 test("model tools reject purchase, unknown identities, extra metadata and unknown IDs", () => {
   const { run, store, input } = setup();
   for (const name of [
@@ -314,7 +363,8 @@ test("blocked checkout distinguishes an unknown connector from a known incompati
   assert.equal(missingContext.hostConnection, null);
   assert.equal(missingContext.needsHostConnection, true);
   assert.ok(missingContext.conflicts.some((conflict) => conflict.code === "HOST_CONNECTION_REQUIRED"));
-  assert.match(missingContext.nextStep, /remember it and retry this requested offer/);
+  assert.match(missingContext.nextStep, /remember_connection_setup/);
+  assert.match(missingContext.nextStep, /without demanding connector names/);
 
   const saved = run("remember_requirements", remember({
     compatibility: { ...remember().compatibility, hostConnection: "USB-C" },

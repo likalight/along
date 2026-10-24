@@ -22,9 +22,25 @@ export function completeLiveDemoCheckout(input: {
   affirmationSummaryId?: string;
 }) {
   const { sessionId, ...completion } = input;
-  const result = getRuntime().store.core.completeLiveDemo(
-    sessionId,
-    completion,
-  );
-  return { snapshot: project(sessionId), receipt: result.receipt };
+  const { core } = getRuntime().store;
+  try {
+    const result = core.completeLiveDemo(sessionId, completion);
+    return { snapshot: project(sessionId), receipt: result.receipt };
+  } catch (error) {
+    // An acknowledgement can fail after the order was accepted. Inspect the
+    // authoritative result before suggesting a retry; never submit again here.
+    const current = core.get(sessionId);
+    if (
+      current.epoch === input.epoch &&
+      current.receipt?.completionSource === "live_demo" &&
+      current.receipt.summaryId === input.summaryId &&
+      current.receipt.summaryRevision === input.summaryRevision
+    ) {
+      return {
+        snapshot: project(sessionId),
+        receipt: structuredClone(current.receipt),
+      };
+    }
+    throw error;
+  }
 }

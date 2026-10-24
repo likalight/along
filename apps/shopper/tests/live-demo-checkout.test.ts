@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { POST } from "@/app/api/session/route";
 import { getRuntime } from "@/lib/integration/runtime";
 import { project } from "@/lib/integration/projection";
@@ -105,23 +105,33 @@ it.each([
   "Please buy it",
   "yes please",
   "sounds good",
-])("accepts a natural response to the displayed order question: %s", async (text) => {
-  const h = await review("text");
-  const response = await h.send(text);
-  expect(response.status).toBe(200);
-  const data = await response.json();
-  expect(data.snapshot.view).toBe("receipt");
-  expect(data.snapshot.receipt.acceptedOrder.productId).toBe(h.snapshot.summary!.productId);
-});
+])(
+  "accepts a natural response to the displayed order question: %s",
+  async (text) => {
+    const h = await review("text");
+    const response = await h.send(text);
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.snapshot.view).toBe("receipt");
+    expect(data.snapshot.receipt.acceptedOrder.productId).toBe(
+      h.snapshot.summary!.productId,
+    );
+  },
+);
 
 it("does not treat yes to an intervening question as order approval", async () => {
   const h = await review("text");
   const current = h.store.core.get(h.s.id);
   const followup = h.store.core.input(h.s.id, {
-    sessionId: h.s.id, epoch: h.s.epoch, eventId: crypto.randomUUID(),
-    turnId: crypto.randomUUID(), baseRevision: current.revision,
-    modality: "text", text: "Can you explain the returns?",
-    visibleRevision: current.revision, visibleProductIds: current.displayOrder,
+    sessionId: h.s.id,
+    epoch: h.s.epoch,
+    eventId: crypto.randomUUID(),
+    turnId: crypto.randomUUID(),
+    baseRevision: current.revision,
+    modality: "text",
+    text: "Can you explain the returns?",
+    visibleRevision: current.revision,
+    visibleProductIds: current.displayOrder,
   });
   // send() references the same identity object; retain the current revision.
   Object.assign(h.s, followup);
@@ -169,4 +179,88 @@ it("client supplied trusted flags and Live completion actions cannot invoke the 
   });
   expect(response.status).toBe(409);
   expect(h.store.core.get(h.s.id)).toEqual(h.s);
+});
+
+it("checks the authoritative receipt after a lost completion acknowledgement without resubmitting", async () => {
+  const h = await review();
+  const original = h.store.core.completeLiveDemo.bind(h.store.core);
+  const completion = vi
+    .spyOn(h.store.core, "completeLiveDemo")
+    .mockImplementationOnce((id, input) => {
+      original(id, input);
+      throw new Error("Completion acknowledgement interrupted");
+    });
+  try {
+    const result = completeLiveDemoCheckout({
+      sessionId: h.s.id,
+      epoch: h.s.epoch,
+      expectedRevision: h.s.revision,
+      summaryId: h.s.summary!.id,
+      summaryRevision: h.s.summary!.revision,
+      responseTurnId: h.s.summary!.responseTurnId,
+      delegationId: "lost-acknowledgement",
+      transcript: "Please buy it",
+    });
+    expect(result.snapshot.view).toBe("receipt");
+    expect(result.receipt.id).toBe(h.store.core.get(h.s.id).receipt!.id);
+    expect(completion).toHaveBeenCalledTimes(1);
+    expect(
+      h.store.core
+        .get(h.s.id)
+        .history.filter((entry) => entry.modality === "live_demo"),
+    ).toHaveLength(1);
+  } finally {
+    completion.mockRestore();
+  }
+});
+
+it("preserves an uncompleted review and surfaces the failure when status confirms no receipt", async () => {
+  const h = await review();
+  const completion = vi
+    .spyOn(h.store.core, "completeLiveDemo")
+    .mockImplementationOnce(() => {
+      throw new Error("Checkout is temporarily unavailable");
+    });
+  try {
+    expect(() =>
+      completeLiveDemoCheckout({
+        sessionId: h.s.id,
+        epoch: h.s.epoch,
+        expectedRevision: h.s.revision,
+        summaryId: h.s.summary!.id,
+        summaryRevision: h.s.summary!.revision,
+        responseTurnId: h.s.summary!.responseTurnId,
+        delegationId: "failed-completion",
+        transcript: "Please buy it",
+      }),
+    ).toThrow("Checkout is temporarily unavailable");
+    expect(h.store.core.get(h.s.id)).toEqual(h.s);
+    expect(completion).toHaveBeenCalledTimes(1);
+  } finally {
+    completion.mockRestore();
+  }
+});
+
+it("never treats a receipt from a different review as this request's success", async () => {
+  const h = await review();
+  const input = {
+    sessionId: h.s.id,
+    epoch: h.s.epoch,
+    expectedRevision: h.s.revision,
+    summaryId: h.s.summary!.id,
+    summaryRevision: h.s.summary!.revision,
+    responseTurnId: h.s.summary!.responseTurnId,
+    delegationId: "first-order",
+    transcript: "Please buy it",
+  };
+  const first = completeLiveDemoCheckout(input);
+  expect(() =>
+    completeLiveDemoCheckout({
+      ...input,
+      summaryId: "another-review",
+      expectedRevision: first.snapshot.revision,
+      delegationId: "another-order",
+    }),
+  ).toThrow();
+  expect(h.store.core.get(h.s.id).receipt!.id).toBe(first.receipt.id);
 });

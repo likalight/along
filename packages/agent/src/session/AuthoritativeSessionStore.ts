@@ -225,6 +225,8 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
             }
             if (hard.compatibility)
               constraints.compatibility = hard.compatibility;
+            if (hard.shopperHandledConnectionFor !== undefined)
+              constraints.shopperHandledConnectionFor = hard.shopperHandledConnectionFor;
             if (hard.minimumCapacityL !== undefined) constraints.minimumCapacityL = hard.minimumCapacityL;
             if (hard.separateShoeCompartment !== undefined) constraints.separateShoeCompartment = hard.separateShoeCompartment;
             if (hard.requiredSpecifications)
@@ -238,6 +240,7 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
                   "category",
                   "currency",
                   "compatibility",
+                  "shopperHandledConnectionFor",
                   "requiredSpecifications",
                   "minimumCapacityL",
                   "separateShoeCompartment",

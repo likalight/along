@@ -71,6 +71,7 @@ export function validateConstraints(x: unknown) {
     "composition",
     "hostConnection",
     "availableHardwareIds",
+    "shopperHandledConnectionFor",
     "bagMaxDimensionsCm",
   ]);
   for (const field of ["productId", "variantId", "composition", "hostConnection"]) {
@@ -87,6 +88,9 @@ export function validateConstraints(x: unknown) {
     requireThat(typeof x.separateShoeCompartment === "boolean", "INVALID_CONSTRAINT", "Separate shoe compartment must be a boolean.");
   if (x.availableHardwareIds !== undefined)
     requireThat(strings(x.availableHardwareIds, 20), "INVALID_CONSTRAINT", "Available hardware IDs must be unique bounded strings.");
+  if (x.shopperHandledConnectionFor !== undefined)
+    requireThat(strings(x.shopperHandledConnectionFor, 20) && x.shopperHandledConnectionFor.every(id => id.trim() === id && id.length <= 100),
+      "INVALID_CONSTRAINT", "Shopper-handled connections must identify a bounded set of product IDs.");
   if (x.deadline !== undefined)
     requireThat(typeof x.deadline === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})$/.test(x.deadline) && Number.isFinite(Date.parse(x.deadline)),
       "INVALID_CONSTRAINT", "Deadline must include an explicit date, time and UTC offset.");
