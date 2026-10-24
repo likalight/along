@@ -579,3 +579,69 @@ test("WebGL context exceptions preserve the text journey", async ({ page }) => {
   await say(page, "bag");
   await expect(page.locator(".orb-fallback")).toBeVisible();
 });
+
+test("inline review pauses voice, stops media before resuming, and preserves the conversation", async ({
+  page,
+  context,
+}) => {
+  await installVoiceMock(page);
+  // Exercise the real app/controller lifecycle without depending on YouTube availability.
+  // Actual YouTube playback is checked separately in personal Chrome.
+  await page.route("https://www.youtube.com/embed/**", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: "<!doctype html><title>Review player fixture</title><button>Play review fixture</button>",
+    }),
+  );
+  await textMode(page);
+  await say(page, "Show catalog MIC-062");
+  const sessionId = await page.evaluate(() =>
+    sessionStorage.getItem("along.sessionId"),
+  );
+  await page
+    .getByRole("textbox", { name: "Your message" })
+    .fill("Keep this thought");
+  await page
+    .getByRole("button", { name: /Start talking|Talk to Along/ })
+    .click();
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__voice.capturing()))
+    .toBe(true);
+  const pagesBefore = context.pages().length;
+  await page.getByRole("button", { name: "Watch review", exact: true }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await expect(
+    page.locator('iframe[title="Rode Wireless Pro — Review & Audio Test"]'),
+  ).toBeVisible();
+  expect(context.pages()).toHaveLength(pagesBefore);
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__voice.capturing()))
+    .toBe(false);
+  await expect(page.locator(".voice-status")).toContainText("Paused");
+  await page
+    .getByRole("button", { name: "Continue conversation", exact: true })
+    .click();
+  await expect(page.locator("dialog")).toHaveCount(0);
+  await expect(page.locator("iframe")).toHaveCount(0);
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__voice.capturing()))
+    .toBe(true);
+  expect(
+    await page.evaluate(() => sessionStorage.getItem("along.sessionId")),
+  ).toBe(sessionId);
+  // Closing without continuing must never silently restart the microphone.
+  await page.getByRole("button", { name: "Watch review", exact: true }).click();
+  await page.getByRole("button", { name: "Close review", exact: true }).click();
+  await expect(page.locator("iframe")).toHaveCount(0);
+  expect(await page.evaluate(() => (window as any).__voice.capturing())).toBe(
+    false,
+  );
+  await page.getByRole("button", { name: "Type instead" }).click();
+  await expect(page.getByRole("textbox", { name: "Your message" })).toHaveValue(
+    "Keep this thought",
+  );
+  await say(page, "Focus MIC-062");
+  expect(
+    await page.evaluate(() => sessionStorage.getItem("along.sessionId")),
+  ).toBe(sessionId);
+});

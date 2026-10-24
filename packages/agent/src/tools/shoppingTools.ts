@@ -190,7 +190,7 @@ const definitions = {
   },
   show_product_video: {
     description:
-      "When the shopper asks to watch a product video, request its curated external review in Chrome. Only MIC-062 (RØDE Wireless PRO) currently has a video. Requires a visible product; no purchase or new conversation. The browser will pause the microphone and offer Back to Along. This only queues a request; opening is not confirmed. Say you are asking Chrome to open it, never that it opened or is playing.",
+      "When the shopper asks to watch a product video, request its curated review inside Along. Only MIC-062 (RØDE Wireless PRO) currently has a video. Requires a visible product; no purchase or new conversation. Along pauses voice during the review. Continue conversation closes the player and resumes the same session. Chrome is an optional fallback. This only queues a request; never claim playback has started.",
     fields: product,
   },
   focus: { description: "Focus a currently visible product.", fields: product },
@@ -409,7 +409,7 @@ export function executeShoppingTool(opts: {
           productVideoId: video.id,
           ...video,
           instruction:
-            "REQUEST QUEUED, not opened or playing. The browser has not confirmed the extension is available. Tell the shopper: I will ask Chrome to open the Wireless PRO review. If the extension needs connecting, Along will show the next step. Use Back to Along when finished. Do not say I opened it. Along pauses its microphone before the handoff.",
+            "REQUEST QUEUED, not opened or playing. Tell the shopper: I will open the Wireless PRO review here in Along. Voice pauses while you watch; choose Continue conversation when finished. Chrome is available as a fallback if the embedded player cannot play. Do not claim playback has started.",
         },
       });
     }

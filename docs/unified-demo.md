@@ -73,15 +73,15 @@ Suggested shopper journey:
 1. “I want a microphone to dictate prompts to AI agents in crowded places. I move around, so a clip-on would be useful.”
 2. Answer the actual follow-up. For the planned product: “Show me the RØDE Wireless PRO. My budget is 400 US dollars.” Do not confuse it with Wireless ME, GO II or Micro.
 3. “Show me photos of that one.” The catalog already has a product photo for `MIC-062`.
-4. “Show me a video of it.” The model calls `show_product_video` for the exact visible product. The app pauses capture and narration, then the paired extension opens the curated YouTube Short.
-5. Click **Back to Along** on YouTube. The extension focuses the original app tab and closes only the video tab it created. Choices and unfinished text remain. Tap **Talk to Along** to resume voice deliberately.
+4. “Show me a video of it.” The model calls `show_product_video` for the exact visible product. The app pauses capture and narration, then opens the curated YouTube Short in an in-app review window. No extension is needed for this step.
+5. Click **Continue conversation**. Along removes the video player before restarting voice in the same conversation. Closing with X or Escape stops the video but leaves voice paused. Choices and unfinished text remain.
 6. “I'd like that one. My computer has USB-C.” Review the complete simulated offer, then give explicit approval. No real payment occurs.
 
-Preflight in the Chrome extension settings: connect the same local Along address and enable **YouTube return button**. This is separate from discovery consent, requires only YouTube host permission, and does not enable browsing observation or screenshots. The review tab is excluded from automatic discovery so it cannot replace the product with a new external reference. Opening requires a current paired session; the page cannot provide an arbitrary destination URL.
+Optional Chrome fallback preflight in the extension settings: connect the same local Along address and enable **YouTube return button**. This is separate from discovery consent, requires only YouTube host permission, and does not enable browsing observation or screenshots. The review tab is excluded from automatic discovery so it cannot replace the product with a new external reference. Opening requires a current paired session; the page cannot provide an arbitrary destination URL.
 
 Curated link: https://www.youtube.com/shorts/WCsWHqMdPJI — “Rode Wireless Pro - Review & Audio Test”, DansTubeTV. The page title and product match were checked. This is an external creator review, not measured proof of dictation quality in crowded areas. Playback depends on YouTube, connectivity and its own user controls; no copied video is distributed.
 
-Fallback: the in-app **Watch review** button invokes the same extension path. Without the extension, **Open in new tab** opens a separate tab and says so; this is not represented as a successful extension handoff. If a presenter closes the video manually, switch to the existing Along tab and resume there.
+Fallback: the review window has **Open in Chrome**, which invokes the existing paired-extension path. **Back to Along** returns to the same conversation, then **Continue conversation** resumes voice. Without the extension, **Open in new tab** opens a separate tab and says so; this is not represented as a successful extension handoff. If a presenter closes the video manually, switch to the existing Along tab and resume there.
 
 Verification for this presentation flow:
 
@@ -109,6 +109,15 @@ The conversation now has a separate Sound on / Muted control. It mutes assistant
 
 Product presentation follows unambiguous spoken model names and explicit navigation. It preserves focus through unrelated backend revisions and reconciles names that arrive before the first shortlist. Short names omit comma-separated catalog configuration only when unique among visible products. Direct Chrome/YouTube navigation captions request only the current curated review; they do not select an offer or authorize checkout. The server also recognizes these phrases as video requests.
 
-The review action now follows the presented product and sits below it. The global demo strip and returned-video banner are removed. Simulation disclosure remains in Settings, order review and receipts. After a video, Back to Along returns to the same conversation, then Continue conversation enables voice. The YouTube tab does not listen for spoken return commands.
+The review action now follows the presented product and sits below it. The global demo strip and returned-video banner are removed. Simulation disclosure remains in Settings, order review and receipts. In the Chrome fallback, Back to Along returns to the same conversation, then Continue conversation enables voice. The YouTube tab does not listen for spoken return commands.
 
 Validation: targeted voice focus/playback/lifecycle checks, installed-extension review/return check, accepted-carousel navigation check, production build and TypeScript passed. In personal Chrome, the typed natural-language request “Take me to the Chrome tab” opened the real YouTube review and its Back control returned to the same session. Live human speech timing and the final spoken checkout still require presenter rehearsal; these checks do not claim otherwise.
+
+
+### In-app review verification — 25 October
+
+- The supplied YouTube Short actually played in the embedded player in personal Chrome, with elapsed time advancing and captions visible. Muted it during verification.
+- Continue conversation removed the player, preserved the Wireless PRO result and prior conversation, and reached Listening · microphone on with the real GPT-Live adapter. Reopening the player paused voice; X left the microphone off.
+- Browser lifecycle check passed: no new tab, stopped capture, removed iframe before resume, preserved session and unfinished draft, subsequent shopping input in the same session. Uses a deterministic video surface and mocked speech; it does not independently establish media quality.
+- Installed-extension fallback round-trip check passed with a deterministic YouTube surface. The final build also opened the real Short via Open in Chrome in the personal profile; Back to Along closed that tab and restored the original conversation. Build and TypeScript passed.
+- One live embed initially remained blank; closing and reopening loaded it successfully. YouTube can block embedding, autoplay or availability; native player controls and Open in Chrome remain available. No video file is copied or hosted.

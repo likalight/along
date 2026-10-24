@@ -86,8 +86,12 @@ test("Wireless PRO video opens through the extension and returns to the same sho
     await page
       .getByRole("textbox", { name: "Your message" })
       .fill("Keep this unfinished thought");
-    const videoPromise = context.waitForEvent("page");
     await watch.click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    const videoPromise = context.waitForEvent("page");
+    await page
+      .getByRole("button", { name: "Open in Chrome", exact: true })
+      .click();
     const video = await videoPromise;
     await expect(video).toHaveURL("https://www.youtube.com/shorts/WCsWHqMdPJI");
     const back = video.getByRole("button", {
