@@ -1,0 +1,3 @@
+# Preserve the supplied research bytes and its SHA-256 on every platform.
+catalog/sources/microphone-demo-data.md -text
+catalog/data/*.json text eol=lf
