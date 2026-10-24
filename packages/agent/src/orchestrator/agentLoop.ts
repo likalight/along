@@ -492,6 +492,8 @@ function runGuidedNeed(
       !snapshot.preferences["color"] &&
       !prefs.budgetMinor &&
       !prefs.needTomorrow &&
+      !snapshot.preferences["shape"] &&
+      !snapshot.preferences["color"] &&
       !Object.keys(parseCompatibility(text)).length &&
       route !== "strong_intent"
     ) {

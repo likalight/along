@@ -19,6 +19,7 @@ import {
   classifyCheckoutReply,
   isLiveDemoConfirmation,
 } from "@concierge/backend/store";
+import { parsePreferences } from "@/lib/context/memory";
 export const runtime = "nodejs";
 const playbacks = new Map<
   string,
@@ -58,7 +59,12 @@ export async function POST(request: Request) {
     const i = b.input;
     id = b.action === "connect" ? b.sessionId : i?.sessionId;
     if (b.action === "connect" && !id) {
+      const context = parsePreferences(b.reviewedContext ?? []);
       const s = orch.createSession();
+      store.initializeReviewedPreferences(
+        s.sessionId,
+        context.map(({ key, value }) => ({ key, value })),
+      );
       const res = NextResponse.json(project(s.sessionId));
       res.cookies.set(
         `along-session-${s.sessionId}`,

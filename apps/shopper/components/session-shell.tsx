@@ -212,6 +212,11 @@ export function SessionShell() {
                     </>
                   )}
                 </div>
+                {opening && (
+                  <p>
+                    <a href="/context">Personal context · manage Mac preferences</a>
+                  </p>
+                )}
                 {s && (
                   <ContentStage
                     narrationProductId={state.narrationProductId}

@@ -82,6 +82,10 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
   accessToken(id: string) {
     return this.tokens.get(id);
   }
+  /** Only a new session may be seeded; these are soft bag preferences, never purchase consent. */
+  initializeReviewedPreferences(id: string, preferences: { key: string; value: string }[]) {
+    this.core.initializeReviewedPreferences(id, preferences);
+  }
   authenticate(id: string, token: string) {
     this.core.authenticate(id, token);
   }

@@ -1,4 +1,5 @@
 import type { Session, SessionTransport } from "./contract";
+import { readLocalPreferences } from "@/lib/context/memory";
 export class TransportError extends Error {
   constructor(
     message: string,
@@ -24,7 +25,11 @@ async function post(
   return data;
 }
 export const httpTransport: SessionTransport = {
-  connect: (sessionId) => post("connect", undefined, { sessionId }),
+  connect: (sessionId) =>
+    post("connect", undefined, {
+      sessionId,
+      ...(!sessionId ? { reviewedContext: readLocalPreferences() } : {}),
+    }),
   send: (input, signal, voiceEvidence) =>
     post("input", input, voiceEvidence ? { voiceEvidence } : {}, signal),
   activity: (input, signal) => post("activity", input, {}, signal),
