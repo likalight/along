@@ -309,7 +309,10 @@ export function applyDemo(input: DemoInput): {
     s.hardConstraints.deadlineDays = "1";
     s.canvas.message =
       "I’ll flag which demo offers meet tomorrow’s deadline. The cheapest may arrive later.";
-    if (productId) s.view = "offers";
+    if (productId) {
+      s.view = "offers";
+      s.focusedProductId = productId;
+    }
   } else if (/remove|exclude/.test(t) && productId) {
     s.exclusions = [...new Set([...s.exclusions, ...ids])];
     s.shortlistIds = s.shortlistIds.filter((id) => !ids.includes(id));
@@ -366,7 +369,11 @@ export function applyDemo(input: DemoInput): {
     s.selectedOfferId = `${s.focusedProductId}-${/fast|earlier/.test(t) ? "fast" : "cheap"}`;
     s.canvas.message =
       "Offer selected for comparison only. Checkout and approval belong to the session backend; this rehearsal cannot place an order.";
-  } else if (/show|focus|option/.test(t) && product) {
+  } else if (
+    /show|focus|option/.test(t) &&
+    !/more|shortlist|back/.test(t) &&
+    product
+  ) {
     s.focusedProductId = productId;
     s.canvas.message = `Looking at ${product.brand} ${product.model}. Focus is separate from your shortlist ranking.`;
   } else if (

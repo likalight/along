@@ -153,6 +153,18 @@ describe("guided narrowing", () => {
       ),
     ).toBe(true);
   });
+  it("returns from a focused product to discovery when asked for more", () => {
+    const j = journey("bags");
+    j.say("Explore options");
+    j.say("Focus the second");
+    const s = j.say("Show more");
+    expect(s.focusedProductId).toBeNull();
+    expect(s.view).toBe("shortlist");
+    expect(s.displayOrder).toHaveLength(3);
+    const offers = j.say("I need the second tomorrow");
+    expect(offers.focusedProductId).toBe(offers.displayOrder[1]);
+    expect(offers.view).toBe("offers");
+  });
   it("checks bedsheet dimensions and depth, preserving unknowns", () => {
     const j = journey("bedsheets");
     j.say("Mattress depth 40 cm");
