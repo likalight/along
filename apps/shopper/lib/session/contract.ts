@@ -76,6 +76,7 @@ export type Summary = {
   status: "presenting" | "eligible" | "invalidated" | "confirmed";
 };
 export type Session = {
+  sharedReferenceIds?: string[];
   canvas?: Presentation;
   catalog?: CanvasData;
   sessionId: string;

@@ -54,6 +54,7 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
   readonly core = new SessionStore(undefined, agreedProfile);
   private metadata = new Map<string, Meta>();
   private tokens = new Map<string, string>();
+  private sharedReferences = new Map<string, Set<string>>();
   override create(
     opts?: Parameters<FixtureSessionStore["create"]>[0],
   ): SessionSnapshot {
@@ -61,6 +62,7 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
     // constraints as assumed consent (INTEGRATION.md). Shopper conversation owns those.
     const { session, accessToken } = this.core.create();
     this.tokens.set(session.id, accessToken);
+    this.sharedReferences.set(session.id, new Set());
     this.metadata.set(session.id, {
       scenarioId: opts?.scenarioId ?? null,
       scenarioStage: "opening",
@@ -176,6 +178,36 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
       ...input,
       ...(input.modality === "link" ? { url: input.text?.trim() } : {}),
     });
+    const reference =
+      input.modality === "image"
+        ? input.attachmentId
+        : input.modality === "link"
+          ? input.text?.trim()
+          : undefined;
+    // Replaying a previously accepted event must not resurrect a removed link.
+    const current = this.core.get(input.sessionId);
+    if (
+      reference &&
+      current.turn?.id === input.turnId &&
+      current.turn.status === "active"
+    )
+      this.sharedReferences.get(input.sessionId)?.add(reference);
+  }
+  acceptedReferences(id: string) {
+    const s = this.core.get(id);
+    return [...(this.sharedReferences.get(id) ?? [])].filter(
+      (ref) => s.attachmentIds.includes(ref) || /^https:\/\//.test(ref),
+    );
+  }
+  removeReference(id: string, expected: number, reference: string) {
+    const result = this.core.removeReference(id, expected, reference);
+    this.sharedReferences.get(id)?.delete(reference);
+    const meta = this.metadata.get(id);
+    if (meta)
+      meta.imageInferences = meta.imageInferences.filter(
+        (x) => x.attachmentId !== reference,
+      );
+    return result;
   }
   override apply(a: AgentProposal): ApplyResult {
     let content = "";
@@ -301,9 +333,10 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
             const eligible = discovery.filter((e) =>
               this.quotes(a.sessionId, e.productId).some((q) => q.eligible),
             );
-            const shown = (
-              eligible.length >= 3 ? eligible : discovery
-            ).slice(0, 5);
+            const shown = (eligible.length >= 3 ? eligible : discovery).slice(
+              0,
+              5,
+            );
             proposal.shortlist = shown.map((e) => e.productId);
             proposal.view = {
               stage: "shortlist",
@@ -621,7 +654,11 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
   /** Idempotent drop of a session image/link reference. */
   removeAttachment(sessionId: string, attachmentId: string) {
     const s = this.core.get(sessionId);
-    this.core.removeAttachment(sessionId, s.revision, attachmentId);
+    if (
+      s.attachmentIds.includes(attachmentId) ||
+      this.acceptedReferences(sessionId).includes(attachmentId)
+    )
+      this.removeReference(sessionId, s.revision, attachmentId);
     return this.get(sessionId)!;
   }
 }

@@ -1195,13 +1195,27 @@ export class SessionStore {
     );
     return { ...a, bytes: Buffer.from(a.bytes) };
   }
-  /** Drop a session reference; idempotent if it was never attached or already gone. */
-  removeAttachment(id: string, expected: number, attachmentId: string) {
+  removeReference(id: string, expected: number, referenceId: string) {
     const s = this.get(id);
     this.revision(s, expected);
     this.mutable(s);
-    s.attachmentIds = s.attachmentIds.filter((x) => x !== attachmentId);
-    this.attachments.delete(attachmentId);
+    const ownsImage = s.attachmentIds.includes(referenceId);
+    const knownLink =
+      this.profile.knownLinks &&
+      Object.hasOwn(this.profile.knownLinks, referenceId);
+    requireThat(
+      ownsImage || knownLink,
+      "UNKNOWN_ATTACHMENT",
+      "Reference is not available in this session.",
+      404,
+    );
+    // A removed source cannot leave an earlier purchase summary eligible.
+    this.invalidate(s);
+    if (s.turn) s.turn.status = "cancelled";
+    s.attachmentIds = s.attachmentIds.filter((value) => value !== referenceId);
+    const asset = this.attachments.get(referenceId);
+    if (asset?.sessionId === id && asset.epoch === s.epoch)
+      this.attachments.delete(referenceId);
     return this.commit(s);
   }
   switchMode(id: string, expected: number, mode: unknown) {

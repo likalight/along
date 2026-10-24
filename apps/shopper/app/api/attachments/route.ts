@@ -3,6 +3,26 @@ import { agreedCatalog } from "@coupang/contract";
 import { authorize } from "@/lib/integration/access";
 import { getRuntime } from "@/lib/integration/runtime";
 export const runtime = "nodejs";
+export async function DELETE(request: Request) {
+  try {
+    const b = await request.json();
+    authorize(request, b.sessionId);
+    const { store } = getRuntime();
+    if (typeof b.attachmentId !== "string")
+      throw new Error("Reference required.");
+    if (store.acceptedReferences(b.sessionId).includes(b.attachmentId))
+      throw new Error("Remove a shared reference through the conversation.");
+    const s = store.core.get(b.sessionId);
+    if (s.attachmentIds.includes(b.attachmentId))
+      store.removeReference(s.id, s.revision, b.attachmentId);
+    return NextResponse.json({ removed: true });
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "Unable to remove reference." },
+      { status: 400 },
+    );
+  }
+}
 export async function POST(request: Request) {
   try {
     if (

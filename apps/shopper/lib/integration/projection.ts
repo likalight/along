@@ -190,6 +190,7 @@ export function project(id: string): Session {
   ];
   return {
     ...s,
+    sharedReferenceIds: store.acceptedReferences(id),
     focusedProductId:
       s.focusedProductId ??
       catalog.offers.find((o: any) => o.id === s.selectedOfferId)?.productId ??

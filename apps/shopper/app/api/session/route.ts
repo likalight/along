@@ -24,10 +24,7 @@ export async function POST(request: Request) {
     }
     const raw = await request.text();
     if (raw.length > 32768) {
-      return NextResponse.json(
-        { error: "Turn too large." },
-        { status: 413 },
-      );
+      return NextResponse.json({ error: "Turn too large." }, { status: 413 });
     }
     let b: Record<string, any>;
     try {
@@ -194,6 +191,35 @@ export async function POST(request: Request) {
       delete input.attachmentId;
     }
     let text = input.text?.trim() ?? "";
+    const removeReference = /^Remove reference (.{1,2048})$/.exec(text);
+    if (removeReference) {
+      const reference = removeReference[1];
+      if (
+        !store.acceptedReferences(sessionId).includes(reference) &&
+        !c.attachmentIds.includes(reference)
+      )
+        throw new Error("Reference is not available in this session.");
+      store.ingestInput(input);
+      store.removeReference(
+        sessionId,
+        store.core.get(sessionId).revision,
+        reference,
+      );
+      messages.set(
+        sessionId,
+        "Reference removed. Your stated requirements remain; review a fresh summary before confirming.",
+      );
+      const snapshot = project(sessionId);
+      return NextResponse.json({
+        sessionId,
+        epoch: snapshot.epoch,
+        turnId: input.turnId,
+        eventId: input.eventId,
+        revision: snapshot.revision,
+        type: "session.updated",
+        snapshot,
+      });
+    }
     const focus =
       c.view?.focusProductId ??
       agreedCatalog.offers.find((o: any) => o.id === c.selection?.offerId)
@@ -250,24 +276,6 @@ export async function POST(request: Request) {
       });
       const picked = ranked[0];
       if (picked?.offer?.id) text = `Select offer ${picked.offer.id}`;
-    }
-    const removeReference = text.match(
-      /^Remove reference ([A-Za-z0-9._:-]+)$/i,
-    );
-    if (removeReference) {
-      store.ingestInput({ ...input, text });
-      store.removeAttachment(sessionId, removeReference[1]);
-      messages.set(sessionId, "Removed that reference.");
-      const removed = project(sessionId);
-      return NextResponse.json({
-        sessionId,
-        epoch: removed.epoch,
-        turnId: input.turnId,
-        eventId: input.eventId,
-        revision: removed.revision,
-        type: "session.updated",
-        snapshot: removed,
-      });
     }
     const exact = text.match(
       /^(Focus|Save|Remove|Show offers for|Show reviews for|(?:Select|Choose) offer) ([A-Z0-9-]+)$/i,
@@ -337,8 +345,7 @@ export async function POST(request: Request) {
             "Only deliberate voice or text confirmation can approve a simulated purchase.",
           );
         }
-      }
-      else if (exact) {
+      } else if (exact) {
         const action = exact[1].toLowerCase(),
           pid = exact[2].toUpperCase();
         if (action === "select offer") {
