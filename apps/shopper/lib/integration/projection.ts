@@ -90,7 +90,14 @@ export function project(id: string): Session {
         responseTurnId: raw.responseTurnId,
       }
     : null;
-  const view = s.view as View;
+  // Cancellation/interrupt invalidates the summary without discarding the shortlist.
+  // Never leave the shopper on an empty confirmation screen for a missing summary.
+  const view: View =
+    s.view === "summary" && !summary
+      ? s.displayOrder.length
+        ? "shortlist"
+        : "understanding"
+      : (s.view as View);
   const heading: Record<string, string> = {
     opening: "A little conversation.\nA better choice.",
     understanding: "Let’s get the details right.",
@@ -105,12 +112,14 @@ export function project(id: string): Session {
     receipt: "A choice made with confidence.",
   };
   const message =
-    view === "summary" && summary
-      ? summary.spokenText!
-      : view === "receipt"
-        ? "Simulated purchase complete. No payment or real order."
-        : (messages.get(id) ??
-          "Tell me what you’re looking for, or start with a problem you’d like to solve.");
+    c.lastOutcome === "cancelled" && !c.receipt
+      ? "Stopped. No purchase was made. Your choices are still here when you’re ready."
+      : view === "summary" && summary
+        ? summary.spokenText!
+        : view === "receipt"
+          ? "Simulated purchase complete. No payment or real order."
+          : (messages.get(id) ??
+            "Tell me what you’re looking for, or start with a problem you’d like to solve.");
   const constraints: Record<string, string> = Object.fromEntries(
     Object.entries(c.constraints).map(([k, v]) => [
       k,

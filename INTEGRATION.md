@@ -66,6 +66,7 @@ Errors after an accepted input may return the latest snapshot alongside the erro
 7. Type `Confirm this simulated purchase`. One labelled simulated receipt should appear.
 8. In another session, use `I want queen sheets for a 60 by 80 inches bed with a 12 inch mattress under 70 dollars`. BED-003 fits; shallow BED-001 does not. Select BED-003-A, prepare summary, cancel. No receipt.
 9. On the bag shortlist, remove the Daylite bag and click Restore. It returns at USD 150 with the original deadline/fit constraints intact. Remove it again, lower the budget to USD 100 while keeping tomorrow, then Restore: removals clear but no ineligible offer is revived. This path was verified in the production browser UI.
+10. The production bedding UI was rehearsed through BED-003-A's USD 54.99 complete summary, then Cancel. It returns to the preserved shortlist with an explicit no-purchase message. A subsequent `Confirm this simulated purchase` is rejected with `Current text summary required`; no receipt is created. This catches the former empty summary screen after cancellation.
 
 ## Verified versus pending
 
