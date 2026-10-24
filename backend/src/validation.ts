@@ -58,7 +58,26 @@ export function validateConstraints(x: unknown) {
     "deliveryWithinDays",
     "category",
     "requiredSpecifications",
+    "compatibility",
   ]);
+  if (x.compatibility !== undefined) {
+    object(x.compatibility);
+    keys(x.compatibility, [
+      "hostConnection",
+      "laptopInches",
+      "bedWidthInches",
+      "bedLengthInches",
+      "mattressDepthInches",
+    ]);
+    for (const [k, v] of Object.entries(x.compatibility))
+      requireThat(
+        k === "hostConnection"
+          ? typeof v === "string" && v.length <= 50
+          : typeof v === "number" && Number.isFinite(v) && v > 0 && v < 1000,
+        "INVALID_COMPATIBILITY",
+        "Use a bounded connector name or positive dimensions in inches.",
+      );
+  }
   if (x.currency !== undefined)
     requireThat(
       ["SGD", "USD"].includes(x.currency as string),

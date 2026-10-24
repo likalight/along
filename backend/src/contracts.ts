@@ -13,7 +13,21 @@ export type Evidence = {
   rating: { value: number | null; count: number | null } | null;
   sourceUrl?: string | null;
 };
+export type Compatibility = {
+  hostConnection?: string;
+  laptopInches?: number;
+  bedWidthInches?: number;
+  bedLengthInches?: number;
+  mattressDepthInches?: number;
+};
 export type Product = {
+  variantId?: string;
+  referencePrice?: { amountMinor: number; currency: Currency; kind: string };
+  compatibility?: {
+    kind: "audio" | "bag" | "bedding";
+    hostConnections?: string[];
+    requiresKnownHost: boolean;
+  };
   id: string;
   category: string;
   name: string;
@@ -48,6 +62,16 @@ export type Product = {
   }[];
 };
 export type Offer = {
+  variantId?: string;
+  destination?: string;
+  setupCost?: Money | null;
+  setupConditions?: string;
+  deliveryWindow?: {
+    latestOffsetDays: number;
+    latestAt: string;
+    scenarioNow: string;
+    timeZone: string;
+  };
   id: string;
   productId: string;
   sellerId: string;
@@ -67,6 +91,7 @@ export type Offer = {
   classification: "proxy" | "snapshot" | "real";
 };
 export type Constraints = {
+  compatibility?: Compatibility;
   currency?: Currency;
   budgetMinor?: number;
   deliveryWithinDays?: number;
@@ -105,6 +130,9 @@ export type Proposal = {
   evidenceIds?: string[];
   destination?: string;
   view?: ShoppingView;
+  stage?: string;
+  comparisonIds?: string[];
+  priority?: string | null;
 };
 export type Conflict = {
   code: string;
@@ -113,6 +141,7 @@ export type Conflict = {
   field?: string;
 };
 export type Quote = {
+  setupCost: number | null;
   destination: string;
   product: Product;
   offer: Offer;
@@ -125,13 +154,37 @@ export type Quote = {
   eligible: boolean;
   conflicts: Conflict[];
 };
+export type InputEnvelope = {
+  sessionId: string;
+  epoch: number;
+  eventId: string;
+  turnId: string;
+  baseRevision: number;
+  modality: "voice" | "text" | "image" | "link";
+  text?: string;
+  attachmentId?: string;
+  url?: string;
+  visibleRevision: number;
+  visibleProductIds: string[];
+  source?: "shopper";
+};
+export type SavedChoice = {
+  id: string;
+  productIds: string[];
+  rationale: string;
+  selection: Selection | null;
+  constraints: Constraints;
+  savedAt: string;
+};
 export type Turn = {
+  input?: InputEnvelope;
   id: string;
   startedAt: string;
   status: "active" | "cancelled";
   approvalWindow: { summaryId: string; nonce: string } | null;
 };
 export type Summary = {
+  presentationMode: "voice" | "text";
   id: string;
   revision: number;
   responseTurnId: string;
@@ -152,6 +205,21 @@ export type Receipt = {
   quote: Quote;
 };
 export type Session = {
+  presentationMode: "voice" | "text";
+  stage: string;
+  comparisonIds: string[];
+  savedItems: SavedChoice[];
+  history: {
+    turnId: string;
+    eventId: string;
+    modality: string;
+    text: string | null;
+    productIds: string[];
+    createdAt: string;
+  }[];
+  attachmentIds: string[];
+  priority: string | null;
+  mediaOwner: "assistant" | "video" | null;
   id: string;
   revision: number;
   epoch: number;
@@ -203,6 +271,8 @@ export type CatalogData = {
   evidence: Evidence[];
 };
 export type CatalogProfile = {
+  clock?: { now: string; timeZone: string };
+  knownLinks?: Record<string, string>;
   catalog: CatalogData;
   scenarios: Scenario[];
   preparedImages: {

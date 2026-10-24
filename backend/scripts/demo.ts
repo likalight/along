@@ -17,9 +17,14 @@ try {
   const c = new ConciergeClient(base, { agentToken });
   let s = await c.create("cafe-dictation");
   console.log("1. Created cafe-dictation session", s.id);
-  const offers = await c.search({...s.constraints, budgetMinor: 12000, deliveryWithinDays: 1});
+  const offers = await c.search({
+    ...s.constraints,
+    budgetMinor: 15000,
+    deliveryWithinDays: 1,
+    compatibility: { hostConnection: "USB-C" },
+  });
   for (const q of [...offers.eligible, ...offers.ineligible].filter(
-    (q: any) => q.product.id === "MIC-019",
+    (q: any) => q.product.id === "MIC-020",
   ))
     console.log(
       "2. Seller comparison",
@@ -33,9 +38,15 @@ try {
       expectedRevision: s.revision,
       turnId: s.turn!.id,
       needs: ["Microphone for cafe dictation"],
-      constraints: {category: "audio-accessories", currency: "USD", budgetMinor: 12000, deliveryWithinDays: 1},
-      shortlist: ["MIC-019"],
-      selection: { offerId: "MIC-019-express", quantity: 1 },
+      constraints: {
+        category: "audio-accessories",
+        currency: "USD",
+        budgetMinor: 15000,
+        deliveryWithinDays: 1,
+        compatibility: { hostConnection: "USB-C" },
+      },
+      shortlist: ["MIC-020"],
+      selection: { offerId: "MIC-020-express", quantity: 1 },
     })
   ).session;
   s = await c.summarize(s.revision, s.turn!.id);

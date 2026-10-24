@@ -1,10 +1,12 @@
-# API v1 — frontend and AI handoff
+# Internal HTTP API — legacy names / agent tools
+
+For the latest agreed multimodal contract, use [INTEGRATION.md](./INTEGRATION.md) and `/v1/integration`. This document describes the internal `/v1` representation, still used by `createShoppingTools`.
 
 Base `http://127.0.0.1:4318`. JSON UTF-8, request limit 32 KiB. All money is integer minor units with explicit currency (USD in the default profile; no conversion). Product evidence distinguishes team-supplied research snapshots from synthetic fixtures. Every checkout offer is synthetic. The shared TypeScript definitions are `src/contracts.ts`; `src/client.ts` works from a frontend or trusted server without any framework dependency.
 
 ## Roles and ownership
 
-**Browser:** create session; keep returned `accessToken` in memory (or sessionStorage if refresh continuity is required); read snapshot/catalog; start/cancel turns; acknowledge rendered summary and real playback; reset through presenter control. Do not put a text composer or approval buttons into the shopper flow.
+**Browser:** create session; keep returned `accessToken` in memory (or sessionStorage if refresh continuity is required); read snapshot/catalog; start/cancel turns; acknowledge rendered summary and real playback; reset through presenter control. The current agreement supports optional typed input; see INTEGRATION.md for the deliberate text confirmation path. Do not use a purchase button.
 
 **AI/voice server:** receive the session capability from the frontend, keep `AGENT_API_TOKEN` server-side, interpret speech, propose structured state, request a summary, speak its exact `spokenText`, classify final shopper speech and forward approval observations. Never expose the agent token to browser JS, model context, product data or URL parameters.
 
@@ -14,23 +16,23 @@ All session routes need `Authorization: Bearer <accessToken>`. `/proposals`, `/s
 
 ## Routes
 
-| Method/path | Body/result |
-|---|---|
-| GET `/health` | Service, contract version, purchase mode and storage mode |
-| GET `/v1/catalog` | `products`, `offers`, `evidence`, currency, proxy notice |
-| GET `/v1/scenarios` | Scenario fixtures for the configured catalog profile |
-| GET `/v1/prepared-images` | Labelled synthetic style-reference assets |
-| POST `/v1/catalog/search` | `{constraints, quantity?:1, excludedProductIds?:[]}` → eligible/ineligible quotes with explicit reasons |
-| POST `/v1/sessions` | `{scenarioId?:"cafe-dictation"}` → `{session, accessToken}` |
-| GET `/v1/sessions/:id` | `{session}`; reconnect baseline |
+| Method/path                   | Body/result                                                                                                                           |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| GET `/health`                 | Service, contract version, purchase mode and storage mode                                                                             |
+| GET `/v1/catalog`             | `products`, `offers`, `evidence`, currency, proxy notice                                                                              |
+| GET `/v1/scenarios`           | Scenario fixtures for the configured catalog profile                                                                                  |
+| GET `/v1/prepared-images`     | Labelled synthetic style-reference assets                                                                                             |
+| POST `/v1/catalog/search`     | `{constraints, quantity?:1, excludedProductIds?:[]}` → eligible/ineligible quotes with explicit reasons                               |
+| POST `/v1/sessions`           | `{scenarioId?:"cafe-dictation"}` → `{session, accessToken}`                                                                           |
+| GET `/v1/sessions/:id`        | `{session}`; reconnect baseline                                                                                                       |
 | GET `/v1/sessions/:id/events` | SSE `data: {type:"session.snapshot", session}`; immediate full snapshot, then updates. Expiration emits `session.expired` and closes. |
-| POST `.../turns` | `{expectedRevision}` → `{session}` with server-issued `turn.id` |
-| POST `.../cancel` | `{turnId}` → `{session}`; stop/barge-in invalidates summary/approval |
-| POST `.../reset` | `{expectedRevision}` → cleared `{session}` with incremented epoch and revision |
-| POST `.../proposals` | `Proposal` → `{session, offers}` (all checked quotes, including ineligible reasons) |
-| POST `.../summaries` | `{expectedRevision,turnId}` → `{session}` with exact summary text/hash |
-| POST `.../presentation` | `{summaryId,turnId,textHash,event}` → `{session}`; event: displayed, playback_started, playback_completed, playback_interrupted |
-| POST `.../approval` | `VoiceObservation` → `{session,receipt}` only on valid explicit approval |
+| POST `.../turns`              | `{expectedRevision}` → `{session}` with server-issued `turn.id`                                                                       |
+| POST `.../cancel`             | `{turnId}` → `{session}`; stop/barge-in invalidates summary/approval                                                                  |
+| POST `.../reset`              | `{expectedRevision}` → cleared `{session}` with incremented epoch and revision                                                        |
+| POST `.../proposals`          | `Proposal` → `{session, offers}` (all checked quotes, including ineligible reasons)                                                   |
+| POST `.../summaries`          | `{expectedRevision,turnId}` → `{session}` with exact summary text/hash                                                                |
+| POST `.../presentation`       | `{summaryId,turnId,textHash,event}` → `{session}`; event: displayed, playback_started, playback_completed, playback_interrupted       |
+| POST `.../approval`           | `VoiceObservation` → `{session,receipt}` only on valid explicit approval                                                              |
 
 ## Normal sequence
 
@@ -43,14 +45,19 @@ All session routes need `Authorization: Bearer <accessToken>`. `/proposals`, `/s
   "expectedRevision": 1,
   "turnId": "<server-issued turn>",
   "needs": ["Microphone for cafe dictation"],
-  "constraints": {"category":"audio-accessories","currency":"USD","budgetMinor":12000,"deliveryWithinDays":1},
-  "shortlist": ["MIC-019"],
-  "selection": {"offerId":"MIC-019-express","quantity":1},
-  "evidenceIds": ["ev-MIC-019-spec","ev-demo-seller-express"]
+  "constraints": {
+    "category": "audio-accessories",
+    "currency": "USD",
+    "budgetMinor": 12000,
+    "deliveryWithinDays": 1
+  },
+  "shortlist": ["MIC-020"],
+  "selection": { "offerId": "MIC-020-express", "quantity": 1 },
+  "evidenceIds": ["ev-MIC-020-spec", "ev-demo-seller-express"]
 }
 ```
 
-Proposal fields are optional, but supplied arrays/constraints are **whole replacements**. Merge retained preferences and constraints from the accepted snapshot before proposing changes. Empty arrays clear a list; `selection:null` clears a choice. Null does not mean zero/unknown for other fields. Unknown request fields are rejected. No arbitrary model-supplied money, review or summary payload is accepted.
+Proposal fields are optional, but supplied arrays/constraints are **whole replacements**, except constraints which merge with existing hard requirements. Merge retained preferences and constraints from the accepted snapshot before proposing changes. Empty arrays clear a list; `selection:null` clears a choice. Null does not mean zero/unknown for other fields. Unknown request fields are rejected. No arbitrary model-supplied money, review or summary payload is accepted.
 
 4. Frontend renders the returned snapshot. Preserve `view.cards` and `shortlist` order. When a proposal includes `view`, its ordered cards become the shortlist; contradictory arrays are rejected. AI resolves “second one” from this accepted array at that revision, then sends a concrete product/offer ID; never resolve against an older streamed draft.
 5. AI requests `/summaries`. Backend computes total and creates `summary.id`, `summary.revision`, `spokenText`, and `textHash`. **Speak this exact text**; don't paraphrase or omit conditions. The frontend displays the same summary and quote.
@@ -82,7 +89,7 @@ Use actual final recognition confidence; if the provider doesn't supply a calibr
 - Apply snapshots only if their revision is newer for that session. Cancel and reset invalidate queued old work; no silent replay.
 - On 409 `STALE_REVISION`, refetch the snapshot and reevaluate the current shopper request. **Never automatically replay a purchase or an old proposal.**
 - A changed budget/deadline can make a previous selection invalid: new constraints are retained, selection and approval are cleared. An explicitly proposed invalid selection is rejected atomically without modifying accepted state.
-- `requiredSpecifications` uses exact equality. Unknown specifications fail hard constraints. Category constraints are exact slugs in the selected profile (`home-lighting`, `audio-accessories` in the current default).
+- `requiredSpecifications` uses exact equality. Unknown specifications fail hard constraints. Category constraints are exact slugs in the selected profile (`bags`, `bedding`, `audio-accessories` in the current default).
 - Shipping and other fees are per order; price is per item. All material fees must be known. Search results include rejected offers so AI can explain the cheapest-versus-eligible tradeoff, bounded to this catalog.
 - Money, offer, variant, quantity, delivery/conditions and uncertainties come only from catalog-backed summaries. Product evidence and seller evidence retain separate associations and proxy labels.
 - Raw audio/images/transcripts are not stored by this service. The upstream voice layer must follow the same retention rule.
@@ -99,7 +106,9 @@ The voice/AI server may import `createShoppingTools` from `src/agent-tools.ts`. 
 
 ```ts
 const client = new ConciergeClient(backendUrl, {
-  sessionId, accessToken, agentToken: process.env.AGENT_API_TOKEN,
+  sessionId,
+  accessToken,
+  agentToken: process.env.AGENT_API_TOKEN,
 });
 const currentTurn = await client.snapshot(); // must already be the new active shopper turn
 const tools = createShoppingTools(client, currentTurn);
@@ -116,8 +125,6 @@ Available tools: `get_shopping_state`, `search_current_offers`, `propose_shoppin
 
 `Proposal.destination` changes the session's displayed destination and invalidates any previous purchase summary. It is included in exact spoken summary and receipt. Current offers apply only to the fictional demo service area; changing this label does not verify real address serviceability. Do not collect a real home address for this simulation.
 
-## Catalog profiles and pending team decision
+## Catalog profile
 
-Default `voiceProfile` implements the 22:23 voice build brief: six synthetic lighting products plus twelve microphone configurations selected from the team's 50-record research file, all in USD. IDs MIC-xxx retain source IDs. All 36 seller offers are explicitly synthetic; a research reference price is never treated as a verified payable total. Audio specs/reviews retain source URLs and unknown values. Ratings were supplied by the team and have not been independently reverified by this backend. Illustrations are not product photographs.
-
-`nonTechProfile` remains an isolated legacy SGD regression fixture. Inject a `CatalogProfile` into `createApp({profile})` to change product data without changing the HTTP session contract. The later combined handoff proposes bags + bedding + microphones; the team must resolve this against the lighting/audio brief before we call any category lineup final. It is not silently merged into the default catalog.
+The active default is `teamProfile`: 12 audio configurations, six bags and six bedsheet sets in USD, per updated issue #2. See INTEGRATION.md for compatibility fields and frozen scenario clock. `voiceProfile` (lighting/audio) and `nonTechProfile` (SGD) are legacy regression fixtures only. They are not the deployed default.

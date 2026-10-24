@@ -244,10 +244,16 @@ export function quoteOffer(
   if (!offer) throw new Error("UNKNOWN_OFFER");
   const product = products.find((p) => p.id === offer.productId)!;
   const subtotal = offer.unitPrice * quantity;
+  const setupCost =
+    offer.setupCost === undefined
+      ? 0
+      : offer.setupCost === null
+        ? null
+        : offer.setupCost * quantity;
   const total =
-    offer.shipping === null || offer.otherFees === null
+    setupCost === null || offer.shipping === null || offer.otherFees === null
       ? null
-      : subtotal + offer.shipping + offer.otherFees;
+      : subtotal + offer.shipping + offer.otherFees + setupCost!;
   const conflicts: Quote["conflicts"] = [];
   const conflict = (code: string, message: string, field?: string) =>
     conflicts.push({ code, message, field, offerId });
@@ -308,6 +314,82 @@ export function quoteOffer(
         `Required ${key} is unmatched or unknown.`,
         key,
       );
+  if (offer.variantId && product.variantId !== offer.variantId)
+    conflict("VARIANT_CONFLICT", "Offer variant does not match the product.");
+  if (offer.destination && destination !== offer.destination)
+    conflict(
+      "DESTINATION_UNSUPPORTED",
+      "Offer only covers the explicitly fictional demo destination.",
+    );
+  const fit = constraints.compatibility ?? {},
+    spec = product.specifications;
+  if (product.compatibility?.kind === "audio") {
+    if (!fit.hostConnection)
+      conflict(
+        "HOST_UNKNOWN",
+        "Confirm the computer/host connection before selecting a purchase.",
+      );
+    else if (
+      !product.compatibility.hostConnections?.includes(fit.hostConnection)
+    )
+      conflict(
+        "HOST_INCOMPATIBLE",
+        "Supported direct host connection is unmatched; adapter/interface compatibility and cost are not established.",
+      );
+    if (setupCost === null)
+      conflict(
+        "SETUP_UNKNOWN",
+        "Required hardware cost has not been established.",
+      );
+  }
+  if (product.compatibility?.kind === "bag" && fit.laptopInches !== undefined) {
+    if (
+      typeof spec.laptopMaxInches !== "number" ||
+      fit.laptopInches > spec.laptopMaxInches
+    )
+      conflict(
+        "LAPTOP_FIT_UNKNOWN",
+        "Laptop size exceeds the documented screening limit or laptop support is unknown.",
+      );
+  }
+  if (product.compatibility?.kind === "bedding") {
+    for (const [requested, measured] of [
+      ["bedWidthInches", "widthInches"],
+      ["bedLengthInches", "lengthInches"],
+    ] as const) {
+      if (fit[requested] === undefined)
+        conflict(
+          "BED_DIMENSIONS_UNKNOWN",
+          "Confirm exact bed width and length before checkout.",
+          requested,
+        );
+      else if (fit[requested] !== spec[measured])
+        conflict(
+          "BED_SIZE_CONFLICT",
+          "Bedding size does not match the bed.",
+          requested,
+        );
+    }
+    if (fit.mattressDepthInches === undefined)
+      conflict(
+        "MATTRESS_DEPTH_UNKNOWN",
+        "Confirm mattress depth before checkout.",
+      );
+    else if (
+      typeof spec.maxMattressDepthInches !== "number" ||
+      fit.mattressDepthInches > spec.maxMattressDepthInches ||
+      fit.mattressDepthInches < Number(spec.minMattressDepthInches ?? 0)
+    )
+      conflict(
+        "MATTRESS_DEPTH_CONFLICT",
+        "Mattress depth is outside supported fit, or fit guarantee is unknown.",
+      );
+    if (spec.includedPieces === null || spec.care === null)
+      conflict(
+        "PACKAGE_UNKNOWN",
+        "Essential package contents or care are unverified.",
+      );
+  }
   return structuredClone({
     product,
     offer,
@@ -315,6 +397,7 @@ export function quoteOffer(
     currency: offer.currency,
     destination,
     subtotal,
+    setupCost,
     shipping: offer.shipping,
     otherFees: offer.otherFees,
     total,
@@ -359,7 +442,12 @@ export function validateCatalog(data: CatalogData = catalog) {
       );
     if (!products.some((p) => p.id === o.productId))
       throw new Error("Invalid offer product");
-    for (const amount of [o.unitPrice, o.shipping, o.otherFees])
+    for (const amount of [
+      o.unitPrice,
+      o.shipping,
+      o.otherFees,
+      o.setupCost ?? null,
+    ])
       if (amount !== null && (!Number.isSafeInteger(amount) || amount < 0))
         throw new Error("Invalid money");
     for (const id of o.evidenceIds)

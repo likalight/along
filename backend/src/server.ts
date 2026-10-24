@@ -1,3 +1,9 @@
+import {
+  integrationResponse,
+  sessionView,
+  acceptAction,
+  acceptApproval,
+} from "./integration.ts";
 import { readFile } from "node:fs/promises";
 import {
   createServer,
@@ -6,7 +12,7 @@ import {
 } from "node:http";
 import { pathToFileURL } from "node:url";
 import { eligibleOffers } from "./catalog.ts";
-import { voiceProfile } from "./voice-catalog.ts";
+import { teamProfile } from "./team-catalog.ts";
 import type { CatalogProfile } from "./contracts.ts";
 import { SessionStore, safeEqual } from "./store.ts";
 import {
@@ -25,7 +31,7 @@ export function createApp(options: {
   store?: SessionStore;
   profile?: CatalogProfile;
 }) {
-  const profile = options.profile ?? options.store?.profile ?? voiceProfile;
+  const profile = options.profile ?? options.store?.profile ?? teamProfile;
   const { catalog, scenarios, preparedImages } = profile;
   const store = options.store ?? new SessionStore(undefined, profile);
   const origins = new Set(
@@ -35,11 +41,14 @@ export function createApp(options: {
       "http://localhost:3000",
     ],
   );
+  const integrated = new WeakSet<ServerResponse>();
   function json(res: ServerResponse, status: number, body: unknown) {
     res.writeHead(status, {
       "content-type": "application/json; charset=utf-8",
     });
-    res.end(JSON.stringify(body));
+    res.end(
+      JSON.stringify(integrated.has(res) ? integrationResponse(body) : body),
+    );
   }
   async function body(req: IncomingMessage) {
     requireThat(
@@ -89,7 +98,7 @@ export function createApp(options: {
         res.writeHead(204, {
           "access-control-allow-methods": "GET,POST,OPTIONS",
           "access-control-allow-headers":
-            "Content-Type,Authorization,X-Agent-Token",
+            "Content-Type,Authorization,X-Agent-Token,X-Session-Revision",
           "access-control-max-age": "600",
         });
         res.end();
@@ -98,6 +107,10 @@ export function createApp(options: {
       const path = new URL(req.url ?? "/", "http://localhost").pathname
         .split("/")
         .filter(Boolean);
+      if (path[0] === "v1" && path[1] === "integration") {
+        integrated.add(res);
+        path.splice(1, 1);
+      }
       if (req.method === "GET" && path.join("/") === "health") {
         json(res, 200, {
           ok: true,
@@ -110,9 +123,16 @@ export function createApp(options: {
       }
       if (
         req.method === "GET" &&
-        ["reference/bag-style.svg", "reference/bedding-style.svg", "reference/lamp-blue.svg", "reference/lamp-ivory.svg", "reference/lamp-sage.svg", "reference/lamp-terracotta.svg", "reference/lamp-white.svg", "reference/microphone-style.svg"].includes(
-          path.join("/"),
-        )
+        [
+          "reference/bag-style.svg",
+          "reference/bedding-style.svg",
+          "reference/lamp-blue.svg",
+          "reference/lamp-ivory.svg",
+          "reference/lamp-sage.svg",
+          "reference/lamp-terracotta.svg",
+          "reference/lamp-white.svg",
+          "reference/microphone-style.svg",
+        ].includes(path.join("/"))
       ) {
         res.writeHead(200, {
           "content-type": "image/svg+xml",
@@ -192,7 +212,13 @@ export function createApp(options: {
         : "";
       store.authenticate(id, bearer);
       const action = path.slice(3).join("/");
-      const agentActions = ["proposals", "summaries", "approval"];
+      const agentActions = [
+        "proposals",
+        "actions",
+        "summaries",
+        "approval",
+        "confirm",
+      ];
       if (agentActions.includes(action)) {
         const supplied = req.headers["x-agent-token"];
         requireThat(
@@ -214,8 +240,10 @@ export function createApp(options: {
           "content-type": "text/event-stream",
           connection: "keep-alive",
         });
-        const emit = (event: unknown) =>
-          res.write(`data: ${JSON.stringify(event)}\n\n`);
+        const emit = (event: any) =>
+          res.write(
+            `data: ${JSON.stringify(integrated.has(res) && event.type === "session.snapshot" ? { type: "session.updated", sessionId: id, epoch: event.session.epoch, eventId: `state-${event.session.epoch}-${event.session.revision}`, turnId: event.session.turn?.id ?? null, revision: event.session.revision, snapshot: sessionView(event.session) } : event)}\n\n`,
+          );
         emit({ type: "session.snapshot", session: store.get(id) });
         const listener = (event: any) => {
           emit(event);
@@ -233,6 +261,37 @@ export function createApp(options: {
         });
         return;
       }
+      if (action.startsWith("attachments/") && req.method === "GET") {
+        const asset = store.attachment(id, action.slice("attachments/".length));
+        res.writeHead(200, {
+          "content-type": asset.contentType,
+          "content-security-policy": "default-src 'none'; sandbox",
+        });
+        res.end(asset.bytes);
+        return;
+      }
+      if (action === "attachments" && req.method === "POST") {
+        let size = 0;
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) {
+          size += chunk.length;
+          requireThat(
+            size <= 2 * 1024 * 1024,
+            "INVALID_IMAGE_SIZE",
+            "Maximum image is 2 MiB.",
+            413,
+          );
+          chunks.push(chunk);
+        }
+        const result = store.addAttachment(
+          id,
+          Number(req.headers["x-session-revision"]),
+          String(req.headers["content-type"] ?? "").split(";")[0],
+          Buffer.concat(chunks),
+        );
+        json(res, 201, result);
+        return;
+      }
       requireThat(
         req.method === "POST",
         "METHOD_NOT_ALLOWED",
@@ -242,6 +301,32 @@ export function createApp(options: {
       const b = await body(req);
       let result: unknown;
       switch (action) {
+        case "inputs":
+          result = { session: store.input(id, b) };
+          break;
+        case "actions":
+          result = acceptAction(store, id, b);
+          break;
+        case "confirm":
+          result = acceptApproval(store, id, b);
+          break;
+        case "mode":
+          keys(b, ["expectedRevision", "mode"]);
+          result = {
+            session: store.switchMode(id, b.expectedRevision as number, b.mode),
+          };
+          break;
+        case "media":
+          keys(b, ["expectedRevision", "type", "videoId"]);
+          result = {
+            session: store.media(
+              id,
+              b.expectedRevision as number,
+              b.type,
+              b.videoId,
+            ),
+          };
+          break;
         case "turns":
           keys(b, ["expectedRevision"]);
           result = {

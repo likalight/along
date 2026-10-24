@@ -13,6 +13,17 @@ const constraintsSchema = {
   type: "object",
   additionalProperties: false,
   properties: {
+    compatibility: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        hostConnection: { type: "string" },
+        laptopInches: { type: "number" },
+        bedWidthInches: { type: "number" },
+        bedLengthInches: { type: "number" },
+        mattressDepthInches: { type: "number" },
+      },
+    },
     currency: { type: "string", enum: ["USD", "SGD"] },
     budgetMinor: {
       type: "integer",
@@ -44,7 +55,7 @@ export const shoppingToolDefinitions = [
   {
     name: "propose_shopping_state",
     description:
-      "Propose IDs and shopper-requested state changes. Supplied arrays and constraints are whole replacements: retain earlier requirements unless the shopper changed them. Backend validates every selection. Never invent IDs or prices.",
+      "Propose IDs and shopper-requested state changes. Supplied arrays replace lists; hard constraints merge with accepted requirements. Never silently remove a budget when changing buying priority. Backend validates every selection. Never invent IDs or prices.",
     parameters: {
       type: "object",
       additionalProperties: false,
@@ -57,25 +68,62 @@ export const shoppingToolDefinitions = [
         evidenceIds: stringList,
         destination: { type: "string", maxLength: 200 },
         view: {
-          type: "object", additionalProperties: false,
-          required: ["stage", "focusProductId", "cards", "evidenceIds", "activeVideoId"],
+          type: "object",
+          additionalProperties: false,
+          required: [
+            "stage",
+            "focusProductId",
+            "cards",
+            "evidenceIds",
+            "activeVideoId",
+          ],
           properties: {
-            stage: { type: "string", enum: ["solution-types", "priorities", "shortlist", "evidence", "offers"] },
+            stage: {
+              type: "string",
+              enum: [
+                "solution-types",
+                "priorities",
+                "shortlist",
+                "evidence",
+                "offers",
+              ],
+            },
             focusProductId: { type: ["string", "null"] },
             activeVideoId: { type: ["string", "null"] },
             evidenceIds: stringList,
-            cards: { type: "array", maxItems: 8, items: {
-              type: "object", additionalProperties: false,
-              required: ["productId", "role", "rank", "reason", "compromise", "evidenceIds"],
-              properties: {
-                productId: { type: "string" },
-                role: { type: "string", enum: ["best-value", "best-quality", "lowest-cost-suitable", "close-match", "discovery"] },
-                rank: { type: ["integer", "null"], enum: [1, 2, 3, null] },
-                reason: { type: "string", minLength: 1, maxLength: 1000 },
-                compromise: { type: "string", minLength: 1, maxLength: 1000 },
-                evidenceIds: stringList,
+            cards: {
+              type: "array",
+              maxItems: 8,
+              items: {
+                type: "object",
+                additionalProperties: false,
+                required: [
+                  "productId",
+                  "role",
+                  "rank",
+                  "reason",
+                  "compromise",
+                  "evidenceIds",
+                ],
+                properties: {
+                  productId: { type: "string" },
+                  role: {
+                    type: "string",
+                    enum: [
+                      "best-value",
+                      "best-quality",
+                      "lowest-cost-suitable",
+                      "close-match",
+                      "discovery",
+                    ],
+                  },
+                  rank: { type: ["integer", "null"], enum: [1, 2, 3, null] },
+                  reason: { type: "string", minLength: 1, maxLength: 1000 },
+                  compromise: { type: "string", minLength: 1, maxLength: 1000 },
+                  evidenceIds: stringList,
+                },
               },
-            } },
+            },
           },
         },
         selection: {

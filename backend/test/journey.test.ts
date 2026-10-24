@@ -302,7 +302,9 @@ test("new voice brief: lighting cards preserve visible order; USD audio offers a
     { agentToken },
   );
   const { createShoppingTools } = await import("../src/agent-tools.ts");
-  for (const url of new Set(voiceProfile.catalog.products.flatMap(p => p.media.map(m => m.url)))) {
+  for (const url of new Set(
+    voiceProfile.catalog.products.flatMap((p) => p.media.map((m) => m.url)),
+  )) {
     const response = await fetch(c.baseUrl + url);
     assert.equal(response.status, 200, `Catalog media must load: ${url}`);
     assert.match(response.headers.get("content-type")!, /image\/svg\+xml/);
@@ -334,11 +336,21 @@ test("new voice brief: lighting cards preserve visible order; USD audio offers a
   assert.deepEqual(s.shortlist, ["LAMP-001"]);
   const adapter = createShoppingTools(c, s);
   const adapterResult: any = await adapter.execute("propose_shopping_state", {
-    view: s.view, destination: "Demo destination, Singapore",
+    view: s.view,
+    destination: "Demo destination, Singapore",
   });
   s = adapterResult.session;
-  await rejects(c.propose({expectedRevision: s.revision, turnId: s.turn!.id,
-    view: {...s.view!, cards: [{...s.view!.cards[0], evidenceIds: ["ev-MIC-019-spec"]}]} }), "UNKNOWN_EVIDENCE");
+  await rejects(
+    c.propose({
+      expectedRevision: s.revision,
+      turnId: s.turn!.id,
+      view: {
+        ...s.view!,
+        cards: [{ ...s.view!.cards[0], evidenceIds: ["ev-MIC-019-spec"] }],
+      },
+    }),
+    "UNKNOWN_EVIDENCE",
+  );
   await rejects(
     c.propose({
       expectedRevision: s.revision,

@@ -24,22 +24,23 @@ npm run demo
 
 ## Integration contract
 
-- [API.md](./API.md): routes, call sequence, examples, trust boundaries and errors.
+- [INTEGRATION.md](./INTEGRATION.md): current issue #2 public contract, routes, scenarios and live wiring.
+- [src/integration-client.ts](./src/integration-client.ts): frontend/server client for the agreed field names.
+- [API.md](./API.md): internal API for the provider-neutral agent tools.
 - [src/contracts.ts](./src/contracts.ts): frontend/AI shared types.
 - [src/client.ts](./src/client.ts): framework-neutral fetch client and streaming snapshots.
-- [src/voice-catalog.ts](./src/voice-catalog.ts): current lighting/audio profile; 18 products, 36 synthetic offers, source-linked microphone evidence and unknown-fee cases.
+- [src/team-catalog.ts](./src/team-catalog.ts): active 24-product audio/bags/bedding profile with 48 labelled synthetic offers.
 - [data/microphones-reference.json](./data/microphones-reference.json): 50 non-purchasable source research records with provenance.
 - [src/catalog.ts](./src/catalog.ts): pure quote/eligibility functions and isolated legacy SGD regression profile.
 - [src/store.ts](./src/store.ts): authoritative state, revisions, turn cancellation, exact summaries and approval.
 
-The current default follows the 22:23 voice build brief (lighting + audio). The later combined data file proposes bags + bedding + microphones, so category agreement remains pending. Profiles isolate this choice from the HTTP contract. Microphone identities/specs/reviews preserve team-supplied source snapshots; the backend has not independently reverified them. All seller prices, stock, taxes and delivery promises are synthetic, labelled demo offers. No reference price is represented as a verified payable price. Synthetic SVGs are style/category illustrations, not product photographs. Resolve relative media URLs against the backend URL.
+The default follows the updated agreed issue #2: 12 audio, six bag and six bedsheet configurations. Lighting is deferred. Source specifications/reviews retain team-supplied URLs and unknown values; they were not independently reverified by this backend. Seller totals, stock, taxes and delivery are synthetic. The scenario clock is frozen at 24 October 2026, 10:00 Asia/Singapore, to fictional DEMO-DESTINATION. Reference prices are not executable offers. Relative SVGs are labelled illustrations, not product photographs.
 
 To regenerate the 50-record reference data from the supplied attachment:
 
 ```sh
 node --experimental-strip-types scripts/import-microphones.ts /absolute/path/microphone-demo-data.md
 ```
-
 
 ## Verified locally
 
@@ -50,7 +51,7 @@ Ordered product cards, honest missing reviews/videos, destination changes and US
 ## Scope limits
 
 - One product/variant and seller offer per simulated order, quantity 1–99.
-- Exact-match specification constraints; numeric ranges must be added explicitly, not guessed by the model.
+- Exact-match specifications plus explicit laptop diagonal, mattress dimensions/depth and host connector compatibility checks. Unknown essential setup, package or fit blocks checkout.
 - Catalog is process-static; updating fixtures requires restart, which expires sessions.
-- The conservative English approval phrases are documented in API.md. Unrecognized or uncertain speech must reprompt, never force approval.
+- The conservative English voice/text approval phrases are documented in INTEGRATION.md. Unrecognized or uncertain speech must reprompt, never force approval.
 - Shared-host production auth, persisted receipts, real fulfillment and production voice verification are outside this closed hackathon demo.

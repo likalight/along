@@ -1,0 +1,538 @@
+{
+  "sourceFile": "combined-shopping-demo-data.md",
+  "sha256": "bf35dc4d1f627c814b7cf02c41b90a37bde57745d51688cbff76500eaad6ee8c",
+  "checkedOn": "2026-10-24",
+  "independentlyReverifiedByBackend": false,
+  "products": [
+    {
+      "id": "BAG-001",
+      "brand": "Osprey",
+      "model": "Daylite Large Tote Pack, one size; color unverified",
+      "category": "bags",
+      "description": "Convertible tote/backpack",
+      "referencePrice": {
+        "amountMinor": 11000,
+        "currency": "USD",
+        "kind": "from_price"
+      },
+      "realAvailability": "unknown",
+      "sourceUrl": "https://www.osprey.com/daylitetm-large-tote-pack",
+      "specificationRow": [
+        "26",
+        "0.722",
+        "Recycled 300D polyester",
+        "Padded sleeve up to 16-inch laptop; bottom shoe/dirty-towel section; mat straps; luggage sleeve",
+        "Strong work-and-gym candidate when separating shoes matters. Larger and heavier than BAG-002."
+      ],
+      "reviewRow": [
+        "null",
+        "null",
+        "Review content not captured."
+      ]
+    },
+    {
+      "id": "BAG-002",
+      "brand": "Osprey",
+      "model": "Daylite Tote Pack 20L, one size; linked yellow variant",
+      "category": "bags",
+      "description": "Convertible tote/backpack",
+      "referencePrice": {
+        "amountMinor": 9500,
+        "currency": "USD",
+        "kind": "from_price"
+      },
+      "realAvailability": "unknown",
+      "sourceUrl": "https://www.osprey.com/daylite-tote-pack-daylttotpks21-779?color=Tumbleweed+Yellow%2FTunnel+Vision&size=O%2FS",
+      "specificationRow": [
+        "20",
+        "0.534",
+        "Recycled 300D polyester",
+        "Sleeve for most 14-inch laptops; bottle pockets; internal mesh pocket; luggage pass-through",
+        "Smaller convertible option. A separate shoe compartment was not established."
+      ],
+      "reviewRow": [
+        "null",
+        "null",
+        "Review content not captured."
+      ]
+    },
+    {
+      "id": "BAG-003",
+      "brand": "Osprey",
+      "model": "Daylite Messenger, one size; color unverified",
+      "category": "bags",
+      "description": "Messenger",
+      "referencePrice": {
+        "amountMinor": 8000,
+        "currency": "USD",
+        "kind": "from_price"
+      },
+      "realAvailability": "unknown",
+      "sourceUrl": "https://www.osprey.com/daylitetm-messenger",
+      "specificationRow": [
+        "12",
+        "null",
+        "Recycled 300D polyester",
+        "Sleeve for most 14-inch laptops; bottle pocket; key clip; buckle flap",
+        "Compact work carry; limited capacity for gym clothes. Weight was not captured."
+      ],
+      "reviewRow": [
+        "null",
+        "null",
+        "Review content not captured."
+      ]
+    },
+    {
+      "id": "BAG-004",
+      "brand": "Osprey",
+      "model": "Daylite Duffel 30, one size; color unverified",
+      "category": "bags",
+      "description": "Gym/travel duffel",
+      "referencePrice": {
+        "amountMinor": 8500,
+        "currency": "USD",
+        "kind": "from_price"
+      },
+      "realAvailability": "unknown",
+      "sourceUrl": "https://www.osprey.com/daylitetm-duffel-30",
+      "specificationRow": [
+        "30",
+        "0.55",
+        "Recycled 300D polyester ripstop",
+        "Wide opening; end and side pockets; padded bottom; multiple carry modes",
+        "Clothes-first gym/weekend option. Dedicated laptop protection was not established."
+      ],
+      "reviewRow": [
+        "null",
+        "null",
+        "Review content not captured."
+      ]
+    },
+    {
+      "id": "BAG-005",
+      "brand": "Osprey",
+      "model": "Daylite Expandable Travel Pack 26+6, one size; color unverified",
+      "category": "bags",
+      "description": "Travel backpack",
+      "referencePrice": {
+        "amountMinor": 11000,
+        "currency": "USD",
+        "kind": "from_price"
+      },
+      "realAvailability": "unknown",
+      "sourceUrl": "https://www.osprey.com/daylitetm-expandable-travel-pack-26-6",
+      "specificationRow": [
+        "26, expandable to 32",
+        "0.84",
+        "Recycled 300D polyester ripstop",
+        "Tech sleeve; bottle pockets; luggage pass-through; internal tie-down",
+        "Travel-focused capacity. Check actual airline limits; no universal cabin-fit promise."
+      ],
+      "reviewRow": [
+        "null",
+        "null",
+        "Review content not captured."
+      ]
+    },
+    {
+      "id": "BAG-006",
+      "brand": "Osprey",
+      "model": "Daylite Plus Driftshade Backpack, one size; color unverified",
+      "category": "bags",
+      "description": "Everyday backpack",
+      "referencePrice": {
+        "amountMinor": 8500,
+        "currency": "USD",
+        "kind": "from_price"
+      },
+      "realAvailability": "unknown",
+      "sourceUrl": "https://www.osprey.com/daylitetm-plus-driftshade-backpack",
+      "specificationRow": [
+        "20",
+        "0.61",
+        "Recycled 600D heathered polyester",
+        "Sleeve for most 14-inch laptops; bottle pockets; compression straps; hipbelt",
+        "Everyday/trail crossover. Dedicated shoe separation was not established."
+      ],
+      "reviewRow": [
+        "null",
+        "null",
+        "Review content not captured."
+      ]
+    },
+    {
+      "id": "BED-001",
+      "brand": "IKEA",
+      "model": "DVALA, white, US Queen, 705.775.31",
+      "category": "bedding",
+      "description": "Cotton sheet set",
+      "referencePrice": {
+        "amountMinor": 2999,
+        "currency": "USD",
+        "kind": "observed_page"
+      },
+      "realAvailability": "unknown",
+      "sourceUrl": "https://www.ikea.com/us/en/p/dvala-sheet-set-white-70577531/",
+      "specificationRow": [
+        "100% cotton; weave not established",
+        "152",
+        "60 × 80",
+        "10; descriptive text says 25 cm",
+        "1 fitted, 1 flat 90 × 104, 2 pillowcases 20 × 30; wash max 60°C, tumble medium"
+      ],
+      "reviewRow": [
+        "3.6",
+        "247",
+        "Some praise value and softness after washing; others report roughness or loose fit."
+      ]
+    },
+    {
+      "id": "BED-002",
+      "brand": "IKEA",
+      "model": "NATTJASMIN, white, US Queen, 006.011.53",
+      "category": "bedding",
+      "description": "Cotton/lyocell sateen set",
+      "referencePrice": {
+        "amountMinor": 5999,
+        "currency": "USD",
+        "kind": "observed_page"
+      },
+      "realAvailability": "unknown",
+      "sourceUrl": "https://www.ikea.com/us/en/p/nattjasmin-sheet-set-white-00601153/",
+      "specificationRow": [
+        "60% cotton, 40% lyocell; sateen",
+        "310",
+        "60 × 80",
+        "15",
+        "1 fitted, 1 flat 90 × 104, 2 pillowcases 20 × 30; wash max 60°C, tumble medium"
+      ],
+      "reviewRow": [
+        "4.3",
+        "47",
+        "Some praise smoothness; others report inconsistent fitted-sheet fit."
+      ]
+    },
+    {
+      "id": "BED-003",
+      "brand": "IKEA",
+      "model": "ULLVIDE, white, US Queen, 905.775.11",
+      "category": "bedding",
+      "description": "Cotton/lyocell percale set",
+      "referencePrice": {
+        "amountMinor": 4999,
+        "currency": "USD",
+        "kind": "observed_page"
+      },
+      "realAvailability": "unknown",
+      "sourceUrl": "https://www.ikea.com/us/en/p/ullvide-sheet-set-white-90577511/",
+      "specificationRow": [
+        "85% cotton, 15% lyocell; percale",
+        "200",
+        "60 × 80",
+        "14.625 conservative limit; measurement table rounds to 15",
+        "1 fitted, 1 flat 90 × 104, 2 pillowcases 20 × 30; wash max 60°C, tumble medium"
+      ],
+      "reviewRow": [
+        "4.0",
+        "41",
+        "Inspected comments praise colors and smooth feel; the captured excerpt did not establish a recurring complaint."
+      ]
+    },
+    {
+      "id": "BED-004",
+      "brand": "IKEA",
+      "model": "SOLFIBBLA, white green/stripe, US Queen, 606.158.35",
+      "category": "bedding",
+      "description": "Cotton striped sheet set",
+      "referencePrice": {
+        "amountMinor": 3999,
+        "currency": "USD",
+        "kind": "observed_page"
+      },
+      "realAvailability": "unknown",
+      "sourceUrl": "https://www.ikea.com/us/en/p/solfibbla-sheet-set-white-green-stripe-60615835/",
+      "specificationRow": [
+        "100% cotton; yarn-dyed stripes",
+        "118",
+        "60 × 80",
+        "10",
+        "1 fitted, 1 flat 90 × 104, 2 pillowcases 20 × 30; wash max 60°C, tumble medium"
+      ],
+      "reviewRow": [
+        "3.7",
+        "56",
+        "Mixed comfort feedback; individual complaints mention roughness, shrinkage, or a damaged arrival."
+      ]
+    },
+    {
+      "id": "BED-005",
+      "brand": "Brooklinen",
+      "model": "Classic Percale Core Sheet Set; US Queen demo selection",
+      "category": "bedding",
+      "description": "Cotton percale set",
+      "referencePrice": {
+        "amountMinor": 19900,
+        "currency": "USD",
+        "kind": "demo_estimate"
+      },
+      "realAvailability": "unknown",
+      "sourceUrl": "https://www.brooklinen.com/products/classic-core-sheet-set",
+      "specificationRow": [
+        "100% long-staple cotton; percale",
+        "270",
+        "60 × 80",
+        "16; brand says 12–16 best fit",
+        "Size guide: flat 92 × 104, pillowcases 20 × 27; exact package count/care not captured"
+      ],
+      "reviewRow": [
+        "null",
+        "null",
+        "Review content not captured."
+      ]
+    },
+    {
+      "id": "BED-006",
+      "brand": "Brooklinen",
+      "model": "Washed European Linen Core Sheet Set; US Queen demo selection",
+      "category": "bedding",
+      "description": "Linen sheet set",
+      "referencePrice": {
+        "amountMinor": 37900,
+        "currency": "USD",
+        "kind": "demo_estimate"
+      },
+      "realAvailability": "unknown",
+      "sourceUrl": "https://www.brooklinen.com/products/washed-linen-core-sheet-set",
+      "specificationRow": [
+        "100% European flax linen; 155 GSM",
+        "null",
+        "60 × 80",
+        "Size-guide pocket height 15; explicit fit guarantee not captured",
+        "Size guide: flat 92 × 104, pillowcases 20 × 27; exact package count/care not captured"
+      ],
+      "reviewRow": [
+        "null",
+        "null",
+        "Review content not captured."
+      ]
+    }
+  ],
+  "offers": [
+    {
+      "id": "BAG-001-A",
+      "productId": "BAG-001",
+      "sellerId": "DEMO-VALUE",
+      "unitPrice": 9900,
+      "shipping": 500,
+      "total": 10400,
+      "deliveryDays": 4
+    },
+    {
+      "id": "BAG-001-B",
+      "productId": "BAG-001",
+      "sellerId": "DEMO-EXPRESS",
+      "unitPrice": 11000,
+      "shipping": 900,
+      "total": 11900,
+      "deliveryDays": 1
+    },
+    {
+      "id": "BAG-002-A",
+      "productId": "BAG-002",
+      "sellerId": "DEMO-VALUE",
+      "unitPrice": 7900,
+      "shipping": 500,
+      "total": 8400,
+      "deliveryDays": 4
+    },
+    {
+      "id": "BAG-002-B",
+      "productId": "BAG-002",
+      "sellerId": "DEMO-EXPRESS",
+      "unitPrice": 9500,
+      "shipping": 900,
+      "total": 10400,
+      "deliveryDays": 1
+    },
+    {
+      "id": "BAG-003-A",
+      "productId": "BAG-003",
+      "sellerId": "DEMO-VALUE",
+      "unitPrice": 6900,
+      "shipping": 500,
+      "total": 7400,
+      "deliveryDays": 3
+    },
+    {
+      "id": "BAG-003-B",
+      "productId": "BAG-003",
+      "sellerId": "DEMO-EXPRESS",
+      "unitPrice": 8000,
+      "shipping": 900,
+      "total": 8900,
+      "deliveryDays": 1
+    },
+    {
+      "id": "BAG-004-A",
+      "productId": "BAG-004",
+      "sellerId": "DEMO-VALUE",
+      "unitPrice": 7500,
+      "shipping": 500,
+      "total": 8000,
+      "deliveryDays": 4
+    },
+    {
+      "id": "BAG-004-B",
+      "productId": "BAG-004",
+      "sellerId": "DEMO-EXPRESS",
+      "unitPrice": 8500,
+      "shipping": 900,
+      "total": 9400,
+      "deliveryDays": 1
+    },
+    {
+      "id": "BAG-005-A",
+      "productId": "BAG-005",
+      "sellerId": "DEMO-VALUE",
+      "unitPrice": 9900,
+      "shipping": 500,
+      "total": 10400,
+      "deliveryDays": 5
+    },
+    {
+      "id": "BAG-005-B",
+      "productId": "BAG-005",
+      "sellerId": "DEMO-EXPRESS",
+      "unitPrice": 11000,
+      "shipping": 900,
+      "total": 11900,
+      "deliveryDays": 1
+    },
+    {
+      "id": "BAG-006-A",
+      "productId": "BAG-006",
+      "sellerId": "DEMO-VALUE",
+      "unitPrice": 7500,
+      "shipping": 500,
+      "total": 8000,
+      "deliveryDays": 3
+    },
+    {
+      "id": "BAG-006-B",
+      "productId": "BAG-006",
+      "sellerId": "DEMO-EXPRESS",
+      "unitPrice": 8500,
+      "shipping": 900,
+      "total": 9400,
+      "deliveryDays": 1
+    },
+    {
+      "id": "BED-001-A",
+      "productId": "BED-001",
+      "sellerId": "DEMO-VALUE",
+      "unitPrice": 2999,
+      "shipping": 500,
+      "total": 3499,
+      "deliveryDays": 4
+    },
+    {
+      "id": "BED-001-B",
+      "productId": "BED-001",
+      "sellerId": "DEMO-EXPRESS",
+      "unitPrice": 3499,
+      "shipping": 900,
+      "total": 4399,
+      "deliveryDays": 1
+    },
+    {
+      "id": "BED-002-A",
+      "productId": "BED-002",
+      "sellerId": "DEMO-VALUE",
+      "unitPrice": 5999,
+      "shipping": 500,
+      "total": 6499,
+      "deliveryDays": 4
+    },
+    {
+      "id": "BED-002-B",
+      "productId": "BED-002",
+      "sellerId": "DEMO-EXPRESS",
+      "unitPrice": 6499,
+      "shipping": 900,
+      "total": 7399,
+      "deliveryDays": 1
+    },
+    {
+      "id": "BED-003-A",
+      "productId": "BED-003",
+      "sellerId": "DEMO-VALUE",
+      "unitPrice": 4999,
+      "shipping": 500,
+      "total": 5499,
+      "deliveryDays": 4
+    },
+    {
+      "id": "BED-003-B",
+      "productId": "BED-003",
+      "sellerId": "DEMO-EXPRESS",
+      "unitPrice": 5499,
+      "shipping": 900,
+      "total": 6399,
+      "deliveryDays": 1
+    },
+    {
+      "id": "BED-004-A",
+      "productId": "BED-004",
+      "sellerId": "DEMO-VALUE",
+      "unitPrice": 3999,
+      "shipping": 500,
+      "total": 4499,
+      "deliveryDays": 4
+    },
+    {
+      "id": "BED-004-B",
+      "productId": "BED-004",
+      "sellerId": "DEMO-EXPRESS",
+      "unitPrice": 4499,
+      "shipping": 900,
+      "total": 5399,
+      "deliveryDays": 1
+    },
+    {
+      "id": "BED-005-A",
+      "productId": "BED-005",
+      "sellerId": "DEMO-VALUE",
+      "unitPrice": 19900,
+      "shipping": 0,
+      "total": 19900,
+      "deliveryDays": 5
+    },
+    {
+      "id": "BED-005-B",
+      "productId": "BED-005",
+      "sellerId": "DEMO-EXPRESS",
+      "unitPrice": 20900,
+      "shipping": 900,
+      "total": 21800,
+      "deliveryDays": 1
+    },
+    {
+      "id": "BED-006-A",
+      "productId": "BED-006",
+      "sellerId": "DEMO-VALUE",
+      "unitPrice": 37900,
+      "shipping": 0,
+      "total": 37900,
+      "deliveryDays": 5
+    },
+    {
+      "id": "BED-006-B",
+      "productId": "BED-006",
+      "sellerId": "DEMO-EXPRESS",
+      "unitPrice": 38900,
+      "shipping": 900,
+      "total": 39800,
+      "deliveryDays": 1
+    }
+  ]
+}

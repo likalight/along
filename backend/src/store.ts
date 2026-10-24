@@ -21,6 +21,7 @@ import type {
   Proposal,
   VoiceObservation,
   Summary,
+  InputEnvelope,
 } from "./contracts.ts";
 
 const clone = <T>(x: T): T => structuredClone(x);
@@ -34,7 +35,24 @@ export function safeEqual(a: string, b: string) {
 const money = (n: number, currency: string) =>
   `${currency} ${(n / 100).toFixed(2)}`;
 export class SessionStore {
-  private records = new Map<string, { state: Session; tokenHash: string }>();
+  private attachments = new Map<
+    string,
+    { sessionId: string; epoch: number; contentType: string; bytes: Buffer }
+  >();
+  private processed = new Map<
+    string,
+    { fingerprint: string; result: unknown }
+  >();
+  private clearSessionData(id: string) {
+    for (const [key, asset] of this.attachments)
+      if (asset.sessionId === id) this.attachments.delete(key);
+    for (const key of this.processed.keys())
+      if (key.startsWith(id + ":")) this.processed.delete(key);
+  }
+  private records = new Map<
+    string,
+    { state: Session; tokenHash: string; usedTurnIds: Set<string> }
+  >();
   readonly events = new EventEmitter();
   readonly ttlMs: number;
   readonly profile: CatalogProfile;
@@ -74,6 +92,14 @@ export class SessionStore {
       expiresAt: new Date(now.getTime() + this.ttlMs).toISOString(),
       destination: this.profile.destination,
       view: null,
+      presentationMode: "voice",
+      stage: "opening",
+      comparisonIds: [],
+      savedItems: [],
+      history: [],
+      attachmentIds: [],
+      priority: null,
+      mediaOwner: null,
       needs: [],
       constraints: clone({
         currency: this.profile.catalog.currency,
@@ -89,7 +115,11 @@ export class SessionStore {
       receipt: null,
       lastOutcome: null,
     };
-    this.records.set(id, { state, tokenHash: hash(accessToken) });
+    this.records.set(id, {
+      state,
+      tokenHash: hash(accessToken),
+      usedTurnIds: new Set(),
+    });
     return { session: clone(state), accessToken };
   }
   private record(id: string) {
@@ -97,6 +127,7 @@ export class SessionStore {
     requireThat(r, "SESSION_NOT_FOUND", "Session not found or expired.", 404);
     if (Date.parse(r.state.expiresAt) <= Date.now()) {
       this.records.delete(id);
+      this.clearSessionData(id);
       this.events.emit(id, { type: "session.expired" });
       throw new ApiError(
         410,
@@ -133,7 +164,7 @@ export class SessionStore {
       "STALE_REVISION",
       "Read the latest snapshot before retrying.",
       409,
-      { currentRevision: s.revision },
+      { currentRevision: s.revision, session: clone(s) },
     );
   }
   private mutable(s: Session) {
@@ -156,13 +187,36 @@ export class SessionStore {
     s.summary = null;
     s.lastOutcome = null;
   }
-  beginTurn(id: string, expected: number) {
+  beginTurn(id: string, expected: number, input?: InputEnvelope) {
     const s = this.get(id);
     this.revision(s, expected);
     this.mutable(s);
-    if (s.summary && s.summary.playback !== "complete") this.invalidate(s);
+    if (s.summary && !(s.summary.approvalNonce && s.summary.displayed))
+      this.invalidate(s);
+    if (input) {
+      s.history.push({
+        turnId: input.turnId,
+        eventId: input.eventId,
+        modality: input.modality,
+        text: input.text ?? null,
+        productIds: [...input.visibleProductIds],
+        createdAt: new Date().toISOString(),
+      });
+      s.history = s.history.slice(-100);
+      if (input.modality === "text" && s.presentationMode !== "text") {
+        this.invalidate(s);
+        s.presentationMode = "text";
+      }
+      if (input.modality === "voice" && s.presentationMode !== "voice") {
+        this.invalidate(s);
+        s.presentationMode = "voice";
+      }
+    }
+    s.mediaOwner = null;
+    if (input) this.record(id).usedTurnIds.add(input.turnId);
     s.turn = {
-      id: randomUUID(),
+      id: input?.turnId ?? randomUUID(),
+      ...(input ? { input: clone(input) } : {}),
       startedAt: new Date().toISOString(),
       status: "active",
       approvalWindow: s.summary?.approvalNonce
@@ -184,10 +238,20 @@ export class SessionStore {
     const s = this.get(id);
     this.revision(s, expected);
     const scenario = this.profile.scenarios.find((x) => x.id === s.scenarioId);
+    this.clearSessionData(id);
+    this.record(id).usedTurnIds.clear();
     Object.assign(s, {
       epoch: s.epoch + 1,
       destination: this.profile.destination,
       view: null,
+      presentationMode: "voice",
+      stage: "opening",
+      comparisonIds: [],
+      savedItems: [],
+      history: [],
+      attachmentIds: [],
+      priority: null,
+      mediaOwner: null,
       needs: [],
       constraints: clone({
         currency: this.profile.catalog.currency,
@@ -294,8 +358,15 @@ export class SessionStore {
           "Cards need bounded reasons and compromises.",
         );
       requireThat(
-        knownEvidence(card.evidenceIds) && (card.evidenceIds as string[]).every(id =>
-          this.profile.catalog.evidence.some(e => e.id === id && e.subjectType === "product" && e.subjectId === card.productId)),
+        knownEvidence(card.evidenceIds) &&
+          (card.evidenceIds as string[]).every((id) =>
+            this.profile.catalog.evidence.some(
+              (e) =>
+                e.id === id &&
+                e.subjectType === "product" &&
+                e.subjectId === card.productId,
+            ),
+          ),
         "UNKNOWN_EVIDENCE",
         "Card evidence must belong to that product; seller evidence belongs in the offers panel.",
       );
@@ -320,6 +391,9 @@ export class SessionStore {
       "evidenceIds",
       "destination",
       "view",
+      "stage",
+      "comparisonIds",
+      "priority",
     ]);
     const s = this.get(id);
     this.revision(s, raw.expectedRevision);
@@ -338,7 +412,26 @@ export class SessionStore {
           "INVALID_PROPOSAL",
           `${key} must be a bounded unique string array.`,
         );
-    if (raw.constraints !== undefined) validateConstraints(raw.constraints);
+    if (raw.constraints !== undefined) {
+      validateConstraints(raw.constraints);
+      const incoming = raw.constraints as Session["constraints"];
+      raw = {
+        ...raw,
+        constraints: {
+          ...s.constraints,
+          ...incoming,
+          requiredSpecifications: {
+            ...s.constraints.requiredSpecifications,
+            ...incoming.requiredSpecifications,
+          },
+          compatibility: {
+            ...s.constraints.compatibility,
+            ...incoming.compatibility,
+          },
+        },
+      };
+    }
+    object(raw);
     if (raw.selection !== undefined && raw.selection !== null) {
       object(raw.selection);
       keys(raw.selection, ["offerId", "quantity"]);
@@ -358,6 +451,43 @@ export class SessionStore {
         "Provide a short demo destination.",
       );
     if (raw.view !== undefined) this.validateView(raw.view);
+    if (raw.stage !== undefined)
+      requireThat(
+        [
+          "opening",
+          "understanding",
+          "solution_types",
+          "buying_priorities",
+          "shortlist",
+          "comparison",
+          "evidence",
+          "saved_choice",
+          "offers",
+          "summary",
+          "receipt",
+          "recovery",
+        ].includes(raw.stage as string),
+        "INVALID_VIEW",
+        "Unknown stage.",
+      );
+    if (raw.priority !== undefined)
+      requireThat(
+        raw.priority === null ||
+          ["best-value", "best-quality", "lowest-cost-suitable"].includes(
+            raw.priority as string,
+          ),
+        "INVALID_PRIORITY",
+        "Unknown buying priority.",
+      );
+    if (raw.comparisonIds !== undefined)
+      requireThat(
+        strings(raw.comparisonIds, 4) &&
+          raw.comparisonIds.every((pid) =>
+            this.profile.catalog.products.some((p) => p.id === pid),
+          ),
+        "UNKNOWN_PRODUCT",
+        "Compare up to four known products.",
+      );
     const p = raw as unknown as Proposal;
     for (const key of ["excludedProductIds", "shortlist"] as const)
       for (const productId of p[key] ?? [])
@@ -394,8 +524,19 @@ export class SessionStore {
       "evidenceIds",
       "destination",
       "view",
+      "stage",
+      "comparisonIds",
+      "priority",
     ] as const)
       if (p[key] !== undefined) Object.assign(s, { [key]: clone(p[key]) });
+    if (p.shortlist && !p.view) s.view = null;
+    if (p.view && !p.stage)
+      s.stage =
+        p.view.stage === "priorities"
+          ? "buying_priorities"
+          : p.view.stage === "solution-types"
+            ? "solution_types"
+            : p.view.stage;
     if (p.view?.cards.length) {
       const visibleIds = p.view.cards.map((c) => c.productId);
       requireThat(
@@ -475,9 +616,11 @@ export class SessionStore {
       422,
       q.conflicts,
     );
-    const spokenText = `This is a simulated purchase only. ${q.quantity} of ${q.product.name}, variant ${q.product.variant}, sold by ${q.offer.sellerName}. Items ${money(q.subtotal, q.currency)}, shipping ${money(q.shipping!, q.currency)}, other fees ${money(q.otherFees!, q.currency)}; total ${money(q.total!, q.currency)}. Destination: ${q.destination}. Delivery: ${q.offer.deliveryConditions} Returns: ${q.offer.returnConditions} Conditions: ${q.offer.conditions.join(" ")} Material uncertainties: ${q.offer.uncertainties.length ? q.offer.uncertainties.join("; ") : "none recorded in this proxy fixture"}. All offer details are synthetic demo data. To approve, say “Confirm this simulated purchase.” You can also change it or cancel.`;
+    const spokenText = `This is a simulated purchase only. ${q.quantity} of ${q.product.name}, variant ${q.product.variant}, sold by ${q.offer.sellerName}. Items ${money(q.subtotal, q.currency)}, shipping ${money(q.shipping!, q.currency)}, other fees ${money(q.otherFees!, q.currency)}, required setup ${money(q.setupCost!, q.currency)}; total ${money(q.total!, q.currency)}. Destination: ${q.destination}. Delivery: ${q.offer.deliveryConditions} Setup: ${q.offer.setupConditions ?? "No additional setup cost in this fixture."} Returns: ${q.offer.returnConditions} Conditions: ${q.offer.conditions.join(" ")} Material uncertainties: ${q.offer.uncertainties.length ? q.offer.uncertainties.join("; ") : "none recorded in this proxy fixture"}. All offer details are synthetic demo data. To approve, ${s.presentationMode === "text" ? "type" : "say"} “Confirm this simulated purchase.” You can also change it or cancel.`;
+    s.stage = "summary";
     s.summary = {
       id: randomUUID(),
+      presentationMode: s.presentationMode,
       revision: s.revision + 1,
       responseTurnId: turnId,
       quote: q,
@@ -516,6 +659,12 @@ export class SessionStore {
       "Unknown presentation event.",
     );
     if (raw.event === "displayed") m.displayed = true;
+    if (raw.event !== "displayed")
+      requireThat(
+        m.presentationMode === "voice",
+        "WRONG_PRESENTATION_MODE",
+        "Audio events cannot enable text approval.",
+      );
     if (raw.event === "playback_started") {
       requireThat(
         m.playback === "pending",
@@ -539,11 +688,16 @@ export class SessionStore {
       m.approvalNonce = null;
       s.lastOutcome = "summary_interrupted";
     }
-    if (m.displayed && m.playback === "complete" && !m.approvalNonce)
+    if (
+      m.displayed &&
+      (m.presentationMode === "text" || m.playback === "complete") &&
+      m.playback !== "interrupted" &&
+      !m.approvalNonce
+    )
       m.approvalNonce = token();
     return this.commit(s);
   }
-  approve(id: string, raw: unknown) {
+  approve(id: string, raw: unknown, typed = false) {
     object(raw);
     keys(raw, [
       "expectedRevision",
@@ -577,7 +731,8 @@ export class SessionStore {
       m &&
         m.id === raw.summaryId &&
         m.displayed &&
-        m.playback === "complete" &&
+        m.presentationMode === (typed ? "text" : "voice") &&
+        (typed || m.playback === "complete") &&
         m.approvalNonce &&
         window?.summaryId === m.id &&
         safeEqual(window.nonce, m.approvalNonce) &&
@@ -587,13 +742,21 @@ export class SessionStore {
       409,
     );
     const o = raw as unknown as VoiceObservation;
+    if (typed)
+      requireThat(
+        s.turn?.input?.modality === "text" &&
+          s.turn.input.text === o.transcript,
+        "UNTRUSTED_APPROVAL",
+        "Typed approval must exactly match a fresh shopper text input, not an agent proposal.",
+      );
     requireThat(
-      o.final === true &&
-        typeof o.confidence === "number" &&
-        o.confidence >= 0.9 &&
-        o.confidence <= 1 &&
-        o.source === "shopper" &&
-        o.echoDetected === false,
+      typed ||
+        (o.final === true &&
+          typeof o.confidence === "number" &&
+          o.confidence >= 0.9 &&
+          o.confidence <= 1 &&
+          o.source === "shopper" &&
+          o.echoDetected === false),
       "UNTRUSTED_APPROVAL",
       "Approval must be final, confident shopper speech without echo.",
     );
@@ -642,14 +805,297 @@ export class SessionStore {
       createdAt: new Date().toISOString(),
       quote: clone(q),
     };
+    s.stage = "receipt";
     s.lastOutcome = "simulated_purchase_complete";
     const result = this.commit(s);
     return { session: result, receipt: result.receipt };
+  }
+
+  /** Dedupe operations by session epoch and caller event identity. Failed calls are not cached. */
+  once<T>(
+    id: string,
+    epoch: number,
+    eventId: string,
+    payload: unknown,
+    operation: () => T,
+  ): T {
+    const s = this.get(id);
+    requireThat(
+      epoch === s.epoch,
+      "STALE_EPOCH",
+      "Reset invalidated this event.",
+      409,
+    );
+    requireThat(
+      typeof eventId === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(eventId),
+      "INVALID_EVENT_ID",
+      "Use a bounded unique event ID.",
+    );
+    const key = id + ":" + epoch + ":" + eventId,
+      fingerprint = hash(JSON.stringify(payload)),
+      previous = this.processed.get(key);
+    if (previous) {
+      requireThat(
+        previous.fingerprint === fingerprint,
+        "EVENT_CONFLICT",
+        "Event ID reused with a different payload.",
+        409,
+      );
+      return clone(previous.result) as T;
+    }
+    requireThat(
+      [...this.processed.keys()].filter((k) => k.startsWith(id + ":")).length <
+        2000,
+      "EVENT_CAPACITY",
+      "Reset the demo after 2000 events.",
+      429,
+    );
+    const result = operation();
+    this.processed.set(key, { fingerprint, result: clone(result) });
+    return result;
+  }
+  input(id: string, raw: unknown) {
+    object(raw);
+    keys(raw, [
+      "sessionId",
+      "epoch",
+      "eventId",
+      "turnId",
+      "baseRevision",
+      "modality",
+      "text",
+      "attachmentId",
+      "url",
+      "visibleRevision",
+      "visibleProductIds",
+      "source",
+    ]);
+    requireThat(
+      raw.sessionId === id,
+      "WRONG_SESSION",
+      "Input session mismatch.",
+      409,
+    );
+    const x = raw as unknown as InputEnvelope;
+    return this.once(id, x.epoch, x.eventId, x, () => {
+      const s = this.get(id);
+      this.revision(s, x.baseRevision);
+      requireThat(
+        ["voice", "text", "image", "link"].includes(x.modality),
+        "INVALID_MODALITY",
+        "Unsupported shopper input.",
+      );
+      requireThat(
+        typeof x.turnId === "string" &&
+          /^[A-Za-z0-9_-]{1,100}$/.test(x.turnId) &&
+          x.turnId !== s.turn?.id &&
+          !this.record(id).usedTurnIds.has(x.turnId),
+        "INVALID_TURN",
+        "Use a fresh turn ID.",
+      );
+      requireThat(
+        x.source === undefined || x.source === "shopper",
+        "UNTRUSTED_INPUT",
+        "Assistant/video audio is not shopper input.",
+      );
+      requireThat(
+        x.visibleRevision === s.revision &&
+          strings(x.visibleProductIds, 50) &&
+          JSON.stringify(x.visibleProductIds) === JSON.stringify(s.shortlist),
+        "STALE_DISPLAY",
+        "Clarify positional references against the latest accepted display.",
+        409,
+        { session: s },
+      );
+      requireThat(
+        x.text === undefined ||
+          (typeof x.text === "string" &&
+            x.text.length > 0 &&
+            x.text.length <= 4000),
+        "INVALID_INPUT",
+        "Input text must be bounded.",
+      );
+      if (x.modality === "text")
+        requireThat(!!x.text, "INVALID_INPUT", "Text input requires text.");
+      if (x.modality === "image")
+        requireThat(
+          !!x.attachmentId && s.attachmentIds.includes(x.attachmentId),
+          "UNKNOWN_ATTACHMENT",
+          "Upload a session image first.",
+        );
+      if (x.modality === "link")
+        requireThat(
+          !!x.url && !!this.profile.knownLinks?.[x.url],
+          "UNSUPPORTED_LINK",
+          "Only curated product links are supported. No URL was fetched.",
+        );
+      return this.beginTurn(id, x.baseRevision, x);
+    });
+  }
+  addAttachment(
+    id: string,
+    expected: number,
+    contentType: string,
+    bytes: Buffer,
+  ) {
+    const s = this.get(id);
+    this.revision(s, expected);
+    this.mutable(s);
+    requireThat(
+      bytes.length > 12 && bytes.length <= 2 * 1024 * 1024,
+      "INVALID_IMAGE_SIZE",
+      "Images must be at most 2 MiB.",
+    );
+    const png = bytes
+      .subarray(0, 8)
+      .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+    const jpeg = bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
+    const webp =
+      bytes.toString("ascii", 0, 4) === "RIFF" &&
+      bytes.toString("ascii", 8, 12) === "WEBP";
+    requireThat(
+      (contentType === "image/png" && png) ||
+        (contentType === "image/jpeg" && jpeg) ||
+        (contentType === "image/webp" && webp),
+      "INVALID_IMAGE_TYPE",
+      "Only PNG/JPEG/WebP with matching signatures. SVG and arbitrary documents are rejected.",
+    );
+    requireThat(
+      s.attachmentIds.length < 5,
+      "ATTACHMENT_LIMIT",
+      "At most five session images.",
+    );
+    const attachmentId = randomUUID();
+    this.attachments.set(attachmentId, {
+      sessionId: id,
+      epoch: s.epoch,
+      contentType,
+      bytes,
+    });
+    s.attachmentIds.push(attachmentId);
+    return {
+      session: this.commit(s),
+      attachment: { id: attachmentId, contentType, size: bytes.length },
+    };
+  }
+  attachment(id: string, attachmentId: string) {
+    const s = this.get(id),
+      a = this.attachments.get(attachmentId);
+    requireThat(
+      a && a.sessionId === id && a.epoch === s.epoch,
+      "UNKNOWN_ATTACHMENT",
+      "Image no longer belongs to this session.",
+      404,
+    );
+    return a;
+  }
+  switchMode(id: string, expected: number, mode: unknown) {
+    const s = this.get(id);
+    this.revision(s, expected);
+    this.mutable(s);
+    requireThat(
+      mode === "voice" || mode === "text",
+      "INVALID_MODE",
+      "Choose voice or text.",
+    );
+    if (s.presentationMode === mode) return s;
+    this.invalidate(s);
+    s.presentationMode = mode;
+    if (s.turn) s.turn.status = "cancelled";
+    s.mediaOwner = null;
+    return this.commit(s);
+  }
+  media(id: string, expected: number, kind: unknown, videoId?: unknown) {
+    const s = this.get(id);
+    this.revision(s, expected);
+    this.mutable(s);
+    requireThat(
+      ["video.started", "video.stopped"].includes(kind as string),
+      "INVALID_MEDIA",
+      "Unknown video event.",
+    );
+    if (kind === "video.started") {
+      requireThat(
+        this.profile.catalog.products.some((p) =>
+          p.videos?.some((v) => v.id === videoId),
+        ),
+        "UNKNOWN_VIDEO",
+        "Video must be curated.",
+      );
+      this.invalidate(s);
+      if (s.turn) s.turn.status = "cancelled";
+      s.mediaOwner = "video";
+    } else s.mediaOwner = null;
+    return this.commit(s);
+  }
+  saveChoice(
+    id: string,
+    expected: number,
+    turnId: string,
+    productIds: unknown,
+    rationale: unknown,
+  ) {
+    const s = this.get(id);
+    this.revision(s, expected);
+    this.active(s, turnId);
+    this.mutable(s);
+    requireThat(
+      strings(productIds, 8) &&
+        productIds.length > 0 &&
+        productIds.every((pid) =>
+          this.profile.catalog.products.some((p) => p.id === pid),
+        ),
+      "UNKNOWN_PRODUCT",
+      "Save known products only.",
+    );
+    requireThat(
+      typeof rationale === "string" &&
+        rationale.length > 0 &&
+        rationale.length <= 1000,
+      "INVALID_RATIONALE",
+      "Provide a bounded decision reason.",
+    );
+    requireThat(
+      s.savedItems.length < 20,
+      "SAVE_LIMIT",
+      "At most 20 saved choices.",
+    );
+    s.savedItems.push({
+      id: randomUUID(),
+      productIds,
+      rationale,
+      selection: clone(s.selection),
+      constraints: clone(s.constraints),
+      savedAt: new Date().toISOString(),
+    });
+    s.stage = "saved_choice";
+    this.invalidate(s);
+    return this.commit(s);
+  }
+  restoreChoice(
+    id: string,
+    expected: number,
+    turnId: string,
+    savedId: unknown,
+  ) {
+    const s = this.get(id);
+    this.revision(s, expected);
+    this.active(s, turnId);
+    const choice = s.savedItems.find((x) => x.id === savedId);
+    requireThat(choice, "UNKNOWN_SAVED_CHOICE", "Saved choice not found.");
+    return this.propose(id, {
+      expectedRevision: expected,
+      turnId,
+      shortlist: choice.productIds,
+      selection: null,
+      stage: "shortlist",
+    });
   }
   sweep() {
     for (const [id, r] of this.records)
       if (Date.parse(r.state.expiresAt) <= Date.now()) {
         this.records.delete(id);
+        this.clearSessionData(id);
         this.events.emit(id, { type: "session.expired" });
       }
   }
