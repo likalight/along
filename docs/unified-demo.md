@@ -82,3 +82,11 @@ Verification for this presentation flow:
 - Live AI (typed input through the production shopping harness) displayed the Wireless PRO photo, requested the exact curated video, prepared a USD 298.06 simulated order and produced a receipt after explicit approval. No real payment was taken. The existing GPT-Live transport remains integrated; this pass does not claim a full spoken rehearsal.
 - Installed-extension browser checks passed for both Mac-memory/discovery checkout and the new video round trip. The video test intercepts YouTube with a local test surface to verify real extension navigation, the return control, preserved session/draft, and paused microphone. It does not verify YouTube playback.
 - Video return permission does not enable discovery observation, screenshots, or microphone access. The test verifies those settings remain off.
+
+Personal Chrome rehearsal, 25 October:
+
+- The presenter loaded the unpacked extension and enabled its YouTube return permission. Pairing from Along's web app showed “Your Chrome companion is connected.”
+- “Watch review in Chrome” opened the real supplied YouTube Short. Playback advanced while muted, with the Along orb and Back to Along visible.
+- Back closed only the review tab and returned to the original app tab. The Wireless PRO, brief, conversation history and unfinished draft were unchanged; the microphone stayed paused.
+- Talk to Along resumed to “Listening · microphone on”; capture was then paused. Typed checkout continued in that same conversation and produced simulated receipt 38D0A9C5 for USD 298.06 after explicit approval. No real payment occurred.
+- This verifies personal-profile navigation, real video playback, return/session continuity, live voice resumption and simulated checkout. It does not claim an entire purchase spoken aloud by the presenter.
