@@ -4,7 +4,7 @@
 
 ### Find your next purchase. Talk it through.
 
-A voice-first shopping concierge that carries your context from the first idea to the final decision.
+A conversational shopping demo that keeps your needs, comparisons, and decisions in one place.
 
 [![Integration CI](https://github.com/likalight/along/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/likalight/along/actions/workflows/ci.yml)
 [![Catalog acceptance](https://github.com/likalight/along/actions/workflows/catalog.yml/badge.svg?branch=main)](https://github.com/likalight/along/actions/workflows/catalog.yml)
@@ -12,64 +12,46 @@ A voice-first shopping concierge that carries your context from the first idea t
 
 [![Node.js: 22.18+](https://img.shields.io/badge/Node.js-22.18%2B-417E38?style=flat-square&logo=nodedotjs&logoColor=white)](./package.json)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)](./tsconfig.base.json)
+[![Docker Compose](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square&logo=docker&logoColor=white)](./docker-compose.yml)
 [![Stage: Hackathon prototype](https://img.shields.io/badge/stage-hackathon_prototype-2563eb?style=flat-square)](#project-status)
-[![Purchases: Simulated](https://img.shields.io/badge/purchases-simulated-64748b?style=flat-square)](#human-approval-by-design)
+[![Purchases: Simulated](https://img.shields.io/badge/purchases-simulated-64748b?style=flat-square)](#human-approval)
 
-[Get started](#getting-started) · [How it works](#how-it-works) · [Scenarios](#demo-scenarios) · [Roadmap](https://github.com/likalight/along/issues) · [Contribute](#contributing)
+[Quickstart](#quickstart) · [Try it](#try-a-shopping-journey) · [Development](#development-and-checks) · [Catalog](#catalog-and-provenance) · [Contribute](#contributing)
 
 </div>
 
 ---
 
-Shopping rarely follows a straight line. You find an option, read a critical review, change your budget, and realize that delivery tomorrow matters more than saving a few dollars.
+Shopping rarely follows a straight line. A review changes your mind, your budget shifts, or delivery tomorrow becomes more important than the lowest price.
 
-**Along keeps that conversation together.** Describe what you need, explore alternatives, compare the evidence, and revise your priorities without starting over. When you're ready, review the exact purchase details and explicitly approve a simulated order. Saving an option or deciding not to buy is a valid outcome too.
+**Along keeps that conversation together.** Explore a curated catalog, compare complete seller offers, revise your requirements, and explicitly confirm a simulated purchase. You can also save an option or decide not to buy.
 
-Built for the Coupang challenge as a bounded hackathon demo.
+Built for the Coupang challenge. The shopper interface, session backend, and text journey run today. Browser speech is available where supported; provider audio streaming remains unfinished. See [project status](#project-status) for the current boundaries.
 
-## Why Along?
+## Quickstart
 
-- **Start anywhere.** Bring a specific product, an unfinished idea, a photo, or a supported product link.
-- **Talk through the whole journey.** Voice is a complete shopping path, with optional typing and photo/link attachments.
-- **Keep your constraints.** A new preference updates the shortlist while preserving your other requirements.
-- **See the evidence.** Product facts, review summaries, seller terms, and missing information remain distinguishable.
-- **Compare the whole offer.** Delivery, required setup hardware, fees, and returns matter alongside the item price.
-- **Stay in control.** Nothing completes a purchase without fresh approval of the current details.
+Clone the repository, then choose Docker or native Node.js:
 
-These describe the target experience. See [project status](#project-status) for what is implemented today.
-
-## How it works
-
-```mermaid
-flowchart LR
-    A["Describe a need"] --> B["Clarify what matters"]
-    B --> C["Explore and compare"]
-    C --> D["Choose a seller offer"]
-    D --> E["Review the complete summary"]
-    E --> F["Explicit approval"]
-    F --> G["Simulated receipt"]
-    C --> H["Save or defer"]
-    C --> B
-    E --> B
+```sh
+git clone https://github.com/likalight/along.git
+cd along
 ```
 
-This is a conversation, not a fixed wizard. A shopper with a precise request can move quickly; someone exploring can compare, ask questions, change direction, or return to an earlier option.
+### Docker Compose
 
-The planned interface pairs a persistent blue voice orb with an adaptive content stage. Product cards settle into stable, numbered positions so references such as “compare the first two” stay meaningful.
+Requires **Docker Engine and Docker Compose v2**. Node.js is not required on the host.
 
-## Demo scenarios
+```sh
+docker compose up --build
+```
 
-| Scenario | Start the conversation | What changes the decision |
-| --- | --- | --- |
-| **Audio for noisy cafés** | “I dictate into my computer, but cafés are too noisy.” | Connection, portability, wearability, total setup cost, and evidence limitations. |
-| **A bag for work and gym** | “I like this shape. I need room for work and gym clothes.” | Capacity, laptop fit, separate shoe storage, budget, and “I need it tomorrow.” |
-| **Bedsheets for a warm room** | “Help me choose sheets for my bed.” | Exact dimensions, mattress depth, composition, care, included pieces, and budget. |
+Open [localhost:3000](http://127.0.0.1:3000) and choose **I'd rather type**. No API key or database is required for the text demo.
 
-The active fixture contains **24 products**: 12 audio configurations, six bags, and six bedsheet sets. Each has two synthetic seller offers. The complete 50-product microphone research is preserved as an archive, separate from the active catalog.
+Stop with Ctrl+C, then `docker compose down`. Compose publishes port 3000 on the host; the container listens on all interfaces. For port changes and another device on the same network, see the [Docker demo guide](./docs/docker-demo.md).
 
-## Getting started
+### Native Node.js
 
-The integrated shopper interface runs locally against the authoritative backend. Live AI/voice provider transport and a hosted demo remain pending. See [the combined handoff](./INTEGRATION.md) for verified behavior and limitations.
+Requires **Node.js 22.18+** and npm.
 
 ```sh
 npm ci
@@ -77,133 +59,199 @@ npm run build
 npm run start -w @along/shopper -- --port 4322
 ```
 
-Open http://127.0.0.1:4322 and choose “I’d rather type”. The diagnostic harness lives in `apps/web`; the shopper interface lives in `apps/shopper`.
+Open [localhost:4322](http://127.0.0.1:4322). The Next.js shopper calls the authoritative backend in the same process, so no separate backend server or agent token is needed.
 
-### Run the catalog checks
+## Try a shopping journey
 
-Requires **Git** and **Node.js 22.18+** with npm. No API key is needed.
+Start in text mode and enter these messages in order:
+
+1. `a work and gym bag`
+2. `shape, budget USD 150`
+3. `compare`
+4. `show evidence`
+5. `show offers`
+6. `choose faster offer`
+7. Read the complete summary, then type `confirm simulated purchase`.
+
+Try `looks good` before the final confirmation: it must not create a receipt. Then enter `review summary`, reread the summary, and give fresh explicit confirmation. Changing the budget or delivery deadline also requires a new summary and fresh approval.
+
+| Scenario | Opening request | What matters |
+| --- | --- | --- |
+| Audio for noisy cafés | “I dictate into my computer, but cafés are too noisy.” | Connection, wearability, portability, setup hardware, and total budget. |
+| A bag for work and gym | “I like this shape. I need room for work and gym clothes.” | Laptop fit, capacity, shoe storage, total price, and delivery. |
+| Bedsheets for a warm room | “Help me choose sheets for my bed.” | Actual mattress width, length and depth, composition, care, and included pieces. |
+
+Conversation routing is bounded and deterministic. Prepared illustrations and supported product links provide context; arbitrary website crawling and general image recognition are not implemented.
+
+## What Along does
+
+- **Preserves context.** Budget, delivery and compatibility requirements survive follow-up questions and changes of direction.
+- **Keeps comparisons stable.** Numbered product cards, focus, saved items and comparisons use accepted product IDs.
+- **Shows the complete offer.** Item cost, shipping, required setup hardware, tax, delivery and returns appear before approval.
+- **Makes evidence inspectable.** Source facts, customer metrics, synthetic seller terms and unknown fields remain distinguishable.
+- **Supports different inputs.** Text, browser speech, validated image uploads, prepared illustrations and allowlisted links feed the same session.
+- **Provides accessible fallbacks.** Keyboard controls, transcripts, reduced motion and a CSS orb keep the interface usable without WebGL.
+
+## How it works
+
+```mermaid
+flowchart LR
+    A["Describe a need"] --> B["Clarify requirements"]
+    B --> C["Explore and compare"]
+    C --> D["Choose a seller offer"]
+    D --> E["Review the exact summary"]
+    E --> F["Fresh explicit approval"]
+    F --> G["Simulated receipt"]
+    C --> H["Save or defer"]
+    C --> B
+    E --> B
+```
+
+The Next.js shopper renders accepted session snapshots. The agent adapter proposes actions, and the backend checks constraints, evidence, offer totals and approval before accepting them. The interface uses React, TypeScript, Motion for React and the vendored ElevenLabs UI Orb; the orb is a visual component.
+
+### Human approval
+
+A purchase summary identifies the product, variant, seller, quantity, destination, complete total, delivery, conditions and uncertainties.
+
+- Material changes invalidate the previous summary and approval.
+- Saving, selecting, “looks good,” attachments and assistant audio are not authorization.
+- Text confirmation must be a fresh, deliberate instruction after the current summary is displayed.
+- The backend voice contract additionally requires completed, uninterrupted playback and trusted shopper speech evidence. Provider voice approval is not yet an integrated, verified path; use explicit text confirmation for the demo.
+- Retried approvals return the same simulated receipt.
+
+**No payment is taken and no real merchant order is placed.**
+
+## Configuration
+
+Defaults are sufficient for the text demo.
+
+| Variable | Used by | Purpose |
+| --- | --- | --- |
+| `OPENAI_API_KEY` | Next.js server / Compose | Optional: enables an attempt to mint an ephemeral Realtime client secret. It does not complete the provider audio transport. |
+| `ALONG_PORT` | Docker Compose | Published host port; defaults to `3000`. The container still listens on port 3000. |
+| `PLAYWRIGHT_PORT` | Browser tests | Isolated test-server port; defaults to `3000`. |
+| `CHROME_PATH` | Browser tests | Optional Chrome executable path instead of Playwright's installed Chromium. |
+
+For Compose, copy [`.env.example`](./.env.example) to `.env` to override defaults (`cp .env.example .env`, or `Copy-Item .env.example .env` in PowerShell). For native development, provide server variables through the process environment or `apps/shopper/.env.local`. Keep keys server-side and out of version control.
+
+### Voice status
+
+The app can mint a real provider client secret when configured. However, `LiveSpeechAdapter` currently uses browser recognition and speech synthesis; WebRTC audio negotiation is still pending. A successful mint or a “live” UI label does not establish a working provider audio stream.
+
+Without a key, the mint endpoint returns `not_connected` and browser speech/text fallback remains available. Browser speech is half duplex: recognition pauses during narration. Support and microphone permissions depend on the browser. For a reproducible purchase rehearsal, use text mode.
+
+## Development and checks
+
+After the initial `npm ci` and `npm run build`:
 
 ```sh
-git clone https://github.com/likalight/along.git
-cd along
+# Shopper application
+npm run dev -w @along/shopper -- --port 4322
 
-cd catalog
-
-npm ci
-npm run verify
+# Optional diagnostic harness, in another terminal
+npm run dev -w @coupang/web -- --port 4321
 ```
 
-This runs TypeScript checks, 41 acceptance/regression tests, all three scenario sequences, and fixture generation. It checks IDs, evidence associations, exact monetary totals, compatibility, stock states, and delivery constraints.
+Root `npm run dev` starts the diagnostic harness. Backend and agent edits require rebuilding their workspace outputs before the Next.js apps consume them.
 
-The generated files are:
-
-| File | Contents |
-| --- | --- |
-| `catalog/data/catalog.json` | 24 products, 48 proxy offers, 121 evidence records, scenarios, supported links, and image metadata. |
-| `catalog/data/microphones-archive.json` | All 50 joined microphone research records, original source fields, and provenance. |
-
-For schemas and server integration, read the [catalog guide](./catalog/README.md).
-
-### Run the backend rehearsal
+The [integration workflow](./.github/workflows/ci.yml) builds the workspaces and runs:
 
 ```sh
-# From the repository root
-cd backend
-npm ci
-npm run verify
+npm run typecheck
+npm test -w @concierge/backend
+npm test -w @coupang/agent
+npm test -w @along/shopper
+npx playwright install chromium
+npm run test:e2e
+npm run test:canvas
 ```
 
-This checks the backend and rehearses all three purchase scenarios over HTTP, including explicit voice/text approval and duplicate receipt prevention. Display and playback callbacks are emulated. See the [backend guide](./backend/README.md) to start the service and the [acceptance review](./backend/ACCEPTANCE.md) for criterion-level evidence.
+Root `npm test` runs only agent tests. Let Playwright start its own server on a free port: its managed server clears `OPENAI_API_KEY` so speech mocks exercise the fallback, while a reused server can have different settings. On Linux CI, browser installation also uses `--with-deps`.
 
-### Try a catalog query
+Catalog and backend acceptance have their own checks:
 
-A server-side TypeScript consumer can use:
-
-```ts
-import { getCatalog, eligibleOffers } from "./catalog/src/index.ts";
-
-const catalog = getCatalog();
-const matches = eligibleOffers(catalog, {
-  category: "everyday-bags",
-  currency: "USD",
-  budgetMinor: 15000,
-  laptopInches: 14,
-  separateShoeCompartment: true,
-  deadline: "2026-10-25T18:00:00+08:00",
-});
-
-// BAG-001-B: USD 119.00, with explicitly simulated next-day delivery.
-console.log(matches);
+```sh
+npm ci --prefix catalog
+npm run verify --prefix catalog
+npm run verify -w @concierge/backend
 ```
 
-Fixtures use a frozen **24 October 2026, 10:00, Asia/Singapore** scenario clock. Dates are reproducible demo inputs, not current delivery promises.
+When catalog source data changes, regenerate it with the catalog verification command, then run `npm run sync:catalog` and `npm run build` from the root. Commit the generated JSON and TypeScript modules together. Backend rehearsals emulate display/playback callbacks; passing them does not prove live speech recognition.
 
-## Evidence you can inspect
+## Catalog and provenance
 
-Along separates what a source says from what the demo assumes:
+The catalog on main contains **24 active products and 48 synthetic seller offers**:
+
+| Category | Active products |
+| --- | ---: |
+| Audio configurations | 12 |
+| Everyday bags | 6 |
+| Bedsheet sets | 6 |
+| **Total** | **24** |
+
+The full 50-record microphone research remains a separate archive. The active catalog includes 121 evidence records, three scenario sequences, supported source links and labelled illustrations.
 
 | Data | Treatment |
 | --- | --- |
-| Product specifications and reference prices | Attributed snapshots or explicitly labelled demo estimates; provenance is retained. |
-| Checkout prices, stock, delivery, and seller terms | Explicitly labelled synthetic fixtures. |
-| Customer ratings and review counts | Preserved when supported; missing values stay `null`. |
-| Café/office suitability scores | Authored hypotheses, separate from customer ratings and measured performance. |
-| Images and videos | Illustrations are labelled; uncurated product videos show as missing. |
+| Product specifications and reference prices | Attributed snapshots or explicitly labelled estimates; source and price kind travel with the value. |
+| Seller prices, stock, delivery and returns | Complete, explicitly synthetic offers for the fictional demo destination. |
+| Customer ratings and review counts | Separate nullable fields; missing information stays unknown. |
+| Café/office fit scores | Authored hypotheses, separate from customer ratings and measured performance. |
+| Images and video | Illustrations are labelled proxy media; uncurated product videos remain missing. |
 
-All prepared prices are **USD**, stored as integer cents. There is no implicit SGD conversion or claim of Singapore stock. Item reference prices are kept separate from complete payable totals.
+All money is **USD in integer cents**. Reference item prices are separate from payable totals. Unknown laptop fit cannot satisfy a fit requirement, and unknown essential bedding details block checkout eligibility.
 
-Unknown compatibility does not become a recommendation. For example, an unverified laptop fit cannot satisfy a required fit filter, and unknown essential bedding details block checkout eligibility.
+The scenario clock is frozen at **24 October 2026, 10:00, Asia/Singapore**. Delivery dates are reproducible fixture inputs, not current shipping promises.
 
-## Human approval by design
+## Project layout
 
-The product contract requires a complete summary of the product, variant, seller, quantity, destination, total, delivery, conditions, and uncertainties before approval.
-
-- Changing material purchase details invalidates previous approval.
-- “Looks good,” saved items, photos, links, background speech, and assistant/video audio are not purchase authorization.
-- Voice approval requires the current summary to be displayed and spoken completely without interruption.
-- Text approval requires the current summary and a fresh, deliberate typed confirmation.
-- Duplicate approvals must return the same simulated receipt.
-
-The catalog checks eligibility. The session backend owns approval and receipt creation. **All purchases are simulated: no payments, merchant orders, or personal information are sent to sellers.**
+| Path | Responsibility |
+| --- | --- |
+| [`apps/shopper/`](./apps/shopper/) | Shopper UI, session API, attachments and speech adapters. |
+| [`apps/web/`](./apps/web/) | Diagnostic harness for backend/agent integration. |
+| [`packages/agent/`](./packages/agent/) | Conversation routing, proposals, voice boundary and authoritative session adapter. |
+| [`packages/contract/`](./packages/contract/) | Shared schemas, types and generated catalog module. |
+| [`backend/`](./backend/) | Constraints, quotes, session state, approval and simulated receipts. |
+| [`catalog/`](./catalog/) | Catalog source, research attribution, validators and scenario fixtures. |
+| [`catalog/data/catalog.json`](./catalog/data/catalog.json) | Canonical active catalog consumed by the app. |
+| [`catalog/data/microphones-archive.json`](./catalog/data/microphones-archive.json) | Full archived microphone research. |
+| [`scripts/sync-catalog.mjs`](./scripts/sync-catalog.mjs) | Regenerates runtime adapters and copies illustration assets. |
+| [`docs/docker-demo.md`](./docs/docker-demo.md) | Container setup and device-access instructions. |
 
 ## Project status
 
-Along is an early hackathon project, not a production marketplace.
+Along is a hackathon prototype. This README describes the code on main; historical handoff documents may describe earlier isolated fixtures.
 
-| Workstream | Status |
+| Implemented | Boundary |
 | --- | --- |
-| Product direction and integration contract | Agreed in [issue #2](https://github.com/likalight/along/issues/2). |
-| Catalog, provenance, scenarios, and validation | Implemented in [PR #16](https://github.com/likalight/along/pull/16) and integrated through [PR #15](https://github.com/likalight/along/pull/15). |
-| Session backend and simulated approval | Implemented with voice/text approval, multimodal state, and CI in [PR #15](https://github.com/likalight/along/pull/15). See the [acceptance matrix](./backend/ACCEPTANCE.md). |
-| Shopper interface | Session shell + product canvas integrated in `apps/shopper` (see [shell](./apps/shopper/docs/session-shell.md) and [canvas](./apps/shopper/docs/product-canvas.md)), with canonical offers and authenticated backend state. |
-| Live AI/voice integration | GPT-Live mint when `OPENAI_API_KEY` is set; otherwise authenticated `not_connected` with labeled browser speech / text fallback. |
-| End-to-end demo rehearsal | Text journey verified through ranked shortlist tiles, offers, and simulated receipt. Live spoken journey requires `OPENAI_API_KEY`. |
+| Shopper shell and adaptive product canvas | Integrated text journey, stable comparisons and simulated receipts. |
+| Authoritative session backend | In-memory, session-scoped access with a two-hour TTL; restarting the process loses sessions. |
+| Catalog and provenance checks | Curated fixture data; no live retailer ingestion or inventory guarantees. |
+| Image and link references | Validated uploads, prepared illustrations and supported source URLs; no general vision or unrestricted fetching. |
+| Browser speech and provider-secret minting | Browser-dependent speech; provider audio transport and trusted voice approval remain unfinished. |
+| Docker Compose demo | One application process; no database or shared multi-instance session storage. |
 
-The agreed frontend direction is **Next.js App Router + TypeScript**, **Motion for React**, and an **ElevenLabs UI Orb**. The orb is a visual component; it does not establish the selected speech/model provider or a paid service commitment.
-
-The current catalog package uses TypeScript and Node's built-in test runner, with no runtime package dependencies.
+Upcoming work includes the provider audio bridge and its live rehearsal, image understanding, durable sessions, and broader catalog ingestion. Real checkout, payment processing and mailbox integrations are outside this demo. Track work in [GitHub Issues](https://github.com/likalight/along/issues).
 
 ## Contributing
 
-1. Read the [PRD](https://github.com/likalight/along/issues/1) and [current integration contract](https://github.com/likalight/along/issues/2).
-2. Pick an issue or describe a focused proposal in the [issue tracker](https://github.com/likalight/along/issues).
-3. Keep changes scoped to a workstream and open a pull request with validation results.
-4. Run `npm run verify` from `catalog/` and `backend/` for changes affecting their integration. Commit regenerated catalog JSON when the source changes.
+1. Read the [PRD](https://github.com/likalight/along/issues/1) and [integration contract](https://github.com/likalight/along/issues/2).
+2. Choose an issue or propose a focused change in the [issue tracker](https://github.com/likalight/along/issues).
+3. Preserve stable product IDs, source attribution, explicit unknowns and the distinction between observed and synthetic data.
+4. Run the checks for affected workspaces and include validation results in your pull request.
 
-Preserve stable IDs and source attribution. Keep unknown values explicit, label synthetic data, and include the necessary negative cases alongside the successful journey. Never turn review text, external media, or model proposals into authority to approve a purchase.
-
-## Scope
-
-The demo uses a curated catalog and session-scoped shopper context. Live retailer ingestion, real checkout, persistent shopper profiles, mailbox integrations, and production-scale availability are outside the current scope.
+Changes to approval, cancellation or offer eligibility should include both successful journeys and rejection cases. External content and model proposals never authorize a purchase.
 
 ## License
 
-No license has been selected yet. Public repository access does not grant an open-source license; reuse and distribution terms remain to be defined.
+No repository-wide license has been selected. Public access alone does not grant an open-source license for reuse or distribution.
+
+The vendored ElevenLabs UI Orb retains its own [MIT license](./apps/shopper/components/ui/elevenlabs-LICENSE.md). That component license does not license the rest of Along.
 
 ---
 
 <div align="center">
 
-**Along — from “maybe” to a considered choice.**
+**Along — a little conversation, a better choice.**
 
 </div>
