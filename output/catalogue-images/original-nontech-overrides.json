@@ -1,0 +1,32 @@
+{
+  "BAG-001": {
+    "sourceUrl": "https://www.osprey.com/daylitetm-large-tote-pack",
+    "imageUrl": "https://www.osprey.com/media/catalog/product/cache/b2f1ce2dfe10d3d31bf2056bf6e0d10f/D/a/DayliteLargeTote_S25_Side_Black-resized.jpg",
+    "source": "Osprey product photograph; pictured color may differ from the demo configuration"
+  },
+  "BAG-002": {
+    "sourceUrl": "https://www.osprey.com/daylite-tote-pack-daylttotpks21-779?color=Tumbleweed+Yellow%2FTunnel+Vision&size=O%2FS",
+    "imageUrl": "https://www.osprey.com/media/catalog/product/cache/b2f1ce2dfe10d3d31bf2056bf6e0d10f/D/a/DayliteTotePack_F24_Side_TumbleweedYellowTunnelVision-resized.jpg",
+    "source": "Osprey product photograph; pictured color may differ from the demo configuration"
+  },
+  "BAG-003": {
+    "sourceUrl": "https://www.osprey.com/daylitetm-messenger",
+    "imageUrl": "https://www.osprey.com/media/catalog/product/cache/b2f1ce2dfe10d3d31bf2056bf6e0d10f/D/a/DayliteMessenger_F24_Side_NightShift-resized.jpg",
+    "source": "Osprey product photograph; pictured color may differ from the demo configuration"
+  },
+  "BAG-004": {
+    "sourceUrl": "https://www.osprey.com/daylitetm-duffel-30",
+    "imageUrl": "https://www.osprey.com/media/catalog/product/cache/b2f1ce2dfe10d3d31bf2056bf6e0d10f/D/a/DayliteDuffel30_F24_Side_TumbleweedYellowTunnelVision-resized.jpg",
+    "source": "Osprey product photograph; pictured color may differ from the demo configuration"
+  },
+  "BAG-005": {
+    "sourceUrl": "https://www.osprey.com/daylitetm-expandable-travel-pack-26-6",
+    "imageUrl": "https://www.osprey.com/media/catalog/product/cache/b2f1ce2dfe10d3d31bf2056bf6e0d10f/d/a/dayliteexpandabletravelpack_26_f24_side_tumbleweedyellowtunnelvision_1_2.jpg",
+    "source": "Osprey product photograph; pictured color may differ from the demo configuration"
+  },
+  "BAG-006": {
+    "sourceUrl": "https://www.osprey.com/daylitetm-plus-driftshade-backpack",
+    "imageUrl": "https://www.osprey.com/media/catalog/product/cache/b2f1ce2dfe10d3d31bf2056bf6e0d10f/D/a/DaylitePlus_Driftshade_F26_Side_GreyWolf_Hi-res.jpg",
+    "source": "Osprey product photograph; pictured color may differ from the demo configuration"
+  }
+}

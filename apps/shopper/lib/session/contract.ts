@@ -26,6 +26,11 @@ export type Identity = {
   turnId: string;
   revision: number;
 };
+/** References an utterance independently observed by the server voice bridge. */
+export type VoiceEvidence = {
+  callId: string;
+  itemId: string;
+};
 export type Input = Omit<Identity, "revision"> & {
   eventId: string;
   baseRevision: number;
@@ -75,7 +80,9 @@ export type Summary = {
   presentationMode: "voice" | "text";
   status: "presenting" | "eligible" | "invalidated" | "confirmed";
 };
+export type NarrationSegment = { text: string; productId: string | null };
 export type Session = {
+  narrationSegments?: NarrationSegment[];
   canvas?: Presentation;
   catalog?: CanvasData;
   sessionId: string;
@@ -97,11 +104,7 @@ export type Session = {
   attachmentIds: string[];
   summaryId: string | null;
   approvalStatus:
-    | "not_prepared"
-    | "presenting"
-    | "eligible"
-    | "approved"
-    | "blocked";
+    "not_prepared" | "presenting" | "eligible" | "approved" | "blocked";
   heading: string;
   message: string;
   cards: StageCard[];
@@ -129,9 +132,23 @@ export type Lifecycle = Identity & {
     | "video.started"
     | "video.stopped";
 };
+export type TurnActivity = {
+  turnId: string;
+  phase: "working" | "speaking" | "done" | "error";
+  label: string;
+  heading: string;
+};
 export interface SessionTransport {
+  activity?(
+    identity: Identity,
+    signal?: AbortSignal,
+  ): Promise<{ activity: TurnActivity | null }>;
   connect(sessionId?: string): Promise<Session>;
-  send(input: Input, signal: AbortSignal): Promise<Accepted>;
+  send(
+    input: Input,
+    signal: AbortSignal,
+    voiceEvidence?: VoiceEvidence,
+  ): Promise<Accepted>;
   cancel(identity: Identity): Promise<Session>;
   mode(identity: Identity, mode: "text" | "voice"): Promise<Session>;
   presented?(identity: Identity, summary: Summary): Promise<Session>;
@@ -139,4 +156,4 @@ export interface SessionTransport {
 }
 export const summaryText = (s: Summary) =>
   s.spokenText ??
-  `Simulated order. Product ${s.productId}, variant ${s.variantId}. Seller ${s.sellerId}. Quantity ${s.quantity}. Items USD ${(s.lineItemsMinor.items / 100).toFixed(2)}, shipping USD ${(s.lineItemsMinor.shipping / 100).toFixed(2)}, other fees USD ${(s.lineItemsMinor.otherFees / 100).toFixed(2)}. Total USD ${(s.totalMinor / 100).toFixed(2)}. Destination ${s.destination}. Delivery ${s.deliveryWindow}. Conditions: ${s.conditions.join(". ")}. Uncertainties: ${s.uncertainties.join(". ")}. Say or type “Confirm this simulated purchase” to approve this exact summary.`;
+  `Your order: ${s.quantity} of product ${s.productId}, variant ${s.variantId}, from ${s.sellerId}. Items USD ${(s.lineItemsMinor.items / 100).toFixed(2)}, shipping USD ${(s.lineItemsMinor.shipping / 100).toFixed(2)}, other fees USD ${(s.lineItemsMinor.otherFees / 100).toFixed(2)}. Total USD ${(s.totalMinor / 100).toFixed(2)}. Destination ${s.destination}. Delivery ${s.deliveryWindow}. Conditions: ${s.conditions.join(". ")}. Before you buy: ${s.uncertainties.join(". ")}. Would you like me to place this order? You can also change it or cancel.`;

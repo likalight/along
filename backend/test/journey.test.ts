@@ -377,9 +377,10 @@ test("new voice brief: lighting cards preserve visible order; USD audio offers a
   s = await c.summarize(s.revision, s.turn!.id);
   assert.equal(s.summary!.quote.total, 11999);
   assert.match(s.summary!.spokenText, /USD 119.99/);
+  assert.equal(s.summary!.quote.destination, "Demo destination, Singapore");
   assert.match(
     s.summary!.spokenText,
-    /Destination: Demo destination, Singapore/,
+    /Destination: Selected delivery destination/,
   );
   for (const event of [
     "displayed",

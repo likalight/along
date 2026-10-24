@@ -10,8 +10,18 @@ export type Evidence = Metrics & {
   checkedOn: string; classification: Classification; claim: string; excerpt?: string;
   media?: { kind: "video"; url: string; creator: string; publishedOn: string | null; topic: string; permission: string };
 };
-export type Image = { url: string; alt: string; source: string; classification: Classification };
+export type Image = { url: string; alt: string; source: string; classification: Classification; sourceUrl?: string; originalUrl?: string; checkedOn?: string };
+export type DemoReview = {
+  id: string; author: string; rating: number; title: string; body: string;
+  usedFor: string; postedOn: string; verifiedPurchase: false;
+};
+export type DemoReviews = {
+  classification: "proxy"; disclosure: string; rating: number; ratingCount: number;
+  writtenReviewCount: number; entries: DemoReview[];
+};
 export type Product = {
+  demoReviews?: DemoReviews;
+  provenance?: { kind: "source_snapshot" | "synthetic"; notice: string };
   id: string; category: "audio-accessories" | "everyday-bags" | "bedsheet-sets"; brand: string; model: string;
   variantId: string; title: string; image: Image; specs: Record<string, Json>;
   limitations: string[]; evidenceIds: string[]; checkedOn: string;
@@ -32,7 +42,7 @@ export type Offer = {
 };
 export type Constraints = {
   category?: Product["category"]; currency?: string; budgetMinor?: number; deadline?: string;
-  productId?: string; variantId?: string;
+  productId?: string; variantId?: string; candidateProductIds?: string[];
   laptopInches?: number; separateShoeCompartment?: boolean; minimumCapacityL?: number;
   bedWidthIn?: number; bedLengthIn?: number; mattressDepthIn?: number; composition?: string;
   hostConnection?: string; availableHardwareIds?: string[];

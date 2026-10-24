@@ -9,6 +9,9 @@ import { EventEmitter } from "node:events";
 import { inflateSync } from "node:zlib";
 import { quoteOffer, eligibleOffers } from "./catalog.ts";
 import { alongProfile } from "./along-catalog.ts";
+import { checkoutCopy } from "./checkout-copy.ts";
+import { classifyCheckoutReply } from "./checkout-intent.ts";
+export { classifyCheckoutReply, isLiveDemoConfirmation } from "./checkout-intent.ts";
 import {
   requireThat,
   object,
@@ -38,6 +41,16 @@ const money = (n: number, currency: string) =>
   `${currency} ${(n / 100).toFixed(2)}`;
 const intentText = (text: string) => text.toLowerCase().replace(/[.,!?“”"']/g, "").trim().replace(/\s+/g, " ");
 const stopIntents = new Set(["stop", "cancel", "cancel purchase", "cancel this purchase", "cancel this simulated purchase", "do not buy", "dont buy", "decline"]);
+export type LiveDemoCompletion = {
+  epoch: number;
+  expectedRevision: number;
+  summaryId: string;
+  summaryRevision: number;
+  responseTurnId: string;
+  delegationId: string;
+  transcript: string;
+  affirmationSummaryId?: string;
+};
 const boundedDimensions = (width: number, height: number) => width > 0 && height > 0 && width <= 8192 && height <= 8192 && width * height <= 16_777_216;
 const crcTable = Array.from({ length: 256 }, (_, initial) => {
   let value = initial;
@@ -483,7 +496,9 @@ export class SessionStore {
     const ranks = value.cards.map((c) => c.rank).filter((rank) => rank !== null);
     requireThat(new Set(ranks).size === ranks.length, "INVALID_VIEW", "Recommendation ranks must be unique; focus does not change ranks.");
   }
-  propose(id: string, raw: unknown) {
+  propose(id: string, raw: unknown): { session: Session; offers: ReturnType<typeof eligibleOffers> };
+  propose(id: string, raw: unknown, options: { includeOffers: false }): { session: Session };
+  propose(id: string, raw: unknown, options?: { includeOffers: false }) {
     object(raw);
     keys(raw, [
       "expectedRevision",
@@ -502,7 +517,8 @@ export class SessionStore {
       "comparisonIds",
       "priority",
     ]);
-    const s = this.get(id);
+    // Validate on an isolated draft; rejected proposals must never alter live state.
+    const s = clone(this.get(id));
     this.revision(s, raw.expectedRevision);
     this.active(s, raw.turnId);
     this.mutable(s);
@@ -707,6 +723,10 @@ export class SessionStore {
     )
       this.invalidate(s);
     const accepted = this.commit(s);
+    // Internal state adapters already quote the products they need. Keep the
+    // public response unchanged, but avoid expanding every offer when unused.
+    // All proposal and selected-offer checks above still run before commit.
+    if (options?.includeOffers === false) return { session: accepted };
     return {
       session: accepted,
       offers: eligibleOffers(
@@ -739,7 +759,10 @@ export class SessionStore {
       422,
       q.conflicts,
     );
-    const spokenText = `This is a simulated purchase only. ${q.quantity} of ${q.product.name}, variant ${q.product.variant}, sold by ${q.offer.sellerName}. Items ${money(q.subtotal, q.currency)}, shipping ${money(q.shipping!, q.currency)}, other fees ${money(q.otherFees!, q.currency)}${q.tax !== undefined ? `, tax ${money(q.tax!, q.currency)}` : ""}, required setup ${money(q.setupCost!, q.currency)}; total ${money(q.total!, q.currency)}. Destination: ${q.destination}. Delivery: ${q.offer.deliveryConditions} Setup: ${q.offer.setupConditions ?? "No additional setup cost in this fixture."} Returns: ${q.offer.returnConditions} Conditions: ${q.offer.conditions.join(" ")} Material uncertainties: ${q.offer.uncertainties.length ? q.offer.uncertainties.join("; ") : "none recorded in this proxy fixture"}. All offer details are synthetic demo data. To approve, ${s.presentationMode === "text" ? "type" : "say"} “Confirm this simulated purchase.” You can also change it or cancel.`;
+    const conditions = q.offer.conditions.map(checkoutCopy).filter(Boolean);
+    const uncertainties = q.offer.uncertainties.map(checkoutCopy).filter(Boolean);
+    const variant = /^[A-Z]+-\d+-DEMO$/i.test(q.product.variant) ? "" : `, variant ${checkoutCopy(q.product.variant)}`;
+    const spokenText = `Here’s your order. ${q.quantity} of ${checkoutCopy(q.product.name)}${variant}, sold by ${checkoutCopy(q.offer.sellerName)}. Items ${money(q.subtotal, q.currency)}, shipping ${money(q.shipping!, q.currency)}, other fees ${money(q.otherFees!, q.currency)}${q.tax !== undefined ? `, tax ${money(q.tax!, q.currency)}` : ""}, required setup ${money(q.setupCost!, q.currency)}; total ${money(q.total!, q.currency)}. Destination: ${checkoutCopy(q.destination)}. Delivery: ${checkoutCopy(q.offer.deliveryConditions)} Setup: ${checkoutCopy(q.offer.setupConditions ?? "No additional setup cost.")} Returns: ${checkoutCopy(q.offer.returnConditions)} Conditions: ${conditions.length ? conditions.join(" ") : "No additional conditions listed."} Material uncertainties: ${uncertainties.length ? uncertainties.join("; ") : "none recorded"}. Would you like me to place this order? You can also change it or cancel.`;
     this.invalidate(s);
     s.stage = "summary";
     s.summary = {
@@ -900,6 +923,58 @@ export class SessionStore {
       return accepted;
     });
   }
+  /** Server-only no-payment rehearsal. Intentionally separate from approve():
+   * Live delegation text has no finality/confidence or exact playback evidence.
+   * This method can only issue the existing synthetic receipt for a proxy offer;
+   * it never mints an approval nonce or calls a payment/order integration. */
+  completeLiveDemo(id: string, raw: LiveDemoCompletion) {
+    object(raw);
+    keys(raw, ["epoch", "expectedRevision", "summaryId", "summaryRevision", "responseTurnId", "delegationId", "transcript", "affirmationSummaryId"]);
+    requireThat(typeof raw.delegationId === "string" && /^[A-Za-z0-9_-]{1,256}$/.test(raw.delegationId), "INVALID_DELEGATION", "A server-observed delegation is required.");
+    const reply = classifyCheckoutReply(raw.transcript);
+    requireThat(reply !== "other", "AMBIGUOUS_APPROVAL", "Would you like to place this order, or change the details?");
+    requireThat(raw.affirmationSummaryId === undefined || (typeof raw.affirmationSummaryId === "string" && raw.affirmationSummaryId.length <= 128), "INVALID_SUMMARY", "A confirmation prompt must refer to an order summary.");
+    // A retry may observe the revision advanced by its own successful receipt.
+    // Stable identity/payload still prevents replaying a delegation for another order.
+    const { expectedRevision, ...identity } = raw;
+    const eventId = `live-demo-${hash(raw.delegationId).slice(0, 40)}`;
+    return this.once(id, raw.epoch, eventId, identity, () => {
+      const s = this.get(id);
+      this.revision(s, expectedRevision);
+      this.mutable(s);
+      this.active(s, raw.responseTurnId);
+      const m = s.summary;
+      requireThat(
+        m && m.id === raw.summaryId && m.revision === raw.summaryRevision &&
+          m.responseTurnId === raw.responseTurnId && m.displayed,
+        "STALE_SUMMARY", "Review the current order details before confirming.", 409,
+      );
+      if (reply === "assent") {
+        requireThat(raw.affirmationSummaryId !== undefined, "AMBIGUOUS_APPROVAL", "That reply needs a current order approval question.");
+        requireThat(raw.affirmationSummaryId === m.id, "STALE_SUMMARY", "The approval question referred to a different order. Review this order first.", 409);
+      }
+      const q = quoteOffer(m.quote.offer.id, m.quote.quantity, s.constraints,
+        s.excludedProductIds, this.profile.catalog, s.destination);
+      requireThat(q.eligible && JSON.stringify(q) === JSON.stringify(m.quote),
+        "STALE_QUOTE", "The offer changed. Review the updated order details first.", 409);
+      requireThat(q.offer.classification === "proxy", "LIVE_DEMO_ONLY",
+        "Live rehearsal completion is limited to synthetic offers.", 409);
+      s.history.push({ turnId: raw.responseTurnId, eventId, modality: "live_demo",
+        text: raw.transcript, productIds: [...s.displayOrder], createdAt: new Date().toISOString() });
+      s.history = s.history.slice(-100);
+      s.receipt = {
+        id: `SIM-${randomUUID()}`, simulated: true,
+        label: "SIMULATED — no payment or real order", completionSource: "live_demo",
+        summaryId: m.id, summaryRevision: m.revision,
+        createdAt: new Date().toISOString(), quote: clone(q),
+      };
+      s.stage = "receipt";
+      s.lastOutcome = "simulated_purchase_complete";
+      const result = this.commit(s);
+      return { session: result, receipt: result.receipt! };
+    });
+  }
+
   approve(id: string, raw: unknown, typed = false) {
     object(raw);
     keys(raw, [
@@ -917,7 +992,8 @@ export class SessionStore {
     // Retries of the same already accepted approval produce the same receipt even after revision advanced.
     if (s.receipt) {
       requireThat(
-        s.receipt.summaryId === raw.summaryId &&
+        s.receipt.completionSource !== "live_demo" &&
+          s.receipt.summaryId === raw.summaryId &&
           s.turn?.id === raw.turnId &&
           s.turn?.approvalWindow?.nonce === raw.approvalNonce,
         "ORDER_COMPLETE",

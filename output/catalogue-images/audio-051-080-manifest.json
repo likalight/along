@@ -1,0 +1,306 @@
+{
+  "mode": "built-in imagegen",
+  "notice": "AI-generated visual approximations; not authenticated manufacturer photographs. Source detail files for MIC051–80 were not supplied.",
+  "jobs": [
+    {
+      "id": "MIC-051",
+      "brand": "Jabra",
+      "model": "Evolve2 55 Stereo, UC / USB-A receiver selection",
+      "group": "Headphones, earbuds, and headsets",
+      "type": "headset",
+      "prompt": "Use case: product-mockup. Asset: square 1024x1024 ecommerce catalogue image for an explicitly labelled AI-generated demo visual approximation of Jabra Evolve2 55 Stereo, UC / USB-A receiver selection, not an authenticated manufacturer photograph. Subject: One black lightweight stereo on-ear office headset with slim padded headband, two round ear pads and an articulated boom microphone; one tiny USB-A receiver beside it. Composition: complete product fully visible, attractive three-quarter studio angle, centered with generous clean margins on seamless warm off-white background. Photorealistic premium product photography, plausible scale and construction, fine material texture, soft diffused key light, gentle contact shadows, crisp edges. Preserve the component count and requested physical form. No people, no hands, no props, no packaging, no labels or readable text, no watermark, no extraneous products. Do not render a collage or contact sheet.",
+      "status": "generated",
+      "sourcePath": "/Users/priyadharshan/.codex/generated_images/01a16f30-5cfc-7311-93c0-7b0c21c37967/exec-566051a1-d815-4925-8dee-84a1536f8aa5.png",
+      "savedPath": "/Users/priyadharshan/Documents/ChatGPT/AI Grand Prix/along/catalog/public/catalog/images/products/MIC-051.png",
+      "output_hint": "Generated images are saved to /Users/priyadharshan/.codex/generated_images/01a16f30-5cfc-7311-93c0-7b0c21c37967 as /Users/priyadharshan/.codex/generated_images/01a16f30-5cfc-7311-93c0-7b0c21c37967/exec-566051a1-d815-4925-8dee-84a1536f8aa5.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    },
+    {
+      "id": "MIC-052",
+      "brand": "Jabra",
+      "model": "Evolve2 85 UC Stereo, Black",
+      "group": "Headphones, earbuds, and headsets",
+      "type": "headset",
+      "prompt": "Use case: product-mockup. Asset: square 1024x1024 ecommerce catalogue image for an explicitly labelled AI-generated demo visual approximation of Jabra Evolve2 85 UC Stereo, Black, not an authenticated manufacturer photograph. Subject: One premium black over-ear office headset with broad oval ear cushions, softly padded headband and discreet fold-out microphone boom. No duplicate headphones. Composition: complete product fully visible, attractive three-quarter studio angle, centered with generous clean margins on seamless warm off-white background. Photorealistic premium product photography, plausible scale and construction, fine material texture, soft diffused key light, gentle contact shadows, crisp edges. Preserve the component count and requested physical form. No people, no hands, no props, no packaging, no labels or readable text, no watermark, no extraneous products. Do not render a collage or contact sheet.",
+      "status": "generated",
+      "sourcePath": "/Users/priyadharshan/.codex/generated_images/01a16f30-5cfc-7311-93c0-7b0c21c37967/exec-250becec-1753-4c1c-a4cc-75bd9ee36aa2.png",
+      "savedPath": "/Users/priyadharshan/Documents/ChatGPT/AI Grand Prix/along/catalog/public/catalog/images/products/MIC-052.png",
+      "output_hint": "Generated images are saved to /Users/priyadharshan/.codex/generated_images/01a16f30-5cfc-7311-93c0-7b0c21c37967 as /Users/priyadharshan/.codex/generated_images/01a16f30-5cfc-7311-93c0-7b0c21c37967/exec-250becec-1753-4c1c-a4cc-75bd9ee36aa2.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    },
+    {
+      "id": "MIC-053",
+      "brand": "HP Poly",
+      "model": "Blackwire 8225 UC, USB-C + USB-A adapter",
+      "group": "Headphones, earbuds, and headsets",
+      "type": "headset",
+      "prompt": "Use case: product-mockup. Asset: square 1024x1024 ecommerce catalogue image for an explicitly labelled AI-generated demo visual approximation of HP Poly Blackwire 8225 UC, USB-C + USB-A adapter, not an authenticated manufacturer photograph. Subject: One black wired stereo on-ear business headset with a slim boom microphone and neatly looped cable ending in USB-C; one small USB-A adapter beside the plug. Composition: complete product fully visible, attractive three-quarter studio angle, centered with generous clean margins on seamless warm off-white background. Photorealistic premium product photography, plausible scale and construction, fine material texture, soft diffused key light, gentle contact shadows, crisp edges. Preserve the component count and requested physical form. No people, no hands, no props, no packaging, no labels or readable text, no watermark, no extraneous products. Do not render a collage or contact sheet.",
+      "status": "generated",
+      "sourcePath": "/Users/priyadharshan/.codex/generated_images/01a16f30-5cfc-7311-93c0-7b0c21c37967/exec-d2d83824-dcb8-441c-9cf2-ceaf583b3dc7.png",
+      "savedPath": "/Users/priyadharshan/Documents/ChatGPT/AI Grand Prix/along/catalog/public/catalog/images/products/MIC-053.png",
+      "output_hint": "Generated images are saved to /Users/priyadharshan/.codex/generated_images/01a16f30-5cfc-7311-93c0-7b0c21c37967 as /Users/priyadharshan/.codex/generated_images/01a16f30-5cfc-7311-93c0-7b0c21c37967/exec-d2d83824-dcb8-441c-9cf2-ceaf583b3dc7.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    },
+    {
+      "id": "MIC-054",
+      "brand": "Logitech",
+      "model": "Zone Wireless 2",
+      "group": "Headphones, earbuds, and headsets",
+      "type": "headset",
+      "prompt": "Use case: product-mockup. Asset: square 1024x1024 ecommerce catalogue image for an explicitly labelled AI-generated demo visual approximation of Logitech Zone Wireless 2, not an authenticated manufacturer photograph. Subject: One graphite wireless stereo office headset with soft oval ear pads, padded fabric headband and a slender pivoting boom microphone. Composition: complete product fully visible, attractive three-quarter studio angle, centered with generous clean margins on seamless warm off-white background. Photorealistic premium product photography, plausible scale and construction, fine material texture, soft diffused key light, gentle contact shadows, crisp edges. Preserve the component count and requested physical form. No people, no hands, no props, no packaging, no labels or readable text, no watermark, no extraneous products. Do not render a collage or contact sheet.",
+      "status": "generated",
+      "sourcePath": "/Users/priyadharshan/.codex/generated_images/01a16f30-5cfc-7311-93c0-7b0c21c37967/exec-fb8b0ee4-caa0-4735-a894-1ff3465778a2.png",
+      "savedPath": "/Users/priyadharshan/Documents/ChatGPT/AI Grand Prix/along/catalog/public/catalog/images/products/MIC-054.png",
+      "output_hint": "Generated images are saved to /Users/priyadharshan/.codex/generated_images/01a16f30-5cfc-7311-93c0-7b0c21c37967 as /Users/priyadharshan/.codex/generated_images/01a16f30-5cfc-7311-93c0-7b0c21c37967/exec-fb8b0ee4-caa0-4735-a894-1ff3465778a2.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    },
+    {
+      "id": "MIC-055",
+      "brand": "EPOS",
+      "model": "IMPACT 1061 ANC (1001131)",
+      "group": "Headphones, earbuds, and headsets",
+      "type": "headset",
+      "prompt": "Use case: product-mockup. Asset: square 1024x1024 ecommerce catalogue image for an explicitly labelled AI-generated demo visual approximation of EPOS IMPACT 1061 ANC (1001131), not an authenticated manufacturer photograph. Subject: One black wireless stereo business headset with thick on-ear cushions, refined slim headband and long narrow microphone boom positioned near one earcup. Composition: complete product fully visible, attractive three-quarter studio angle, centered with generous clean margins on seamless warm off-white background. Photorealistic premium product photography, plausible scale and construction, fine material texture, soft diffused key light, gentle contact shadows, crisp edges. Preserve the component count and requested physical form. No people, no hands, no props, no packaging, no labels or readable text, no watermark, no extraneous products. Do not render a collage or contact sheet.",
+      "status": "generated",
+      "sourcePath": "/Users/priyadharshan/.codex/generated_images/01a16f30-5cfc-7311-93c0-7b0c21c37967/exec-7a997ca2-3a6f-4328-8832-0427d43b90c0.png",
+      "savedPath": "/Users/priyadharshan/Documents/ChatGPT/AI Grand Prix/along/catalog/public/catalog/images/products/MIC-055.png",
+      "output_hint": "Generated images are saved to /Users/priyadharshan/.codex/generated_images/01a16f30-5cfc-7311-93c0-7b0c21c37967 as /Users/priyadharshan/.codex/generated_images/01a16f30-5cfc-7311-93c0-7b0c21c37967/exec-7a997ca2-3a6f-4328-8832-0427d43b90c0.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    },
+    {
+      "id": "MIC-056",
+      "brand": "EPOS / Sennheiser",
+      "model": "PC 8 USB (1000432)",
+      "group": "Headphones, earbuds, and headsets",
+      "type": "headset",
+      "prompt": "Use case: product-mockup. Asset: square 1024x1024 ecommerce catalogue image for an explicitly labelled AI-generated demo visual approximation of EPOS / Sennheiser PC 8 USB (1000432), not an authenticated manufacturer photograph. Subject: One lightweight black wired stereo computer headset with simple foam ear pads and a thin adjustable microphone boom; its USB cable loosely coiled beside it. Composition: complete product fully visible, attractive three-quarter studio angle, centered with generous clean margins on seamless warm off-white background. Photorealistic premium product photography, plausible scale and construction, fine material texture, soft diffused key light, gentle contact shadows, crisp edges. Preserve the component count and requested physical form. No people, no hands, no props, no packaging, no labels or readable text, no watermark, no extraneous products. Do not render a collage or contact sheet.",
+      "status": "generated",
+      "sourcePath": "/Users/priyadharshan/.codex/generated_images/01a16f30-5cfc-7311-93c0-7b0c21c37967/exec-d5f72ccc-bb34-4d26-bfd2-abfa09812a61.png",
+      "savedPath": "/Users/priyadharshan/Documents/ChatGPT/AI Grand Prix/along/catalog/public/catalog/images/products/MIC-056.png",
+      "output_hint": "Generated images are saved to /Users/priyadharshan/.codex/generated_images/01a16f30-5cfc-7311-93c0-7b0c21c37967 as /Users/priyadharshan/.codex/generated_images/01a16f30-5cfc-7311-93c0-7b0c21c37967/exec-d5f72ccc-bb34-4d26-bfd2-abfa09812a61.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    },
+    {
+      "id": "MIC-057",
+      "brand": "Audio-Technica",
+      "model": "ATH-M50xSTS-USB StreamSet, Black",
+      "group": "Headphones, earbuds, and headsets",
+      "type": "headset",
+      "prompt": "Use case: product-mockup. Asset: square 1024x1024 ecommerce catalogue image for an explicitly labelled AI-generated demo visual approximation of Audio-Technica ATH-M50xSTS-USB StreamSet, Black, not an authenticated manufacturer photograph. Subject: One black substantial over-ear studio monitoring headset with large oval leatherette cushions, reinforced headband and attached slim broadcast boom microphone; USB cable arranged neatly. Composition: complete product fully visible, attractive three-quarter studio angle, centered with generous clean margins on seamless warm off-white background. Photorealistic premium product photography, plausible scale and construction, fine material texture, soft diffused key light, gentle contact shadows, crisp edges. Preserve the component count and requested physical form. No people, no hands, no props, no packaging, no labels or readable text, no watermark, no extraneous products. Do not render a collage or contact sheet.",
+      "status": "generated",
+      "sourcePath": "/Users/priyadharshan/.codex/generated_images/01a16f30-5cfc-7311-93c0-7b0c21c37967/exec-a831eed5-f2a3-4bdc-ad61-e3825cb43ac7.png",
+      "savedPath": "/Users/priyadharshan/Documents/ChatGPT/AI Grand Prix/along/catalog/public/catalog/images/products/MIC-057.png",
+      "output_hint": "Generated images are saved to /Users/priyadharshan/.codex/generated_images/01a16f30-5cfc-7311-93c0-7b0c21c37967 as /Users/priyadharshan/.codex/generated_images/01a16f30-5cfc-7311-93c0-7b0c21c37967/exec-a831eed5-f2a3-4bdc-ad61-e3825cb43ac7.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    },
+    {
+      "id": "MIC-058",
+      "brand": "Apple",
+      "model": "AirPods 4 with Active Noise Cancellation",
+      "group": "Headphones, earbuds, and headsets",
+      "type": "headset",
+      "prompt": "Use case: product-mockup. Asset: square 1024x1024 ecommerce catalogue image for an explicitly labelled AI-generated demo visual approximation of Apple AirPods 4 with Active Noise Cancellation, not an authenticated manufacturer photograph. Subject: Exactly two small glossy white open-fit wireless earbuds with short stems beside one compact white charging case with its lid open. No silicone ear tips, no extra earbuds. Composition: complete product fully visible, attractive three-quarter studio angle, centered with generous clean margins on seamless warm off-white background. Photorealistic premium product photography, plausible scale and construction, fine material texture, soft diffused key light, gentle contact shadows, crisp edges. Preserve the component count and requested physical form. No people, no hands, no props, no packaging, no labels or readable text, no watermark, no extraneous products. Do not render a collage or contact sheet.",
+      "status": "generated",
+      "sourcePath": "/Users/priyadharshan/.codex/generated_images/01a16f30-5cfc-7311-93c0-7b0c21c37967/exec-603d3f6c-1599-4dec-82c3-b57f7285fb1f.png",
+      "savedPath": "/Users/priyadharshan/Documents/ChatGPT/AI Grand Prix/along/catalog/public/catalog/images/products/MIC-058.png",
+      "output_hint": "Generated images are saved to /Users/priyadharshan/.codex/generated_images/01a16f30-5cfc-7311-93c0-7b0c21c37967 as /Users/priyadharshan/.codex/generated_images/01a16f30-5cfc-7311-93c0-7b0c21c37967/exec-603d3f6c-1599-4dec-82c3-b57f7285fb1f.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    },
+    {
+      "id": "MIC-059",
+      "brand": "Sony",
+      "model": "WH-1000XM6/B (Black)",
+      "group": "Headphones, earbuds, and headsets",
+      "type": "headset",
+      "prompt": "Use case: product-mockup. Asset: square 1024x1024 ecommerce catalogue image for an explicitly labelled AI-generated demo visual approximation of Sony WH-1000XM6/B (Black), not an authenticated manufacturer photograph. Subject: One matte black premium over-ear wireless headphone set with thick rounded ear cushions, broad padded headband and smooth minimal earcup shells. No external microphone boom. Composition: complete product fully visible, attractive three-quarter studio angle, centered with generous clean margins on seamless warm off-white background. Photorealistic premium product photography, plausible scale and construction, fine material texture, soft diffused key light, gentle contact shadows, crisp edges. Preserve the component count and requested physical form. No people, no hands, no props, no packaging, no labels or readable text, no watermark, no extraneous products. Do not render a collage or contact sheet.",
+      "status": "generated",
+      "sourcePath": "/Users/priyadharshan/.codex/generated_images/01a16f30-5cfc-7311-93c0-7b0c21c37967/exec-d6f9300f-d236-403c-aae8-84c1ab07e177.png",
+      "savedPath": "/Users/priyadharshan/Documents/ChatGPT/AI Grand Prix/along/catalog/public/catalog/images/products/MIC-059.png",
+      "output_hint": "Generated images are saved to /Users/priyadharshan/.codex/generated_images/01a16f30-5cfc-7311-93c0-7b0c21c37967 as /Users/priyadharshan/.codex/generated_images/01a16f30-5cfc-7311-93c0-7b0c21c37967/exec-d6f9300f-d236-403c-aae8-84c1ab07e177.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    },
+    {
+      "id": "MIC-060",
+      "brand": "HP Poly",
+      "model": "Voyager Surround 80 UC (8G7T9AA)",
+      "group": "Headphones, earbuds, and headsets",
+      "type": "headset",
+      "prompt": "Use case: product-mockup. Asset: square 1024x1024 ecommerce catalogue image for an explicitly labelled AI-generated demo visual approximation of HP Poly Voyager Surround 80 UC (8G7T9AA), not an authenticated manufacturer photograph. Subject: One dark charcoal over-ear wireless office headphone set with oval cushions, fabric-covered headband, subtle metallic side details and no protruding microphone boom. Composition: complete product fully visible, attractive three-quarter studio angle, centered with generous clean margins on seamless warm off-white background. Photorealistic premium product photography, plausible scale and construction, fine material texture, soft diffused key light, gentle contact shadows, crisp edges. Preserve the component count and requested physical form. No people, no hands, no props, no packaging, no labels or readable text, no watermark, no extraneous products. Do not render a collage or contact sheet.",
+      "status": "generated",
+      "sourcePath": "/Users/priyadharshan/.codex/generated_images/01a16f30-5cfc-7311-93c0-7b0c21c37967/exec-92a7cf83-3462-4556-a394-2c847ba3f2b8.png",
+      "savedPath": "/Users/priyadharshan/Documents/ChatGPT/AI Grand Prix/along/catalog/public/catalog/images/products/MIC-060.png",
+      "output_hint": "Generated images are saved to /Users/priyadharshan/.codex/generated_images/01a16f30-5cfc-7311-93c0-7b0c21c37967 as /Users/priyadharshan/.codex/generated_images/01a16f30-5cfc-7311-93c0-7b0c21c37967/exec-92a7cf83-3462-4556-a394-2c847ba3f2b8.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    },
+    {
+      "id": "MIC-061",
+      "brand": "RØDE",
+      "model": "Lavalier II, Black",
+      "group": "Lavaliers and wearable clip-on microphones",
+      "type": "clip",
+      "prompt": "Use case: product-mockup. Asset: square 1024x1024 ecommerce catalogue image for an explicitly labelled AI-generated demo visual approximation of RØDE Lavalier II, Black, not an authenticated manufacturer photograph. Subject: One tiny black wearable lavalier microphone with low-profile flat capsule, attached clothing clip and a neatly looped thin cable ending in a small 3.5mm plug. Composition: complete product fully visible, attractive three-quarter studio angle, centered with generous clean margins on seamless warm off-white background. Photorealistic premium product photography, plausible scale and construction, fine material texture, soft diffused key light, gentle contact shadows, crisp edges. Preserve the component count and requested physical form. No people, no hands, no props, no packaging, no labels or readable text, no watermark, no extraneous products. Do not render a collage or contact sheet.",
+      "status": "pending"
+    },
+    {
+      "id": "MIC-062",
+      "brand": "RØDE",
+      "model": "Wireless PRO (2 TX + RX + 2 Lavalier II mics)",
+      "group": "Lavaliers and wearable clip-on microphones",
+      "type": "clip",
+      "prompt": "Use case: product-mockup. Asset: square 1024x1024 ecommerce catalogue image for an explicitly labelled AI-generated demo visual approximation of RØDE Wireless PRO (2 TX + RX + 2 Lavalier II mics), not an authenticated manufacturer photograph. Subject: Exactly two small black square wireless microphone transmitters, one matching receiver with a dark inactive display, and exactly two separate wired lavalier microphones with coiled cables. Arrange as one coherent kit; no charging case or additional units. Composition: complete product fully visible, attractive three-quarter studio angle, centered with generous clean margins on seamless warm off-white background. Photorealistic premium product photography, plausible scale and construction, fine material texture, soft diffused key light, gentle contact shadows, crisp edges. Preserve the component count and requested physical form. No people, no hands, no props, no packaging, no labels or readable text, no watermark, no extraneous products. Do not render a collage or contact sheet.",
+      "status": "pending"
+    },
+    {
+      "id": "MIC-063",
+      "brand": "RØDE",
+      "model": "Wireless Micro, USB-C, Black",
+      "group": "Lavaliers and wearable clip-on microphones",
+      "type": "clip",
+      "prompt": "Use case: product-mockup. Asset: square 1024x1024 ecommerce catalogue image for an explicitly labelled AI-generated demo visual approximation of RØDE Wireless Micro, USB-C, Black, not an authenticated manufacturer photograph. Subject: Exactly two small black pill-shaped clip-on wireless transmitters, one compact USB-C phone receiver, and one black charging case with open lid. No extra microphones. Composition: complete product fully visible, attractive three-quarter studio angle, centered with generous clean margins on seamless warm off-white background. Photorealistic premium product photography, plausible scale and construction, fine material texture, soft diffused key light, gentle contact shadows, crisp edges. Preserve the component count and requested physical form. No people, no hands, no props, no packaging, no labels or readable text, no watermark, no extraneous products. Do not render a collage or contact sheet.",
+      "status": "pending"
+    },
+    {
+      "id": "MIC-064",
+      "brand": "DJI",
+      "model": "Mic 3 (2 TX + 1 RX + charging case)",
+      "group": "Lavaliers and wearable clip-on microphones",
+      "type": "clip",
+      "prompt": "Use case: product-mockup. Asset: square 1024x1024 ecommerce catalogue image for an explicitly labelled AI-generated demo visual approximation of DJI Mic 3 (2 TX + 1 RX + charging case), not an authenticated manufacturer photograph. Subject: Exactly two compact black wireless clip-on microphone transmitters, one small black receiver with inactive screen, and one dark charging case. Four main pieces only; no extra transmitters. Composition: complete product fully visible, attractive three-quarter studio angle, centered with generous clean margins on seamless warm off-white background. Photorealistic premium product photography, plausible scale and construction, fine material texture, soft diffused key light, gentle contact shadows, crisp edges. Preserve the component count and requested physical form. No people, no hands, no props, no packaging, no labels or readable text, no watermark, no extraneous products. Do not render a collage or contact sheet.",
+      "status": "pending"
+    },
+    {
+      "id": "MIC-065",
+      "brand": "Hollyland",
+      "model": "LARK M2S Combo, Space Gray",
+      "group": "Lavaliers and wearable clip-on microphones",
+      "type": "clip",
+      "prompt": "Use case: product-mockup. Asset: square 1024x1024 ecommerce catalogue image for an explicitly labelled AI-generated demo visual approximation of Hollyland LARK M2S Combo, Space Gray, not an authenticated manufacturer photograph. Subject: A compact space-gray wearable wireless audio combo kit with exactly two tiny clip-on microphone transmitters with thin curved clips, one small camera receiver with dark display, one USB-C receiver, and one open charging case. Composition: complete product fully visible, attractive three-quarter studio angle, centered with generous clean margins on seamless warm off-white background. Photorealistic premium product photography, plausible scale and construction, fine material texture, soft diffused key light, gentle contact shadows, crisp edges. Preserve the component count and requested physical form. No people, no hands, no props, no packaging, no labels or readable text, no watermark, no extraneous products. Do not render a collage or contact sheet.",
+      "status": "pending"
+    },
+    {
+      "id": "MIC-066",
+      "brand": "Hollyland",
+      "model": "LARK MAX 2 Combo, 2-person",
+      "group": "Lavaliers and wearable clip-on microphones",
+      "type": "clip",
+      "prompt": "Use case: product-mockup. Asset: square 1024x1024 ecommerce catalogue image for an explicitly labelled AI-generated demo visual approximation of Hollyland LARK MAX 2 Combo, 2-person, not an authenticated manufacturer photograph. Subject: A black two-person wireless audio kit with exactly two compact rectangular clip-on transmitters, one compact receiver with dark display, and one open charging case. No duplicate components. Composition: complete product fully visible, attractive three-quarter studio angle, centered with generous clean margins on seamless warm off-white background. Photorealistic premium product photography, plausible scale and construction, fine material texture, soft diffused key light, gentle contact shadows, crisp edges. Preserve the component count and requested physical form. No people, no hands, no props, no packaging, no labels or readable text, no watermark, no extraneous products. Do not render a collage or contact sheet.",
+      "status": "pending"
+    },
+    {
+      "id": "MIC-067",
+      "brand": "BOYA",
+      "model": "BY-V10 (USB-C, 1 TX + 1 RX)",
+      "group": "Lavaliers and wearable clip-on microphones",
+      "type": "clip",
+      "prompt": "Use case: product-mockup. Asset: square 1024x1024 ecommerce catalogue image for an explicitly labelled AI-generated demo visual approximation of BOYA BY-V10 (USB-C, 1 TX + 1 RX), not an authenticated manufacturer photograph. Subject: Exactly one small black clip-on wireless microphone transmitter and one compact black USB-C phone receiver; two components only, no case. Composition: complete product fully visible, attractive three-quarter studio angle, centered with generous clean margins on seamless warm off-white background. Photorealistic premium product photography, plausible scale and construction, fine material texture, soft diffused key light, gentle contact shadows, crisp edges. Preserve the component count and requested physical form. No people, no hands, no props, no packaging, no labels or readable text, no watermark, no extraneous products. Do not render a collage or contact sheet.",
+      "status": "pending"
+    },
+    {
+      "id": "MIC-068",
+      "brand": "BOYA",
+      "model": "BY-V4U (USB-C RX + 4 TX + case)",
+      "group": "Lavaliers and wearable clip-on microphones",
+      "type": "clip",
+      "prompt": "Use case: product-mockup. Asset: square 1024x1024 ecommerce catalogue image for an explicitly labelled AI-generated demo visual approximation of BOYA BY-V4U (USB-C RX + 4 TX + case), not an authenticated manufacturer photograph. Subject: Exactly four compact black clip-on microphone transmitters, one black USB-C phone receiver and one open charging case. Clearly show all four transmitters arranged individually in front of the case; no extra microphones. Composition: complete product fully visible, attractive three-quarter studio angle, centered with generous clean margins on seamless warm off-white background. Photorealistic premium product photography, plausible scale and construction, fine material texture, soft diffused key light, gentle contact shadows, crisp edges. Preserve the component count and requested physical form. No people, no hands, no props, no packaging, no labels or readable text, no watermark, no extraneous products. Do not render a collage or contact sheet.",
+      "status": "pending"
+    },
+    {
+      "id": "MIC-069",
+      "brand": "BOYA",
+      "model": "BY-M1 Pro II",
+      "group": "Lavaliers and wearable clip-on microphones",
+      "type": "clip",
+      "prompt": "Use case: product-mockup. Asset: square 1024x1024 ecommerce catalogue image for an explicitly labelled AI-generated demo visual approximation of BOYA BY-M1 Pro II, not an authenticated manufacturer photograph. Subject: One black wired lavalier microphone with foam-covered tiny capsule, clothing clip, slim inline control capsule and long cable neatly coiled, ending in one 3.5mm audio plug. Composition: complete product fully visible, attractive three-quarter studio angle, centered with generous clean margins on seamless warm off-white background. Photorealistic premium product photography, plausible scale and construction, fine material texture, soft diffused key light, gentle contact shadows, crisp edges. Preserve the component count and requested physical form. No people, no hands, no props, no packaging, no labels or readable text, no watermark, no extraneous products. Do not render a collage or contact sheet.",
+      "status": "pending"
+    },
+    {
+      "id": "MIC-070",
+      "brand": "Sennheiser",
+      "model": "XS Lav USB-C (2m)",
+      "group": "Lavaliers and wearable clip-on microphones",
+      "type": "clip",
+      "prompt": "Use case: product-mockup. Asset: square 1024x1024 ecommerce catalogue image for an explicitly labelled AI-generated demo visual approximation of Sennheiser XS Lav USB-C (2m), not an authenticated manufacturer photograph. Subject: One black wired lavalier microphone with a small foam windscreen and clothing clip, a loosely coiled thin two-metre cable ending in USB-C. Single microphone only. Composition: complete product fully visible, attractive three-quarter studio angle, centered with generous clean margins on seamless warm off-white background. Photorealistic premium product photography, plausible scale and construction, fine material texture, soft diffused key light, gentle contact shadows, crisp edges. Preserve the component count and requested physical form. No people, no hands, no props, no packaging, no labels or readable text, no watermark, no extraneous products. Do not render a collage or contact sheet.",
+      "status": "pending"
+    },
+    {
+      "id": "MIC-071",
+      "brand": "Shure",
+      "model": "MVL Mobile Lavalier",
+      "group": "Lavaliers and wearable clip-on microphones",
+      "type": "clip",
+      "prompt": "Use case: product-mockup. Asset: square 1024x1024 ecommerce catalogue image for an explicitly labelled AI-generated demo visual approximation of Shure MVL Mobile Lavalier, not an authenticated manufacturer photograph. Subject: One miniature black mobile lavalier microphone with a small round capsule, clothing clip and thin coiled cable ending in a 3.5mm mobile audio plug. Composition: complete product fully visible, attractive three-quarter studio angle, centered with generous clean margins on seamless warm off-white background. Photorealistic premium product photography, plausible scale and construction, fine material texture, soft diffused key light, gentle contact shadows, crisp edges. Preserve the component count and requested physical form. No people, no hands, no props, no packaging, no labels or readable text, no watermark, no extraneous products. Do not render a collage or contact sheet.",
+      "status": "pending"
+    },
+    {
+      "id": "MIC-072",
+      "brand": "Audio-Technica",
+      "model": "ATR3350xiS",
+      "group": "Lavaliers and wearable clip-on microphones",
+      "type": "clip",
+      "prompt": "Use case: product-mockup. Asset: square 1024x1024 ecommerce catalogue image for an explicitly labelled AI-generated demo visual approximation of Audio-Technica ATR3350xiS, not an authenticated manufacturer photograph. Subject: One black compact wired lavalier microphone with a small foam windscreen and clip, slim inline power module, long neatly coiled cable and 3.5mm plug. Composition: complete product fully visible, attractive three-quarter studio angle, centered with generous clean margins on seamless warm off-white background. Photorealistic premium product photography, plausible scale and construction, fine material texture, soft diffused key light, gentle contact shadows, crisp edges. Preserve the component count and requested physical form. No people, no hands, no props, no packaging, no labels or readable text, no watermark, no extraneous products. Do not render a collage or contact sheet.",
+      "status": "pending"
+    },
+    {
+      "id": "MIC-073",
+      "brand": "Deity",
+      "model": "W.Lav Pro, locking 3.5mm TRS",
+      "group": "Lavaliers and wearable clip-on microphones",
+      "type": "clip",
+      "prompt": "Use case: product-mockup. Asset: square 1024x1024 ecommerce catalogue image for an explicitly labelled AI-generated demo visual approximation of Deity W.Lav Pro, locking 3.5mm TRS, not an authenticated manufacturer photograph. Subject: One discreet black professional lavalier microphone with a very small rounded capsule and clothing clip, thin coiled cable ending in a metallic locking 3.5mm TRS connector. Composition: complete product fully visible, attractive three-quarter studio angle, centered with generous clean margins on seamless warm off-white background. Photorealistic premium product photography, plausible scale and construction, fine material texture, soft diffused key light, gentle contact shadows, crisp edges. Preserve the component count and requested physical form. No people, no hands, no props, no packaging, no labels or readable text, no watermark, no extraneous products. Do not render a collage or contact sheet.",
+      "status": "pending"
+    },
+    {
+      "id": "MIC-074",
+      "brand": "Saramonic",
+      "model": "LavMicro U3A, 6.6ft USB-C",
+      "group": "Lavaliers and wearable clip-on microphones",
+      "type": "clip",
+      "prompt": "Use case: product-mockup. Asset: square 1024x1024 ecommerce catalogue image for an explicitly labelled AI-generated demo visual approximation of Saramonic LavMicro U3A, 6.6ft USB-C, not an authenticated manufacturer photograph. Subject: One black miniature wired lavalier microphone with foam windscreen and clip, thin cable in a neat broad coil ending in a USB-C connector. One microphone only. Composition: complete product fully visible, attractive three-quarter studio angle, centered with generous clean margins on seamless warm off-white background. Photorealistic premium product photography, plausible scale and construction, fine material texture, soft diffused key light, gentle contact shadows, crisp edges. Preserve the component count and requested physical form. No people, no hands, no props, no packaging, no labels or readable text, no watermark, no extraneous products. Do not render a collage or contact sheet.",
+      "status": "pending"
+    },
+    {
+      "id": "MIC-075",
+      "brand": "Sennheiser",
+      "model": "MKE 2-ew Gold, Black, locking 3.5mm",
+      "group": "Lavaliers and wearable clip-on microphones",
+      "type": "clip",
+      "prompt": "Use case: product-mockup. Asset: square 1024x1024 ecommerce catalogue image for an explicitly labelled AI-generated demo visual approximation of Sennheiser MKE 2-ew Gold, Black, locking 3.5mm, not an authenticated manufacturer photograph. Subject: One tiny professional black lavalier microphone with an extremely small capsule, miniature clothing clip and thin coiled cable ending in a locking 3.5mm connector. Composition: complete product fully visible, attractive three-quarter studio angle, centered with generous clean margins on seamless warm off-white background. Photorealistic premium product photography, plausible scale and construction, fine material texture, soft diffused key light, gentle contact shadows, crisp edges. Preserve the component count and requested physical form. No people, no hands, no props, no packaging, no labels or readable text, no watermark, no extraneous products. Do not render a collage or contact sheet.",
+      "status": "pending"
+    },
+    {
+      "id": "MIC-076",
+      "brand": "Shure",
+      "model": "MoveMic Two Receiver Kit",
+      "group": "Lavaliers and wearable clip-on microphones",
+      "type": "clip",
+      "prompt": "Use case: product-mockup. Asset: square 1024x1024 ecommerce catalogue image for an explicitly labelled AI-generated demo visual approximation of Shure MoveMic Two Receiver Kit, not an authenticated manufacturer photograph. Subject: Exactly two tiny black clip-on wireless microphones, one separate black receiver with dark inactive screen, and one small open charging case for the two microphones. No additional microphones. Composition: complete product fully visible, attractive three-quarter studio angle, centered with generous clean margins on seamless warm off-white background. Photorealistic premium product photography, plausible scale and construction, fine material texture, soft diffused key light, gentle contact shadows, crisp edges. Preserve the component count and requested physical form. No people, no hands, no props, no packaging, no labels or readable text, no watermark, no extraneous products. Do not render a collage or contact sheet.",
+      "status": "pending"
+    },
+    {
+      "id": "MIC-077",
+      "brand": "Shure",
+      "model": "MV7i Smart Mic and Interface",
+      "group": "Directional desk and shotgun microphones",
+      "type": "desktop",
+      "prompt": "Use case: product-mockup. Asset: square 1024x1024 ecommerce catalogue image for an explicitly labelled AI-generated demo visual approximation of Shure MV7i Smart Mic and Interface, not an authenticated manufacturer photograph. Subject: One black compact broadcast microphone with long foam windscreen, stout cylindrical body, side yoke and subtle top control strip, angled toward the camera. No extra microphone, no interface box or cables. Composition: complete product fully visible, attractive three-quarter studio angle, centered with generous clean margins on seamless warm off-white background. Photorealistic premium product photography, plausible scale and construction, fine material texture, soft diffused key light, gentle contact shadows, crisp edges. Preserve the component count and requested physical form. No people, no hands, no props, no packaging, no labels or readable text, no watermark, no extraneous products. Do not render a collage or contact sheet.",
+      "status": "pending"
+    },
+    {
+      "id": "MIC-078",
+      "brand": "RØDE X",
+      "model": "XDM-100",
+      "group": "Directional desk and shotgun microphones",
+      "type": "desktop",
+      "prompt": "Use case: product-mockup. Asset: square 1024x1024 ecommerce catalogue image for an explicitly labelled AI-generated demo visual approximation of RØDE X XDM-100, not an authenticated manufacturer photograph. Subject: One black cylindrical dynamic USB broadcast microphone with dark metal body, red subtle accent trim and black foam windscreen, mounted in one sturdy black suspension shockmount. No desk stand. Composition: complete product fully visible, attractive three-quarter studio angle, centered with generous clean margins on seamless warm off-white background. Photorealistic premium product photography, plausible scale and construction, fine material texture, soft diffused key light, gentle contact shadows, crisp edges. Preserve the component count and requested physical form. No people, no hands, no props, no packaging, no labels or readable text, no watermark, no extraneous products. Do not render a collage or contact sheet.",
+      "status": "pending"
+    },
+    {
+      "id": "MIC-079",
+      "brand": "Sennheiser",
+      "model": "Profile USB (table-stand package)",
+      "group": "Directional desk and shotgun microphones",
+      "type": "desktop",
+      "prompt": "Use case: product-mockup. Asset: square 1024x1024 ecommerce catalogue image for an explicitly labelled AI-generated demo visual approximation of Sennheiser Profile USB (table-stand package), not an authenticated manufacturer photograph. Subject: One dark graphite USB desktop microphone with a tall rounded metal mesh grille and a simple row of three small front control knobs, attached to a short table stand with round weighted base. Composition: complete product fully visible, attractive three-quarter studio angle, centered with generous clean margins on seamless warm off-white background. Photorealistic premium product photography, plausible scale and construction, fine material texture, soft diffused key light, gentle contact shadows, crisp edges. Preserve the component count and requested physical form. No people, no hands, no props, no packaging, no labels or readable text, no watermark, no extraneous products. Do not render a collage or contact sheet.",
+      "status": "pending"
+    },
+    {
+      "id": "MIC-080",
+      "brand": "Audio-Technica",
+      "model": "AT2040USB",
+      "group": "Directional desk and shotgun microphones",
+      "type": "desktop",
+      "prompt": "Use case: product-mockup. Asset: square 1024x1024 ecommerce catalogue image for an explicitly labelled AI-generated demo visual approximation of Audio-Technica AT2040USB, not an authenticated manufacturer photograph. Subject: One black broadcast-style dynamic USB microphone with rounded cylindrical grille and tapered body, held in a minimal yoke. Show microphone and yoke only, no extra stand. Composition: complete product fully visible, attractive three-quarter studio angle, centered with generous clean margins on seamless warm off-white background. Photorealistic premium product photography, plausible scale and construction, fine material texture, soft diffused key light, gentle contact shadows, crisp edges. Preserve the component count and requested physical form. No people, no hands, no props, no packaging, no labels or readable text, no watermark, no extraneous products. Do not render a collage or contact sheet.",
+      "status": "pending"
+    }
+  ]
+}

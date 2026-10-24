@@ -35,6 +35,8 @@ import type { SessionThread } from "../thread/SessionThread.js";
 import { reduce } from "../thread/reduce.js";
 
 export interface LoopResult {
+  narrationSegments?: Array<{ text: string; productId: string | null }>;
+  heading?: string;
   proposals: AgentProposal[];
   speakable: SpeakableResult[];
   cancelled: boolean;
@@ -68,6 +70,7 @@ export async function agentLoop(opts: {
   const proposals: AgentProposal[] = [];
   const speakable: SpeakableResult[] = [];
   let snapshot = thread.snapshot;
+  let updateReply: SpeakableResult | undefined;
 
   const push = (proposal: AgentProposal) => {
     if (cancel.aborted) return false;
@@ -93,7 +96,14 @@ export async function agentLoop(opts: {
       result.snapshot,
     );
     proposals.push(proposal);
-    speakable.push(result.speakable);
+    // Keep tool outcomes in the thread, but do not narrate bookkeeping before
+    // the actual answer. Errors remain visible and audible.
+    if (
+      result.ok &&
+      ["set_constraints", "set_priority"].includes(proposal.action)
+    )
+      updateReply = result.speakable;
+    else speakable.push(result.speakable);
     snapshot = result.snapshot;
     // Keep baseRevision in sync for chained proposals within the same turn
     input.baseRevision = snapshot.revision;
@@ -383,6 +393,7 @@ export async function agentLoop(opts: {
     }
   }
 
+  if (!speakable.length && updateReply) speakable.push(updateReply);
   return { proposals, speakable, cancelled: cancel.aborted };
 }
 
@@ -474,6 +485,10 @@ function runGuidedNeed(
     if (
       !prefs.shape &&
       !prefs.color &&
+      !prefs.bagPriority &&
+      !snapshot.preferences["bagPriority"] &&
+      !snapshot.preferences["shape"] &&
+      !snapshot.preferences["color"] &&
       !prefs.budgetMinor &&
       !prefs.needTomorrow &&
       !Object.keys(parseCompatibility(text)).length &&
@@ -483,6 +498,8 @@ function runGuidedNeed(
       patchScenario(store, input.sessionId, "bag_inspiration");
       return;
     }
+    const bagPriority =
+      prefs.bagPriority ?? snapshot.preferences["bagPriority"];
     push({
       ...baseProposal(input, "constraints"),
       action: "set_constraints",
@@ -498,6 +515,7 @@ function runGuidedNeed(
             : {}),
         },
         preferences: {
+          ...(bagPriority ? { bagPriority } : {}),
           ...(prefs.color ? { color: prefs.color } : {}),
           ...(prefs.shape ? { shape: prefs.shape } : {}),
         },
@@ -641,13 +659,19 @@ function inferScenario(
   if (snapshot.scenarioId) {
     return { id: snapshot.scenarioId, needs: snapshot.needs };
   }
+  const requestedId = text.match(/\b(?:MIC|BAG|BED)-\d{3}\b/i)?.[0].toUpperCase();
+  const product = requestedId ? getProduct(requestedId) : undefined;
+  if (product) return {
+    id: product.category === "bags" ? "bag_inspiration" : product.category === "bedding" ? "warm_bedding" : "cafe_dictation",
+    needs: [`Explore ${product.title}`],
+  };
   if (/bag|backpack|gym|tote|sling/i.test(text)) {
     return { id: "bag_inspiration", needs: ["bag inspiration"] };
   }
   if (/sheet|bedding|linen|percale|mattress/i.test(text)) {
     return { id: "warm_bedding", needs: ["warm room bedding"] };
   }
-  if (/mic|café|cafe|dictation|headset|noisy/i.test(text)) {
+  if (/mic|café|cafe|dictation|headset|headphone|earbud|earpod|airpod|noisy/i.test(text)) {
     return { id: "cafe_dictation", needs: ["café dictation"] };
   }
   // default opening — café is scenario 1

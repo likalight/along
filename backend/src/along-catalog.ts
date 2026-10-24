@@ -6,7 +6,14 @@ import type { CatalogData, CatalogProfile, Constraints, Product, Offer, Quote } 
 const minor = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 const same = (left: unknown, right: unknown) => JSON.stringify(left) === JSON.stringify(right);
 const category = (value: string | undefined) => value === "bags" ? "everyday-bags" : value === "bedding" ? "bedsheet-sets" : value;
-const host = (value: string | undefined) => value?.trim().toLowerCase();
+/** USB names an interface family; it does not establish the host's connector. */
+export function normalizeHostConnection(value: string | undefined): string | undefined {
+  const normalized = value?.trim().toLowerCase().replace(/\s+/g, " ");
+  if (normalized && /^usb(?:\s*[234](?:\.\d+)?)?(?: (?:ports?|connection|interface))?$/.test(normalized)) return undefined;
+  const usbConnector = normalized?.match(/^usb[ -]?(?:type[ -]?)?([ac])(?: port)?$/);
+  return usbConnector ? `usb-${usbConnector[1]}` : normalized;
+}
+const host = normalizeHostConnection;
 
 /** Legacy aliases are presentation adapters only. Canonical source fields remain lossless. */
 function adaptProduct(product: CanonicalProduct, data: Catalog): Product {
@@ -26,7 +33,7 @@ function adaptProduct(product: CanonicalProduct, data: Catalog): Product {
     specifications.includedPieces = product.specs.includedPieces === null ? null : JSON.stringify(product.specs.includedPieces);
   }
   const path = product.specs.compatibilityFixture as { supportedHostConnections: string[] } | undefined;
-  const reviews = data.evidence.filter(e => product.evidenceIds.includes(e.id) && e.sourceType === "review");
+  const reviews = data.evidence.filter(e => product.evidenceIds.includes(e.id) && e.sourceType === "review" && e.classification !== "proxy");
   return {
     canonical: product,
     id: product.id, category: product.category, brand: product.brand, name: product.title,
@@ -167,7 +174,7 @@ export function quoteAlongOffer(offerId: string, quantity: number, constraints: 
   const mapped: CanonicalConstraints = {
     ...(constraints as CanonicalConstraints),
     category: category(constraints.category) as CanonicalConstraints["category"],
-    hostConnection: host(constraints.hostConnection ?? fit.hostConnection),
+    hostConnection: host(constraints.hostConnection) ?? host(fit.hostConnection),
     laptopInches: constraints.laptopInches ?? fit.laptopInches,
     bedWidthIn: constraints.bedWidthIn ?? fit.bedWidthInches,
     bedLengthIn: constraints.bedLengthIn ?? fit.bedLengthInches,

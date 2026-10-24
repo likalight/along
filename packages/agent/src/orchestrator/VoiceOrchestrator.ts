@@ -10,9 +10,12 @@ import { SessionThread } from "../thread/SessionThread.js";
 import { reduce } from "../thread/reduce.js";
 import type { VoiceAdapter } from "../voice/adapter.js";
 import { agentLoop } from "./agentLoop.js";
+import { openEndedLoop, type OpenEndedAgentConfig } from "./openEndedLoop.js";
 import { TurnMachine } from "./TurnMachine.js";
 
 export interface TurnOutcome {
+  narrationSegments?: Array<{ text: string; productId: string | null }>;
+  heading?: string;
   snapshot: SessionSnapshot;
   speakable: SpeakableResult[];
   cancelled: boolean;
@@ -38,6 +41,7 @@ export class VoiceOrchestrator {
   constructor(
     private readonly store: FixtureSessionStore,
     private readonly voice: VoiceAdapter,
+    private readonly options?: { agent?: OpenEndedAgentConfig },
   ) {}
 
   createSession(opts?: {
@@ -52,6 +56,21 @@ export class VoiceOrchestrator {
 
   getSnapshot(sessionId: string): SessionSnapshot | undefined {
     return this.store.get(sessionId);
+  }
+
+  getConversation(
+    sessionId: string,
+  ): Array<{ role: "user" | "assistant"; text: string }> {
+    const events = this.threads.get(sessionId)?.events ?? [];
+    return events.flatMap(
+      (event): Array<{ role: "user" | "assistant"; text: string }> => {
+        if (event.type === "user_input" && event.data.text?.trim())
+          return [{ role: "user" as const, text: event.data.text }];
+        if (event.type === "assistant_transcript" && event.data.text.trim())
+          return [{ role: "assistant" as const, text: event.data.text }];
+        return [];
+      },
+    );
   }
 
   async handleInput(input: InputEvent): Promise<TurnOutcome> {
@@ -106,19 +125,39 @@ export class VoiceOrchestrator {
       },
     );
 
-    const route = routeInput(input, basedOn);
+    const route = this.options?.agent
+      ? "open_ended"
+      : routeInput(input, basedOn);
     const normalized: InputEvent = {
       ...input,
       baseRevision: basedOn.revision,
     };
 
-    const result = await agentLoop({
-      input: normalized,
-      route,
-      thread,
-      store: this.store,
-      cancel: turn.cancelToken.signal,
-    });
+    let result;
+    try {
+      result = this.options?.agent
+        ? await openEndedLoop({
+            input: normalized,
+            thread,
+            store: this.store,
+            cancel: turn.cancelToken.signal,
+            config: this.options.agent,
+          })
+        : await agentLoop({
+            input: normalized,
+            route: routeInput(input, basedOn),
+            thread,
+            store: this.store,
+            cancel: turn.cancelToken.signal,
+          });
+    } catch (error) {
+      turns.cancel(turn.turnId, "agent_error");
+      reduce(thread, {
+        type: "delegation_cancelled",
+        data: { turnId: turn.turnId, reason: "agent_error" },
+      });
+      throw error;
+    }
 
     const current = this.store.get(input.sessionId)!;
     // Own applies advance revision; only drop when this turn was cancelled (barge-in / newer input).
@@ -152,6 +191,8 @@ export class VoiceOrchestrator {
     return {
       snapshot: thread.snapshot,
       speakable: result.speakable,
+      heading: result.heading,
+      narrationSegments: result.narrationSegments,
       cancelled: false,
       route,
     };

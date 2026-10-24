@@ -12,10 +12,10 @@ function quote(profile: CatalogProfile, id: string, constraints: Constraints = {
 }
 const has = (result: ReturnType<typeof quote>, code: string) => result.conflicts.some(conflict => conflict.code === code);
 
-test("#6: default backend retains the shared 24/48 catalog, all canonical provenance, nullable metrics and archive identities", () => {
+test("#6: default backend retains the complete shared catalog, all canonical provenance, nullable metrics and archive identities", () => {
   const expected = getCatalog();
-  assert.equal(catalog.products.length, 24);
-  assert.equal(catalog.offers.length, 48);
+  assert.equal(catalog.products.length, expected.products.length);
+  assert.equal(catalog.offers.length, expected.offers.length);
   assert.deepEqual(catalog.canonical, expected);
   validateCatalog(catalog);
   const exposed = catalogView(catalog);
@@ -43,6 +43,29 @@ test("#8.1: unknown IDs, mismatched variants, unavailable stock, invalid quantit
   }
   assert(has(quote(p, "BAG-001-B", { currency: "SGD" }), "CURRENCY_CONFLICT"));
   assert(has(quote(p, "BAG-001-B", {}, 1, "Singapore real address"), "UNSUPPORTED_DESTINATION"));
+});
+
+test("expanded audio, bags and bedding have complete simulated quotes with separate demo review provenance", () => {
+  const profile = buildAlongProfile();
+  for (const [id, constraints] of [
+    ["MIC-100", { hostConnection: "usb-c" }],
+    ["BAG-010", { laptopInches: 16 }],
+    ["BED-018", { bedWidthIn: 60, bedLengthIn: 80, mattressDepthIn: 12, composition: "100% cotton" }],
+  ] as const) {
+    const result = quote(profile, `${id}-A`, constraints);
+    assert.equal(result.eligible, true, `${id}: ${JSON.stringify(result.conflicts)}`);
+    assert.ok(result.total !== null && result.total > 0);
+    const canonical = result.product.canonical!;
+    assert.equal(canonical.demoReviews?.classification, "proxy");
+    assert.ok(canonical.demoReviews?.entries.every(review => review.verifiedPurchase === false));
+    assert.equal(result.product.buyerSignals?.averageRating, canonical.buyerMetrics.rating);
+    if (canonical.provenance?.kind === "synthetic") assert.equal(result.product.buyerSignals?.reviewSummary, null);
+    assert.match(result.offer.conditions.join(" "), /simulated|synthetic/i);
+  }
+  const incompleteSet = quote(profile, "BED-024-A", { bedWidthIn: 60, bedLengthIn: 80, mattressDepthIn: 12 });
+  assert.equal(incompleteSet.eligible, false);
+  assert(has(incompleteSet, "ESSENTIAL_PRODUCT_DETAILS_UNKNOWN"));
+  assert.equal(incompleteSet.product.canonical!.specs.includedPieces, null);
 });
 
 test("#8.2: reference prices stay separate, required hardware appears exactly once, and explicit tax completes the line items", () => {
@@ -118,9 +141,27 @@ test("#8.3: audio requires an explicit compatible host and includes every requir
   assert.match(result.offer.setupConditions!, /microphone input/);
 });
 
+test("generic USB is an unknown host connector, while explicit USB-A and USB-C remain authoritative", () => {
+  const p = buildAlongProfile();
+  for (const generic of ["USB", "usb", "USB port", "USB 2.0", "USB 3.0 interface"]) {
+    for (const constraints of [{ hostConnection: generic }, { compatibility: { hostConnection: generic } }]) {
+      const result = quote(p, "MIC-067-A", constraints);
+      assert.equal(result.eligible, false, "An unspecified connector must still block checkout");
+      assert(has(result, "HOST_CONNECTION_REQUIRED"), generic);
+      assert(!has(result, "INCOMPATIBLE_HARDWARE"), generic);
+    }
+  }
+  for (const connector of ["USB-C", "USB C", "USB Type-C"]) assert(quote(p, "MIC-067-A", { compatibility: { hostConnection: connector } }).eligible, connector);
+  assert(quote(p, "MIC-067-A", { hostConnection: "USB", compatibility: { hostConnection: "USB-C" } }).eligible);
+  assert(quote(p, "MIC-067-A", { hostConnection: "USB-C", compatibility: { hostConnection: "USB" } }).eligible);
+  assert(has(quote(p, "MIC-067-A", { hostConnection: "USB A" }), "INCOMPATIBLE_HARDWARE"));
+  assert(has(quote(p, "MIC-067-A", { hostConnection: "headphone-only" }), "INCOMPATIBLE_HARDWARE"));
+  assert(has(quote(p, "MIC-067-A", { hostConnection: "usb-c", compatibility: { hostConnection: "usb-a" } }), "CONFLICTING_COMPATIBILITY"));
+});
+
 test("#8.4/6: deadline revisions recalculate the same-variant cheap/late versus fast/dearer trade-off and expose no-match conflicts", () => {
   const p = buildAlongProfile();
-  const base: Constraints = { category: "everyday-bags", laptopInches: 14, separateShoeCompartment: true, budgetMinor: 15000 };
+  const base: Constraints = { productId: "BAG-001", category: "everyday-bags", laptopInches: 14, separateShoeCompartment: true, budgetMinor: 15000 };
   const all = (constraints: Constraints) => eligibleOffers(constraints, 1, [], p.catalog, p.destination);
   assert.deepEqual(all(base).filter(q => q.eligible).map(q => q.offer.id), ["BAG-001-A", "BAG-001-B"]);
   const tomorrow = { ...base, deadline: "2026-10-25T18:00:00+08:00" };

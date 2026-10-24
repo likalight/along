@@ -14,4 +14,4 @@ const directory = new URL("../data/", import.meta.url);
 mkdirSync(directory, {recursive: true});
 writeFileSync(new URL("catalog.json", directory), JSON.stringify(catalog, null, 2) + "\n");
 writeFileSync(new URL("microphones-archive.json", directory), JSON.stringify(microphoneArchive, null, 2) + "\n");
-console.log(`Validated ${catalog.products.length} products, ${catalog.offers.length} proxy offers, ${catalog.evidence.length} evidence records, 3 scenarios; archived 50 source rows.`);
+console.log(`Validated ${catalog.products.length} products, ${catalog.offers.length} proxy offers, ${catalog.evidence.length} evidence records, 3 scenarios; archived ${microphoneArchive.records.length} source rows.`);

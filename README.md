@@ -69,7 +69,7 @@ The active fixture contains **24 products**: 12 audio configurations, six bags, 
 
 ## Getting started
 
-The integrated shopper interface runs locally against the authoritative backend. Live AI/voice provider transport and a hosted demo remain pending. See [the combined handoff](./INTEGRATION.md) for verified behavior and limitations.
+The integrated shopper interface runs locally against the authoritative backend. Real OpenAI transcription and narration are available with a private local API key; voice takes turns listening and speaking. See [local voice setup](./apps/shopper/docs/live-voice.md) and [the combined handoff](./INTEGRATION.md). A hosted demo remains pending.
 
 ```sh
 npm ci
@@ -176,8 +176,8 @@ Along is an early hackathon project, not a production marketplace.
 | Catalog, provenance, scenarios, and validation | Implemented in [PR #16](https://github.com/likalight/along/pull/16) and integrated through [PR #15](https://github.com/likalight/along/pull/15). |
 | Session backend and simulated approval | Implemented with voice/text approval, multimodal state, and CI in [PR #15](https://github.com/likalight/along/pull/15). See the [acceptance matrix](./backend/ACCEPTANCE.md). |
 | Shopper interface | Session shell + product canvas integrated in `apps/shopper` (see [shell](./apps/shopper/docs/session-shell.md) and [canvas](./apps/shopper/docs/product-canvas.md)), with canonical offers and authenticated backend state. |
-| Live AI/voice integration | GPT-Live mint when `OPENAI_API_KEY` is set; otherwise authenticated `not_connected` with labeled browser speech / text fallback. |
-| End-to-end demo rehearsal | Text journey verified through ranked shortlist tiles, offers, and simulated receipt. Live spoken journey requires `OPENAI_API_KEY`. |
+| Live AI/voice integration | OpenAI WebRTC transcription, server-verified spoken input, and exact-text narration. Half duplex; see [setup and limits](./apps/shopper/docs/live-voice.md). |
+| End-to-end demo rehearsal | Text journey verified through ranked shortlist tiles, offers, and simulated receipt. Live API speech and browser connection verified; use the [voice rehearsal](./apps/shopper/docs/live-voice.md) to test spoken checkout. |
 
 The agreed frontend direction is **Next.js App Router + TypeScript**, **Motion for React**, and an **ElevenLabs UI Orb**. The orb is a visual component; it does not establish the selected speech/model provider or a paid service commitment.
 

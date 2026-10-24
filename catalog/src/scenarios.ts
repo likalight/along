@@ -16,7 +16,7 @@ export const scenarios: Scenario[] = [
   { ...base, id: "work-gym", title: "Bag inspiration / work and gym",
     opening: "I like this bag's shape. I need a bag for work and gym under 150 dollars.",
     anchorProductId: "BAG-001",
-    constraints: { category: "everyday-bags", currency: "USD", budgetMinor: 15000, laptopInches: 14, separateShoeCompartment: true },
+    constraints: { category: "everyday-bags", candidateProductIds: ["BAG-001", "BAG-002", "BAG-003", "BAG-004", "BAG-005", "BAG-006"], currency: "USD", budgetMinor: 15000, laptopInches: 14, separateShoeCompartment: true },
     changes: [
       { utterance: "Show offers with verified separate shoe storage and laptop support.",
         constraints: {}, expectedOfferIds: ["BAG-001-A", "BAG-001-B"] },
@@ -26,7 +26,7 @@ export const scenarios: Scenario[] = [
   { ...base, id: "warm-room", title: "Bedsheets for a warm room",
     opening: "My room gets hot at night; help me choose bedsheets.",
     anchorProductId: "BED-003",
-    constraints: { category: "bedsheet-sets", currency: "USD", budgetMinor: 7000, bedWidthIn: 60, bedLengthIn: 80, mattressDepthIn: 12 },
+    constraints: { category: "bedsheet-sets", candidateProductIds: ["BED-001", "BED-002", "BED-003", "BED-004", "BED-005", "BED-006"], currency: "USD", budgetMinor: 7000, bedWidthIn: 60, bedLengthIn: 80, mattressDepthIn: 12 },
     changes: [
       { utterance: "Compare sets that fit my 12-inch-deep US Queen mattress.",
         constraints: {}, expectedOfferIds: ["BED-002-A", "BED-003-A", "BED-003-B"] },

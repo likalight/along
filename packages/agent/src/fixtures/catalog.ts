@@ -6,6 +6,19 @@ import {
   type Evidence,
   type Attachment,
 } from "@coupang/contract";
+
+/** Seed metadata is authoritative; names only support older catalog snapshots. */
+export function audioSolutionType(specs: Record<string, unknown>, title: string): Product["solutionType"] {
+  const explicit = specs.solutionType;
+  if (explicit === "headset") return "headset";
+  if (explicit === "clip" || explicit === "clip_on") return "clip_on";
+  if (explicit === "desktop" || explicit === "directional_desktop") return "directional_desktop";
+  const family = String(specs.family ?? specs.audioCategory ?? specs.formFactor ?? title);
+  if (/headset|headphone|earpods|airpods|earbud|headworn/i.test(family)) return "headset";
+  if (/lavalier|clip|\blav\b|wearable|wireless.*(?:mic|system)/i.test(family)) return "clip_on";
+  return "directional_desktop";
+}
+
 export const PRODUCTS: Product[] = c.products.map((p: any) => ({
   ...p,
   category:
@@ -16,17 +29,13 @@ export const PRODUCTS: Product[] = c.products.map((p: any) => ({
         : "bedding",
   specs: {
     ...p.specs,
-    size: p.specs.sizeMarket?.toLowerCase(),
+    size: p.specs.sizeMarket?.toLowerCase().replace(/^us\s+/, ""),
     material: p.specs.material ?? p.specs.compositionLabel,
   },
   solutionType:
     p.category !== "audio-accessories"
       ? undefined
-      : /headset|earpods/i.test(p.title)
-        ? "headset"
-        : /lavalier|clip|lav\b/i.test(p.title)
-          ? "clip_on"
-          : "directional_desktop",
+      : audioSolutionType(p.specs, p.title),
   authoredFitScore: p.authoredFit
     ? p.authoredFit.demo_cafe_fit * 20
     : undefined,

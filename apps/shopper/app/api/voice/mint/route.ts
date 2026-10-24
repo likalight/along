@@ -1,25 +1,20 @@
 import { NextResponse } from "next/server";
-import { authorize, assertOrigin } from "@/lib/integration/access";
-import { getRuntime } from "@/lib/integration/runtime";
+import { voiceBody } from "@/lib/voice/server";
 
 export const runtime = "nodejs";
 
-/**
- * Mint a GPT-Live client-delegated WebRTC session for the shopper shell.
- * Returns mode:"live" only when a real client secret is obtained; otherwise
- * authenticated mode:"not_connected" (never a silent fake duplex claim).
- */
+/** Availability only: opening the page never creates a paid provider session. */
 export async function POST(request: Request) {
   try {
-    assertOrigin(request);
-    const raw = await request.text();
-    if (raw.length > 4096) throw new Error("Turn too large.");
-    const body = JSON.parse(raw) as { sessionId?: string };
-    if (!body.sessionId) throw new Error("sessionId required");
-    authorize(request, body.sessionId);
-    const { voice } = getRuntime();
-    const minted = await voice.mint(body.sessionId);
-    return NextResponse.json(minted);
+    await voiceBody(request, 4096);
+    const available = Boolean(process.env.OPENAI_API_KEY);
+    return NextResponse.json({
+      mode: available ? "available" : "not_connected",
+      duplex: false,
+      note: available
+        ? "OpenAI voice is available. Microphone capture pauses during spoken replies."
+        : "OpenAI voice is not configured. Browser speech and text mode remain available.",
+    }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     return NextResponse.json(
       {

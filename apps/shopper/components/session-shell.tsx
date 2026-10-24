@@ -14,13 +14,11 @@ import {
 } from "motion/react";
 import {
   ArrowUp,
-  ArrowUpRight,
   Mic,
   Pause,
   RotateCcw,
   Keyboard,
   ArrowRight,
-  Check,
   MessageSquare,
 } from "lucide-react";
 import { SessionController } from "@/lib/session/controller";
@@ -28,6 +26,8 @@ import { httpTransport } from "@/lib/session/http-transport";
 import { BrowserSpeechAdapter } from "@/lib/voice/browser-adapter";
 import { createSpeechAdapter } from "@/lib/voice/create-speech-adapter";
 import { ProductCanvas } from "./canvas/ProductCanvas";
+import { PurchaseComplete } from "./canvas/PurchaseComplete";
+import { customerCopy, customerDestinationLabel, customerNotes, customerSellerLabel } from "@/lib/canvas/customer-copy";
 import { VoiceOrb } from "./voice-orb";
 import { Attachments } from "./attachments";
 import type { Session, VoiceStatus } from "@/lib/session/contract";
@@ -51,6 +51,8 @@ export function SessionShell() {
   );
   const [draft, setDraft] = useState("");
   const [voiceNote, setVoiceNote] = useState<string | null>(null);
+  const [voiceReady, setVoiceReady] = useState(false);
+  const [voice, setVoice] = useState<"marin" | "cedar" | "coral">("marin");
   const reduced = useReducedMotion();
   const stageRef = useRef<HTMLElement>(null);
   const acknowledgeSummary = useCallback(() => {
@@ -58,6 +60,20 @@ export function SessionShell() {
   }, [controller]);
   const s = state.snapshot,
     opening = !s || s.view === "opening";
+  const readableRequest = (text: string) => {
+    let display = text;
+    for (const product of s?.catalog?.products ?? [])
+      display = display.replaceAll(
+        product.id,
+        `${product.brand} ${product.model}`,
+      );
+    return display.replace(/^Focus /i, "Show me ");
+  };
+  const orbGreeting = !s?.displayOrder?.length;
+  const latestRequest =
+    state.requestText ||
+    [...(s?.history ?? [])].reverse().find((entry) => entry.role === "user")
+      ?.text;
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -70,9 +86,13 @@ export function SessionShell() {
         return;
       }
       controller.setSpeechAdapter(adapter, kind);
-      setVoiceNote(note ?? (kind === "live" ? null : null));
+      setVoiceNote(note ?? null);
+      setVoiceReady(true);
     })();
-    const offline = () => controller.interrupt();
+    const offline = () => {
+      controller.interrupt();
+      controller.pauseListening();
+    };
     const online = () => void controller.reconnect();
     const key = (e: KeyboardEvent) => {
       if (e.key === "Escape") controller.interrupt();
@@ -83,6 +103,7 @@ export function SessionShell() {
     return () => {
       cancelled = true;
       controller.interrupt();
+      controller.closeVoice();
       window.removeEventListener("offline", offline);
       window.removeEventListener("online", online);
       window.removeEventListener("keydown", key);
@@ -107,35 +128,44 @@ export function SessionShell() {
             <span className="brand-mark">a</span>along
             <span className="brand-dot">.</span>
           </a>
-          <span className="demo-badge">
-            <span /> A shopping conversation <i>·</i> Research catalog ·
-            simulated offers
-          </span>
-          <span className="private-note">Thoughtfully, together.</span>
         </header>
-        <main className={opening ? "main opening" : "main active"}>
-          <aside className="voice-anchor" aria-label="Voice session">
+        <main
+          className={`${opening ? "main opening" : "main active"} ${orbGreeting ? "orb-greeting" : ""}`}
+        >
+          <motion.aside
+            layout={reduced ? false : "position"}
+            layoutDependency={orbGreeting}
+            transition={{
+              layout: { duration: 0.45, ease: [0.22, 1, 0.36, 1] },
+            }}
+            className="voice-anchor"
+            aria-label="Voice session"
+          >
             <VoiceOrb
               status={state.status}
               capturing={state.capturing}
-              compact={!opening}
+              compact={!orbGreeting}
             />
             <div className="voice-status" role="status" aria-live="polite">
               <span className={state.capturing ? "live-dot" : "status-dot"} />
               {state.capturing
-                ? statusLabels.listening
+                ? state.status === "speaking"
+                  ? "Speaking · microphone on"
+                  : state.livePending
+                    ? "Finding your options · microphone on"
+                    : statusLabels.listening
                 : state.status === "listening"
                   ? "Ready · microphone off"
-                  : statusLabels[state.status]}
+                  : state.status === "thinking" && state.activity
+                    ? state.activity.label
+                    : state.status === "reconnecting" && state.mode === "voice"
+                      ? "Connecting voice…"
+                      : statusLabels[state.status]}
             </div>
-            {!opening && (
-              <p className="anchor-note">
-                You lead.
-                <br />
-                I’ll keep up.
-              </p>
+            {state.delayed && state.status === "thinking" && (
+              <p className="activity-delay">Still working on your request.</p>
             )}
-          </aside>
+          </motion.aside>
           <section
             className="stage"
             tabIndex={-1}
@@ -144,7 +174,7 @@ export function SessionShell() {
           >
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
-                key={s?.view ?? "opening"}
+                key={s ? `${s.sessionId}:${s.epoch}` : "opening"}
                 initial={
                   reduced || s?.view === "summary" || s?.view === "receipt"
                     ? false
@@ -154,43 +184,49 @@ export function SessionShell() {
                 exit={reduced ? undefined : { opacity: 0, y: -8 }}
                 transition={{ duration: 0.25 }}
               >
-                <p className="eyebrow">
-                  {opening
-                    ? "YOUR NEXT GOOD FIND"
-                    : s?.view === "receipt"
-                      ? "SIMULATED RECEIPT"
-                      : s?.view === "recovery"
-                        ? "RECOVERY"
-                        : `THE CONVERSATION / ${s?.view.replaceAll("_", " ")}`}
-                </p>
-                {(!s?.canvas ||
-                  ["opening", "summary", "receipt", "recovery"].includes(
-                    s.view,
-                  )) && (
-                  <h1 aria-live="polite" aria-atomic="true">
-                    {s?.heading ?? "A little conversation.\nA better choice."}
-                  </h1>
-                )}
-                {s?.view !== "summary" &&
-                  (!s?.canvas ||
-                    opening ||
-                    s.view === "receipt" ||
-                    s.view === "recovery") && (
-                    <p className="stage-message">
-                      {s?.message ??
-                        "Tell me what you’re looking for, or start with a problem you’d like to solve."}
+                <div className="conversation-current">
+                  {latestRequest && (
+                    <p className="latest-request">
+                      <span className="sr-only">You: </span>
+                      {readableRequest(latestRequest)}
                     </p>
                   )}
-                {opening && (
-                  <div className="opening-invitation">
-                    <span className="invitation-line" />
-                    <span>Something in mind? Something to figure out?</span>
-                  </div>
-                )}
+                  {opening && !latestRequest && !state.liveCaption ? (
+                    <>
+                      <h1>What are you looking for?</h1>
+                      <p className="stage-message">
+                        Tell me what you need and what you’d like to spend. We
+                        can work out the rest together.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <h1 className="sr-only">Shopping conversation</h1>
+                      {(!opening || latestRequest || state.liveCaption) &&
+                        s?.view !== "summary" && (
+                          <p className="assistant-reply">
+                            <span className="sr-only">Along: </span>
+                            {state.liveCaption || s?.message}
+                          </p>
+                        )}
+                    </>
+                  )}
+                </div>
                 {s && (
                   <ContentStage
-                    session={s}
-                    busy={state.status === "thinking"}
+                    narrationProductId={state.narrationProductId}
+                    session={
+                      state.activity?.phase === "working" && s.canvas
+                        ? {
+                            ...s,
+                            canvas: {
+                              ...s.canvas,
+                              heading: state.activity.heading,
+                            },
+                          }
+                        : s
+                    }
+                    busy={state.status === "thinking" || state.livePending}
                     onSummaryDisplayed={acknowledgeSummary}
                     onChooseText={() => void controller.chooseMode("text")}
                     onMediaEvent={(event) =>
@@ -204,6 +240,28 @@ export function SessionShell() {
               </motion.div>
             </AnimatePresence>
           </section>
+          {s && s.history.length > 0 && (
+            <details className="transcript">
+              <summary>
+                <MessageSquare size={15} /> Earlier in this conversation{" "}
+                <span>
+                  {s.history.filter((h) => h.role === "user").length} turns
+                </span>
+              </summary>
+              <ol>
+                {s.history.map((entry, i) => (
+                  <li key={i}>
+                    <span>{entry.role === "user" ? "You" : "Along"}</span>
+                    <p>
+                      {entry.role === "user"
+                        ? readableRequest(entry.text)
+                        : entry.text}
+                    </p>
+                  </li>
+                ))}
+              </ol>
+            </details>
+          )}
           <section
             className="conversation-controls"
             aria-label="Conversation controls"
@@ -222,21 +280,34 @@ export function SessionShell() {
               state.capturing ? (
                 <button
                   className="primary-button"
-                  onClick={() => controller.interrupt()}
+                  onClick={() =>
+                    state.capturing && state.status !== "speaking"
+                      ? controller.pauseListening()
+                      : controller.interrupt()
+                  }
                 >
                   <Pause size={17} />{" "}
-                  {state.capturing ? "Pause microphone" : "Interrupt response"}
+                  {state.status === "speaking"
+                    ? "Stop speaking"
+                    : state.capturing
+                      ? "Pause microphone"
+                      : "Interrupt response"}
                   <span className="key-hint">esc</span>
                 </button>
               ) : (
                 <button
                   className="primary-button"
-                  disabled={!s || state.status === "reconnecting"}
+                  disabled={
+                    !s || !voiceReady || state.status === "reconnecting"
+                  }
                   onClick={() => void controller.chooseMode("voice")}
                 >
                   <Mic size={17} />
-                  {opening ? "Start Chat" : "Speak / interrupt"}
-                  <ArrowUpRight size={16} />
+                  {state.status === "reconnecting"
+                    ? "Connecting voice…"
+                    : opening
+                      ? "Start talking"
+                      : "Talk to Along"}
                 </button>
               )}
               <button
@@ -245,10 +316,66 @@ export function SessionShell() {
                 onClick={() => void controller.chooseMode("text")}
               >
                 <Keyboard size={17} />
-                {state.mode === "text"
-                  ? "Text mode · microphone off"
-                  : "I’d rather type"}
+                {state.mode === "text" ? "Typing · mic off" : "Type instead"}
               </button>
+              <details className="conversation-options">
+                <summary>Settings</summary>
+                <div className="options-panel">
+                  {voiceReady && controller.speechKind === "live" && (
+                    <label className="voice-choice">
+                      Voice
+                      <select
+                        aria-label="Assistant voice"
+                        value={voice}
+                        disabled={
+                          state.status === "thinking" ||
+                          state.status === "speaking" ||
+                          state.capturing
+                        }
+                        onChange={(event) => {
+                          const choice = event.target.value as typeof voice;
+                          setVoice(choice);
+                          controller.setVoice(choice);
+                        }}
+                      >
+                        <option value="marin">Marin</option>
+                        <option value="cedar">Cedar</option>
+                        <option value="coral">Coral</option>
+                      </select>
+                    </label>
+                  )}
+                  <p className="voice-help">
+                    {state.mode === "voice"
+                      ? controller.speechKind === "live"
+                        ? "You can speak while I work. Press Esc to pause a reply. After reviewing your order, tell me when you’d like me to place it."
+                        : "Browser voice. Your microphone pauses during replies. Press Esc to interrupt."
+                      : "AI-generated voice. Start talking to enable your microphone."}
+                    {voiceNote ? ` ${voiceNote}` : ""}
+                  </p>
+                  {s && (
+                    <Attachments
+                      key={`${s.sessionId}:${s.epoch}`}
+                      sessionId={s.sessionId}
+                      onInterrupt={controller.interrupt}
+                      onRemove={(a) => {
+                        // Always tell the session — even if the share response has not
+                        // landed yet — so a late accept cannot leave a ghost attachment.
+                        void controller.send(
+                          `Remove reference ${a.id}`,
+                          "text",
+                        );
+                      }}
+                      onUse={(a) =>
+                        void controller.send(
+                          "",
+                          state.mode === "voice" ? "voice" : "text",
+                          a,
+                        )
+                      }
+                    />
+                  )}
+                </div>
+              </details>
             </div>
             {state.mode === "text" && (
               <form
@@ -263,11 +390,12 @@ export function SessionShell() {
                 </label>
                 <input
                   id="turn"
+                  autoComplete="off"
                   value={draft}
                   maxLength={4000}
                   placeholder={
                     s?.view === "summary"
-                      ? "Type “Confirm this simulated purchase” to approve"
+                      ? "Ready to order, or want to change something?"
                       : "Tell me what you have in mind…"
                   }
                   onChange={(e) => {
@@ -285,64 +413,14 @@ export function SessionShell() {
                 </button>
               </form>
             )}
-            <p className="voice-help">
-              {controller.speechKind === "live"
-                ? state.mode === "voice"
-                  ? "GPT-Live duplex connected · barge-in cancels stale narration. Interrupt with the control or Esc."
-                  : "Start Chat activates GPT-Live. Typing still receives spoken replies."
-                : state.mode === "voice"
-                  ? "Browser speech fallback · half duplex, microphone pauses during narration. Interrupt with the control or Esc."
-                  : "Start Chat asks for microphone access. Typing is always optional."}
-              {voiceNote ? ` ${voiceNote}` : ""}
-            </p>
-            {s && (
-              <Attachments
-                key={`${s.sessionId}:${s.epoch}`}
-                sessionId={s.sessionId}
-                onInterrupt={controller.interrupt}
-                onRemove={(a) => {
-                  // Always tell the session — even if the share response has not
-                  // landed yet — so a late accept cannot leave a ghost attachment.
-                  void controller.send(`Remove reference ${a.id}`, "text");
-                }}
-                onUse={(a) =>
-                  void controller.send(
-                    "",
-                    state.mode === "voice" ? "voice" : "text",
-                    a,
-                  )
-                }
-              />
-            )}
           </section>
-          {s && s.history.length > 0 && (
-            <details className="transcript">
-              <summary>
-                <MessageSquare size={15} /> Conversation transcript{" "}
-                <span>
-                  {s.history.filter((h) => h.role === "user").length} turns
-                </span>
-              </summary>
-              <ol>
-                {s.history.map((entry, i) => (
-                  <li key={i}>
-                    <span>{entry.role === "user" ? "You" : "Along"}</span>
-                    <p>{entry.text}</p>
-                  </li>
-                ))}
-              </ol>
-            </details>
-          )}
         </main>
-        <footer>
-          <span>Voice, text, or a little inspiration.</span>
-          <span>Demo data only. Purchases are simulated.</span>
-        </footer>
       </div>
     </MotionConfig>
   );
 }
 function ContentStage({
+  narrationProductId,
   session: s,
   onCommand,
   onSummaryDisplayed,
@@ -350,6 +428,7 @@ function ContentStage({
   onMediaEvent,
   busy,
 }: {
+  narrationProductId?: string | null;
   session: Session;
   onCommand: (text: string) => void;
   onSummaryDisplayed: () => void;
@@ -380,24 +459,11 @@ function ContentStage({
   }, [s.view, s.summaryId, onSummaryDisplayed]);
   return (
     <>
-      {s.needs.length > 0 && s.view !== "summary" && (
-        <div className="preferences">
-          <span>
-            {s.category === "audio"
-              ? "Audio accessories"
-              : s.category === "bags"
-                ? "Everyday bags"
-                : "Bedsheet sets"}
-          </span>
-          {s.preferences.slice(-2).map((p, i) => (
-            <span key={i}>{p}</span>
-          ))}
-        </div>
-      )}
       {s.canvas &&
         s.catalog &&
         !["opening", "summary", "receipt", "recovery"].includes(s.view) && (
           <ProductCanvas
+            narrationProductId={narrationProductId}
             busy={busy}
             snapshot={{ ...s, canvas: s.canvas }}
             data={s.catalog}
@@ -439,9 +505,9 @@ function ContentStage({
                 </span>
                 <span className="card-type">
                   {c.kind === "product"
-                    ? "Synthetic product"
+                    ? "Product"
                     : c.kind === "offer"
-                      ? "Proxy offer"
+                      ? "Offer"
                       : "Solution type"}
                 </span>
               </div>
@@ -479,24 +545,20 @@ function ContentStage({
           data-summary-status={s.summary.status}
         >
           <p className="summary-label">
-            SIMULATED ORDER ·{" "}
+            Your order ·{" "}
             {s.summary.status === "invalidated"
-              ? "INVALIDATED"
+              ? "Review needed"
               : s.summary.status === "eligible"
-                ? "ELIGIBLE"
+                ? "Ready to confirm"
                 : s.summary.status === "confirmed"
-                  ? "CONFIRMED"
-                  : "PRESENTING"}{" "}
-            ·{" "}
-            {s.summary.presentationMode === "text"
-              ? "TEXT CONFIRMATION"
-              : "VOICE CONFIRMATION"}
+                  ? "Confirmed"
+                  : "Review the details"}
           </p>
           <dl>
             {[
-              ["Product", s.summary.productId],
-              ["Exact variant", s.summary.variantId],
-              ["Seller", s.summary.sellerId],
+              ["Product", s.catalog?.products.find((product) => product.id === s.summary?.productId)?.title ?? s.summary.productId],
+              ["Variant", customerCopy(s.catalog?.products.find((product) => product.id === s.summary?.productId)?.model ?? s.summary.variantId.replace(/-DEMO$/i, ""))],
+              ["Seller", customerSellerLabel(s.summary.sellerId)],
               ["Quantity", String(s.summary.quantity)],
               [
                 "Items",
@@ -511,11 +573,11 @@ function ContentStage({
                 `USD ${(s.summary.lineItemsMinor.otherFees / 100).toFixed(2)}`,
               ],
               ["Total", `USD ${(s.summary.totalMinor / 100).toFixed(2)}`],
-              ["Destination", s.summary.destination],
+              ["Destination", customerDestinationLabel(s.summary.destination)],
               ["Delivery estimate", s.summary.deliveryWindow],
-              ["Conditions", s.summary.conditions.join(". ")],
-              ["Uncertainties", s.summary.uncertainties.join(". ")],
-            ].map(([k, v]) => (
+              ["Conditions", customerNotes(s.summary.conditions).join(". ")],
+              ["Before you buy", customerNotes(s.summary.uncertainties).join(". ")],
+            ].filter(([, value]) => value).map(([k, v]) => (
               <div key={k}>
                 <dt>{k}</dt>
                 <dd>{v}</dd>
@@ -526,14 +588,13 @@ function ContentStage({
             <p className="exact-summary-text">{s.summary.spokenText}</p>
           )}
           <p role="status">
-            {s.summary.status === "eligible" ||
-            s.approvalStatus === "eligible"
-              ? "Full summary displayed. Say or type “Confirm this simulated purchase” to approve this exact summary. There is no purchase button."
+            {s.summary.status === "eligible" || s.approvalStatus === "eligible"
+              ? "Everything look right? Would you like me to place this order?"
               : s.summary.status === "invalidated" ||
                   s.approvalStatus === "blocked" ||
                   s.view === "recovery"
-                ? "Approval was invalidated. Say or type “review summary” for a fresh presentation, or explicitly choose text mode."
-                : "Listen to the complete summary before approving, or choose text confirmation."}
+                ? "This order needs another review before you can confirm it. Say “review summary” or switch to text below."
+                : "Review the details above, then tell me if you’d like to place this order."}
           </p>
           {(s.view === "recovery" || s.summary.status === "invalidated") && (
             <div className="priority-choices">
@@ -550,27 +611,11 @@ function ContentStage({
         </article>
       )}
       {s.view === "receipt" && s.receipt && (
-        <div className="receipt" data-simulated="true">
-          <Check size={24} />
-          <div>
-            <strong>SIMULATED receipt — no payment, no real order</strong>
-            <p>
-              {s.receipt.acceptedOrder.productId} · USD{" "}
-              {(s.receipt.acceptedOrder.totalMinor / 100).toFixed(2)}
-            </p>
-            <small>Receipt {s.receipt.id} · duplicate confirms reuse this ID</small>
-          </div>
-        </div>
+        <PurchaseComplete
+          receipt={s.receipt}
+          product={s.catalog?.products.find((product) => product.id === s.receipt?.acceptedOrder.productId)}
+        />
       )}
-      {s.view !== "opening" &&
-        s.view !== "summary" &&
-        s.view !== "receipt" &&
-        s.view !== "recovery" && (
-          <p className="stage-hint">
-            Keep talking, or type your next thought. “Show options”, “compare”,
-            “show offers”, and “save for later” all work.
-          </p>
-        )}
     </>
   );
 }

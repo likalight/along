@@ -1,0 +1,952 @@
+[
+  {
+    "id": "MIC-001",
+    "name": "Apple EarPods (USB-C)",
+    "group": "Headphones, earbuds, and headsets",
+    "technical": {
+      "capsule / mic system": "Unspecified",
+      "polar_pattern": "Unspecified",
+      "connection": "USB-C",
+      "power": "USB bus",
+      "additional_hardware": "None with compatible USB-C host",
+      "noise_strategy": "Inline microphone; no dedicated mic noise suppression verified"
+    }
+  },
+  {
+    "id": "MIC-002",
+    "name": "Apple EarPods (3.5mm Headphone Plug)",
+    "group": "Headphones, earbuds, and headsets",
+    "technical": {
+      "capsule / mic system": "Unspecified",
+      "polar_pattern": "Unspecified",
+      "connection": "3.5mm TRRS",
+      "power": "Host mic input",
+      "additional_hardware": "CTIA-compatible microphone input or USB audio adapter with mic support",
+      "noise_strategy": "Inline microphone; no dedicated mic noise suppression verified"
+    }
+  },
+  {
+    "id": "MIC-003",
+    "name": "Logitech H390 (USB-A)",
+    "group": "Headphones, earbuds, and headsets",
+    "technical": {
+      "capsule / mic system": "Unspecified headset mic",
+      "polar_pattern": "Unspecified",
+      "connection": "USB-A",
+      "power": "USB bus",
+      "additional_hardware": "USB-C adapter if required",
+      "noise_strategy": "Noise-canceling boom microphone"
+    }
+  },
+  {
+    "id": "MIC-004",
+    "name": "Logitech H540",
+    "group": "Headphones, earbuds, and headsets",
+    "technical": {
+      "capsule / mic system": "Unspecified headset mic",
+      "polar_pattern": "Unspecified",
+      "connection": "USB-A",
+      "power": "USB bus",
+      "additional_hardware": "USB-C adapter if required",
+      "noise_strategy": "Noise-canceling boom microphone"
+    }
+  },
+  {
+    "id": "MIC-005",
+    "name": "Logitech Zone Wired (Teams, Graphite)",
+    "group": "Headphones, earbuds, and headsets",
+    "technical": {
+      "capsule / mic system": "Dual microphone system",
+      "polar_pattern": "Unspecified",
+      "connection": "USB-C; USB-A adapter",
+      "power": "USB bus",
+      "additional_hardware": "Confirm USB adapter in chosen seller package",
+      "noise_strategy": "Dual-mic background-noise reduction"
+    }
+  },
+  {
+    "id": "MIC-006",
+    "name": "Logitech Zone Vibe 100 (Graphite)",
+    "group": "Headphones, earbuds, and headsets",
+    "technical": {
+      "capsule / mic system": "Dual microphone system",
+      "polar_pattern": "Unspecified",
+      "connection": "Bluetooth",
+      "power": "Rechargeable battery",
+      "additional_hardware": "Bluetooth-capable host",
+      "noise_strategy": "Beamforming / noise-canceling microphone system"
+    }
+  },
+  {
+    "id": "MIC-007",
+    "name": "Jabra Evolve 20 UC Stereo (4999-829-289-01)",
+    "group": "Headphones, earbuds, and headsets",
+    "technical": {
+      "capsule / mic system": "Unspecified headset mic",
+      "polar_pattern": "Unspecified",
+      "connection": "USB-C / USB-A",
+      "power": "USB bus",
+      "additional_hardware": "None for matching USB host",
+      "noise_strategy": "Noise-canceling boom microphone"
+    }
+  },
+  {
+    "id": "MIC-008",
+    "name": "Jabra Evolve2 40 SE UC Stereo",
+    "group": "Headphones, earbuds, and headsets",
+    "technical": {
+      "capsule / mic system": "3-microphone system",
+      "polar_pattern": "Unspecified",
+      "connection": "USB-C; USB-A adapter",
+      "power": "USB bus",
+      "additional_hardware": "None for matching USB host",
+      "noise_strategy": "3-microphone call-noise reduction"
+    }
+  },
+  {
+    "id": "MIC-009",
+    "name": "Jabra Evolve2 65 Flex Link380a UC Stereo",
+    "group": "Headphones, earbuds, and headsets",
+    "technical": {
+      "capsule / mic system": "Multi-microphone system",
+      "polar_pattern": "Beamforming / unspecified physical pattern",
+      "connection": "Bluetooth; Link380a USB-A receiver",
+      "power": "Rechargeable battery",
+      "additional_hardware": "USB-C adapter for receiver if needed",
+      "noise_strategy": "ClearVoice microphone processing; headphone ANC is separate"
+    }
+  },
+  {
+    "id": "MIC-010",
+    "name": "HP Poly Blackwire 3220 (8X228AA)",
+    "group": "Headphones, earbuds, and headsets",
+    "technical": {
+      "capsule / mic system": "Unspecified headset mic",
+      "polar_pattern": "Unresolved: retailer lists omnidirectional",
+      "connection": "USB-C; USB-A adapter",
+      "power": "USB bus",
+      "additional_hardware": "None for matching USB host",
+      "noise_strategy": "Boom placement; manufacturer markets noise-canceling mic"
+    }
+  },
+  {
+    "id": "MIC-011",
+    "name": "HP Poly Blackwire 5220 (8X231AA)",
+    "group": "Headphones, earbuds, and headsets",
+    "technical": {
+      "capsule / mic system": "Unspecified headset mic",
+      "polar_pattern": "Unresolved: retailer lists omnidirectional",
+      "connection": "USB-C; USB-A adapter; 3.5mm",
+      "power": "USB bus / analog host",
+      "additional_hardware": "Compatible mic input for analog mode",
+      "noise_strategy": "Boom placement; manufacturer noise-canceling mic"
+    }
+  },
+  {
+    "id": "MIC-012",
+    "name": "HP Poly Voyager Focus 2 UC (9T9J3AA#AC3)",
+    "group": "Headphones, earbuds, and headsets",
+    "technical": {
+      "capsule / mic system": "Multi-microphone system",
+      "polar_pattern": "Unspecified",
+      "connection": "Bluetooth; USB-C receiver + USB-A adapter",
+      "power": "Rechargeable battery",
+      "additional_hardware": "Included receiver; confirm package",
+      "noise_strategy": "Acoustic Fence microphone processing; separate headphone ANC"
+    }
+  },
+  {
+    "id": "MIC-013",
+    "name": "HP Poly Voyager 5200 UC USB-A + BT700",
+    "group": "Headphones, earbuds, and headsets",
+    "technical": {
+      "capsule / mic system": "Multi-microphone system",
+      "polar_pattern": "Unspecified",
+      "connection": "Bluetooth; BT700 USB-A receiver",
+      "power": "Rechargeable battery",
+      "additional_hardware": "USB-C adapter for receiver if needed",
+      "noise_strategy": "Multi-microphone noise reduction; WindSmart"
+    }
+  },
+  {
+    "id": "MIC-014",
+    "name": "Shure WH20XLR",
+    "group": "Headphones, earbuds, and headsets",
+    "technical": {
+      "capsule / mic system": "Dynamic",
+      "polar_pattern": "Cardioid",
+      "connection": "3-pin XLR",
+      "power": "No phantom power required",
+      "additional_hardware": "XLR audio interface + cable; no headphones included",
+      "noise_strategy": "Close boom position and directional pickup"
+    }
+  },
+  {
+    "id": "MIC-015",
+    "name": "Shure MV6 Gen 2 (Black)",
+    "group": "Directional desk and shotgun microphones",
+    "technical": {
+      "capsule / mic system": "Dynamic",
+      "polar_pattern": "Cardioid",
+      "connection": "USB-C",
+      "power": "USB bus",
+      "additional_hardware": "Included desk stand; optional boom arm",
+      "noise_strategy": "Directional pickup; denoiser; auto level; pop suppression"
+    }
+  },
+  {
+    "id": "MIC-016",
+    "name": "Shure MV7+ (Black)",
+    "group": "Directional desk and shotgun microphones",
+    "technical": {
+      "capsule / mic system": "Dynamic",
+      "polar_pattern": "Cardioid",
+      "connection": "USB-C; XLR",
+      "power": "USB bus; interface in XLR mode",
+      "additional_hardware": "Stand / boom arm; interface only for XLR",
+      "noise_strategy": "Directional close capture; DSP denoising and level control"
+    }
+  },
+  {
+    "id": "MIC-017",
+    "name": "RØDE PodMic USB",
+    "group": "Directional desk and shotgun microphones",
+    "technical": {
+      "capsule / mic system": "Dynamic",
+      "polar_pattern": "Cardioid",
+      "connection": "USB-C; XLR",
+      "power": "USB bus; interface in XLR mode",
+      "additional_hardware": "Stand / boom arm; interface only for XLR",
+      "noise_strategy": "Close directional capture; APHEX DSP via USB"
+    }
+  },
+  {
+    "id": "MIC-018",
+    "name": "Audio-Technica ATR2100x-USB",
+    "group": "Directional desk and shotgun microphones",
+    "technical": {
+      "capsule / mic system": "Dynamic",
+      "polar_pattern": "Cardioid",
+      "connection": "USB-C; XLR",
+      "power": "USB bus; interface in XLR mode",
+      "additional_hardware": "Stand / boom arm; interface only for XLR",
+      "noise_strategy": "Directional close capture; no dedicated denoiser verified"
+    }
+  },
+  {
+    "id": "MIC-019",
+    "name": "Samson Q2U Recording and Podcasting Pack",
+    "group": "Directional desk and shotgun microphones",
+    "technical": {
+      "capsule / mic system": "Dynamic",
+      "polar_pattern": "Cardioid",
+      "connection": "USB mini-B; XLR",
+      "power": "USB bus; interface in XLR mode",
+      "additional_hardware": "Included desk stand / windscreen / cables; optional boom",
+      "noise_strategy": "Directional close capture; no dedicated denoiser verified"
+    }
+  },
+  {
+    "id": "MIC-020",
+    "name": "FIFINE AmpliGame AM8 (base stand + USB cable)",
+    "group": "Directional desk and shotgun microphones",
+    "technical": {
+      "capsule / mic system": "Dynamic",
+      "polar_pattern": "Cardioid",
+      "connection": "USB-C; XLR",
+      "power": "USB bus; interface in XLR mode",
+      "additional_hardware": "Included base stand; interface only for XLR",
+      "noise_strategy": "Directional close capture; no dedicated denoiser verified"
+    }
+  },
+  {
+    "id": "MIC-021",
+    "name": "MAONO PD200X + BA20 boom arm",
+    "group": "Directional desk and shotgun microphones",
+    "technical": {
+      "capsule / mic system": "Dynamic",
+      "polar_pattern": "Cardioid",
+      "connection": "USB-C; XLR",
+      "power": "USB bus; interface in XLR mode",
+      "additional_hardware": "BA20 boom arm in selected variant; XLR interface optional",
+      "noise_strategy": "Close directional capture; Maono Link processing via USB"
+    }
+  },
+  {
+    "id": "MIC-022",
+    "name": "RØDE NT-USB Mini",
+    "group": "Directional desk and shotgun microphones",
+    "technical": {
+      "capsule / mic system": "Condenser",
+      "polar_pattern": "Cardioid",
+      "connection": "USB-C",
+      "power": "USB bus",
+      "additional_hardware": "Included magnetic desk stand; optional boom",
+      "noise_strategy": "Directional pickup; integrated pop filter"
+    }
+  },
+  {
+    "id": "MIC-023",
+    "name": "RØDE NT-USB+",
+    "group": "Directional desk and shotgun microphones",
+    "technical": {
+      "capsule / mic system": "Condenser",
+      "polar_pattern": "Cardioid",
+      "connection": "USB-C",
+      "power": "USB bus",
+      "additional_hardware": "Included tripod / pop filter; optional boom",
+      "noise_strategy": "Directional pickup; APHEX processing"
+    }
+  },
+  {
+    "id": "MIC-024",
+    "name": "Logitech / Blue Yeti (Blackout)",
+    "group": "Directional desk and shotgun microphones",
+    "technical": {
+      "capsule / mic system": "Condenser",
+      "polar_pattern": "Selectable cardioid / omni / bidirectional / stereo",
+      "connection": "USB mini-B",
+      "power": "USB bus",
+      "additional_hardware": "Included desk stand; optional boom",
+      "noise_strategy": "Use cardioid mode; Blue VO!CE software filters"
+    }
+  },
+  {
+    "id": "MIC-025",
+    "name": "Logitech / Blue Snowball iCE (Black)",
+    "group": "Directional desk and shotgun microphones",
+    "technical": {
+      "capsule / mic system": "Condenser",
+      "polar_pattern": "Cardioid",
+      "connection": "USB mini-B",
+      "power": "USB bus",
+      "additional_hardware": "Included desk tripod; optional boom",
+      "noise_strategy": "Directional pickup; no dedicated denoiser verified"
+    }
+  },
+  {
+    "id": "MIC-026",
+    "name": "Elgato Wave:3 MK.2",
+    "group": "Directional desk and shotgun microphones",
+    "technical": {
+      "capsule / mic system": "Condenser",
+      "polar_pattern": "Cardioid",
+      "connection": "USB-C",
+      "power": "USB bus",
+      "additional_hardware": "Desk mount / optional boom; confirm selected package",
+      "noise_strategy": "Wave FX DSP; Clipguard; auto gain"
+    }
+  },
+  {
+    "id": "MIC-027",
+    "name": "HyperX SoloCast 2",
+    "group": "Directional desk and shotgun microphones",
+    "technical": {
+      "capsule / mic system": "Condenser",
+      "polar_pattern": "Cardioid",
+      "connection": "USB-C",
+      "power": "USB bus",
+      "additional_hardware": "Included adjustable stand; optional boom",
+      "noise_strategy": "Built-in pop filter / shock mount; software audio filters"
+    }
+  },
+  {
+    "id": "MIC-028",
+    "name": "HyperX QuadCast S (Black)",
+    "group": "Directional desk and shotgun microphones",
+    "technical": {
+      "capsule / mic system": "Condenser",
+      "polar_pattern": "Selectable cardioid / omni / bidirectional / stereo",
+      "connection": "USB-C",
+      "power": "USB bus",
+      "additional_hardware": "Included stand / shock mount; optional boom",
+      "noise_strategy": "Use cardioid; vibration isolation; no dedicated denoiser verified"
+    }
+  },
+  {
+    "id": "MIC-029",
+    "name": "Razer Seiren V3 Mini (Black)",
+    "group": "Directional desk and shotgun microphones",
+    "technical": {
+      "capsule / mic system": "Condenser",
+      "polar_pattern": "Supercardioid",
+      "connection": "USB",
+      "power": "USB bus",
+      "additional_hardware": "Included desk stand; optional boom",
+      "noise_strategy": "Directional pickup; tap-to-mute"
+    }
+  },
+  {
+    "id": "MIC-030",
+    "name": "Shure SM58",
+    "group": "Studio, broadcast, meeting, and specialist dictation microphones",
+    "technical": {
+      "capsule / mic system": "Dynamic",
+      "polar_pattern": "Cardioid",
+      "connection": "XLR",
+      "power": "No phantom power required",
+      "additional_hardware": "XLR interface + cable + stand",
+      "noise_strategy": "Close directional pickup; built-in pop filtering"
+    }
+  },
+  {
+    "id": "MIC-031",
+    "name": "Shure SM7B",
+    "group": "Studio, broadcast, meeting, and specialist dictation microphones",
+    "technical": {
+      "capsule / mic system": "Dynamic",
+      "polar_pattern": "Cardioid",
+      "connection": "XLR",
+      "power": "No phantom power for mic itself",
+      "additional_hardware": "High-gain low-noise XLR interface + cable + boom; booster only if needed",
+      "noise_strategy": "Close directional capture; windscreen; analog tone switches"
+    }
+  },
+  {
+    "id": "MIC-032",
+    "name": "RØDE PodMic (XLR, Black)",
+    "group": "Studio, broadcast, meeting, and specialist dictation microphones",
+    "technical": {
+      "capsule / mic system": "Dynamic",
+      "polar_pattern": "Cardioid",
+      "connection": "XLR",
+      "power": "No phantom power required",
+      "additional_hardware": "XLR interface + cable + sturdy stand / boom",
+      "noise_strategy": "Close directional pickup; integrated pop shield"
+    }
+  },
+  {
+    "id": "MIC-033",
+    "name": "Audio-Technica AT2020 (XLR)",
+    "group": "Studio, broadcast, meeting, and specialist dictation microphones",
+    "technical": {
+      "capsule / mic system": "Condenser",
+      "polar_pattern": "Cardioid",
+      "connection": "XLR",
+      "power": "48V phantom power",
+      "additional_hardware": "Phantom-powered XLR interface + cable + stand + pop filter",
+      "noise_strategy": "Directional capture; no dedicated denoiser verified"
+    }
+  },
+  {
+    "id": "MIC-034",
+    "name": "Sennheiser e 835",
+    "group": "Studio, broadcast, meeting, and specialist dictation microphones",
+    "technical": {
+      "capsule / mic system": "Dynamic",
+      "polar_pattern": "Cardioid",
+      "connection": "XLR",
+      "power": "No phantom power required",
+      "additional_hardware": "XLR interface + cable + stand",
+      "noise_strategy": "Close directional capture"
+    }
+  },
+  {
+    "id": "MIC-035",
+    "name": "BOYA BY-M1 Classic",
+    "group": "Lavaliers and wearable clip-on microphones",
+    "technical": {
+      "capsule / mic system": "Condenser",
+      "polar_pattern": "Omnidirectional",
+      "connection": "3.5mm TRRS with camera / phone mode",
+      "power": "LR44 in applicable camera mode",
+      "additional_hardware": "Mic-capable USB / TRRS adapter if required",
+      "noise_strategy": "Close clothing placement; no verified active cancellation for Classic"
+    }
+  },
+  {
+    "id": "MIC-036",
+    "name": "RØDE smartLav+",
+    "group": "Lavaliers and wearable clip-on microphones",
+    "technical": {
+      "capsule / mic system": "Condenser",
+      "polar_pattern": "Omnidirectional",
+      "connection": "3.5mm TRRS",
+      "power": "Plug-in power from compatible host",
+      "additional_hardware": "Mic-capable USB audio adapter; TRRS-to-TRS adapter for TRS inputs",
+      "noise_strategy": "Close clothing placement; pop filter"
+    }
+  },
+  {
+    "id": "MIC-037",
+    "name": "RØDE Lavalier GO (Black)",
+    "group": "Lavaliers and wearable clip-on microphones",
+    "technical": {
+      "capsule / mic system": "Condenser",
+      "polar_pattern": "Omnidirectional",
+      "connection": "3.5mm TRS",
+      "power": "Plug-in power from compatible mic input",
+      "additional_hardware": "Compatible TRS mic input / wireless bodypack; adapter for TRRS or USB",
+      "noise_strategy": "Close clothing placement; pop shield"
+    }
+  },
+  {
+    "id": "MIC-038",
+    "name": "DJI Mic Mini (1 TX + 1 RX)",
+    "group": "Lavaliers and wearable clip-on microphones",
+    "technical": {
+      "capsule / mic system": "Condenser",
+      "polar_pattern": "Omnidirectional",
+      "connection": "2.4GHz TX-to-RX; USB-C / 3.5mm RX; Bluetooth to supported hosts",
+      "power": "Rechargeable TX / RX",
+      "additional_hardware": "USB data cable for computer; Lightning adapter if required",
+      "noise_strategy": "Two-level active noise cancellation"
+    }
+  },
+  {
+    "id": "MIC-039",
+    "name": "DJI Mic 2 (1 TX + 1 RX)",
+    "group": "Lavaliers and wearable clip-on microphones",
+    "technical": {
+      "capsule / mic system": "Condenser",
+      "polar_pattern": "Omnidirectional",
+      "connection": "2.4GHz TX-to-RX; USB-C / 3.5mm RX; Bluetooth to supported hosts",
+      "power": "Rechargeable TX / RX",
+      "additional_hardware": "USB data cable for computer; matching phone adapter",
+      "noise_strategy": "Intelligent noise cancellation"
+    }
+  },
+  {
+    "id": "MIC-040",
+    "name": "RØDE Wireless ME (single TX kit)",
+    "group": "Lavaliers and wearable clip-on microphones",
+    "technical": {
+      "capsule / mic system": "Condenser",
+      "polar_pattern": "Omnidirectional",
+      "connection": "2.4GHz TX-to-RX; USB-C / 3.5mm RX",
+      "power": "Rechargeable TX / RX",
+      "additional_hardware": "Included cables; confirm host cable",
+      "noise_strategy": "Close clip-on capture; GainAssist level control"
+    }
+  },
+  {
+    "id": "MIC-041",
+    "name": "RØDE Wireless GO II Single",
+    "group": "Lavaliers and wearable clip-on microphones",
+    "technical": {
+      "capsule / mic system": "Condenser",
+      "polar_pattern": "Omnidirectional",
+      "connection": "2.4GHz TX-to-RX; USB-C / 3.5mm RX",
+      "power": "Rechargeable TX / RX",
+      "additional_hardware": "USB data cable; optional external lav",
+      "noise_strategy": "Close clip-on capture; no dedicated denoiser verified"
+    }
+  },
+  {
+    "id": "MIC-042",
+    "name": "Hollyland LARK M2 Combo (Black)",
+    "group": "Lavaliers and wearable clip-on microphones",
+    "technical": {
+      "capsule / mic system": "Condenser",
+      "polar_pattern": "Omnidirectional",
+      "connection": "2.4GHz; USB-C / Lightning receiver options",
+      "power": "Rechargeable TX / RX / case",
+      "additional_hardware": "Use matching included receiver; confirm exact Combo contents",
+      "noise_strategy": "Environmental noise cancellation"
+    }
+  },
+  {
+    "id": "MIC-043",
+    "name": "Saramonic Blink 500 B2+ (2-person kit)",
+    "group": "Lavaliers and wearable clip-on microphones",
+    "technical": {
+      "capsule / mic system": "Condenser",
+      "polar_pattern": "Omnidirectional",
+      "connection": "2.4GHz TX-to-RX; USB-C / Lightning / 3.5mm RX",
+      "power": "Rechargeable TX / RX / case",
+      "additional_hardware": "Use matching output cable / adapter",
+      "noise_strategy": "Two-stage noise cancellation; low-cut filters"
+    }
+  },
+  {
+    "id": "MIC-044",
+    "name": "RØDE VideoMic GO II with Helix mount",
+    "group": "Directional desk and shotgun microphones",
+    "technical": {
+      "capsule / mic system": "Condenser",
+      "polar_pattern": "Supercardioid shotgun",
+      "connection": "USB-C; 3.5mm TRS",
+      "power": "USB bus or plug-in power",
+      "additional_hardware": "USB data cable + desk / boom mount for computer use",
+      "noise_strategy": "Directional pickup; isolation mount"
+    }
+  },
+  {
+    "id": "MIC-045",
+    "name": "RØDE VideoMic NTG",
+    "group": "Directional desk and shotgun microphones",
+    "technical": {
+      "capsule / mic system": "Condenser",
+      "polar_pattern": "Supercardioid shotgun",
+      "connection": "USB-C; 3.5mm auto-sensing output",
+      "power": "Internal rechargeable battery / USB",
+      "additional_hardware": "USB data cable + suitable desk / boom mount",
+      "noise_strategy": "Directional pickup; high-pass filter; gain controls"
+    }
+  },
+  {
+    "id": "MIC-046",
+    "name": "Sennheiser MKE 400 (2nd generation)",
+    "group": "Directional desk and shotgun microphones",
+    "technical": {
+      "capsule / mic system": "Condenser",
+      "polar_pattern": "Supercardioid shotgun",
+      "connection": "3.5mm TRS / TRRS via supplied cables",
+      "power": "2 AAA batteries",
+      "additional_hardware": "USB audio interface with mic input for USB-only laptops; mount",
+      "noise_strategy": "Directional pickup; low-cut filter; wind protection"
+    }
+  },
+  {
+    "id": "MIC-047",
+    "name": "Deity V-Mic D4 Mini",
+    "group": "Directional desk and shotgun microphones",
+    "technical": {
+      "capsule / mic system": "Condenser",
+      "polar_pattern": "Supercardioid",
+      "connection": "3.5mm TRS; supplied TRRS host cable",
+      "power": "1–5V plug-in power",
+      "additional_hardware": "Mic-capable USB adapter for USB-only hosts; mount",
+      "noise_strategy": "Directional pickup; included windscreen"
+    }
+  },
+  {
+    "id": "MIC-048",
+    "name": "Philips SpeechMike Premium LFH3500",
+    "group": "Studio, broadcast, meeting, and specialist dictation microphones",
+    "technical": {
+      "capsule / mic system": "Electret condenser",
+      "polar_pattern": "Unidirectional",
+      "connection": "USB-A",
+      "power": "USB bus",
+      "additional_hardware": "None for USB-A; USB-C adapter if required",
+      "noise_strategy": "Decoupled mic; pop filtering; speech-focused close capture"
+    }
+  },
+  {
+    "id": "MIC-049",
+    "name": "Philips SpeechOne PSM6300 kit (PSM6000 family)",
+    "group": "Headphones, earbuds, and headsets",
+    "technical": {
+      "capsule / mic system": "Electret condenser",
+      "polar_pattern": "Unidirectional",
+      "connection": "Wireless headset to USB docking station",
+      "power": "Rechargeable battery",
+      "additional_hardware": "USB docking station; optional AirBridge sold separately",
+      "noise_strategy": "Triple-layer noise-reduction filter; close boom"
+    }
+  },
+  {
+    "id": "MIC-050",
+    "name": "OM SYSTEM / Olympus RecMic II RM-4010P",
+    "group": "Studio, broadcast, meeting, and specialist dictation microphones",
+    "technical": {
+      "capsule / mic system": "Dual microphone system",
+      "polar_pattern": "Directional modes / beamforming",
+      "connection": "USB",
+      "power": "USB bus",
+      "additional_hardware": "USB-C adapter if required; configuration software for controls",
+      "noise_strategy": "Dual-mic noise cancellation; dictation mode selection"
+    }
+  },
+  {
+    "id": "MIC-051",
+    "name": "Jabra Evolve2 55 Stereo, UC / USB-A receiver selection",
+    "group": "Headphones, earbuds, and headsets",
+    "technical": null
+  },
+  {
+    "id": "MIC-052",
+    "name": "Jabra Evolve2 85 UC Stereo, Black",
+    "group": "Headphones, earbuds, and headsets",
+    "technical": null
+  },
+  {
+    "id": "MIC-053",
+    "name": "HP Poly Blackwire 8225 UC, USB-C + USB-A adapter",
+    "group": "Headphones, earbuds, and headsets",
+    "technical": null
+  },
+  {
+    "id": "MIC-054",
+    "name": "Logitech Zone Wireless 2",
+    "group": "Headphones, earbuds, and headsets",
+    "technical": null
+  },
+  {
+    "id": "MIC-055",
+    "name": "EPOS IMPACT 1061 ANC (1001131)",
+    "group": "Headphones, earbuds, and headsets",
+    "technical": null
+  },
+  {
+    "id": "MIC-056",
+    "name": "EPOS / Sennheiser PC 8 USB (1000432)",
+    "group": "Headphones, earbuds, and headsets",
+    "technical": null
+  },
+  {
+    "id": "MIC-057",
+    "name": "Audio-Technica ATH-M50xSTS-USB StreamSet, Black",
+    "group": "Headphones, earbuds, and headsets",
+    "technical": null
+  },
+  {
+    "id": "MIC-058",
+    "name": "Apple AirPods 4 with Active Noise Cancellation",
+    "group": "Headphones, earbuds, and headsets",
+    "technical": null
+  },
+  {
+    "id": "MIC-059",
+    "name": "Sony WH-1000XM6/B (Black)",
+    "group": "Headphones, earbuds, and headsets",
+    "technical": null
+  },
+  {
+    "id": "MIC-060",
+    "name": "HP Poly Voyager Surround 80 UC (8G7T9AA)",
+    "group": "Headphones, earbuds, and headsets",
+    "technical": null
+  },
+  {
+    "id": "MIC-061",
+    "name": "RØDE Lavalier II, Black",
+    "group": "Lavaliers and wearable clip-on microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-062",
+    "name": "RØDE Wireless PRO (2 TX + RX + 2 Lavalier II mics)",
+    "group": "Lavaliers and wearable clip-on microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-063",
+    "name": "RØDE Wireless Micro, USB-C, Black",
+    "group": "Lavaliers and wearable clip-on microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-064",
+    "name": "DJI Mic 3 (2 TX + 1 RX + charging case)",
+    "group": "Lavaliers and wearable clip-on microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-065",
+    "name": "Hollyland LARK M2S Combo, Space Gray",
+    "group": "Lavaliers and wearable clip-on microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-066",
+    "name": "Hollyland LARK MAX 2 Combo, 2-person",
+    "group": "Lavaliers and wearable clip-on microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-067",
+    "name": "BOYA BY-V10 (USB-C, 1 TX + 1 RX)",
+    "group": "Lavaliers and wearable clip-on microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-068",
+    "name": "BOYA BY-V4U (USB-C RX + 4 TX + case)",
+    "group": "Lavaliers and wearable clip-on microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-069",
+    "name": "BOYA BY-M1 Pro II",
+    "group": "Lavaliers and wearable clip-on microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-070",
+    "name": "Sennheiser XS Lav USB-C (2m)",
+    "group": "Lavaliers and wearable clip-on microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-071",
+    "name": "Shure MVL Mobile Lavalier",
+    "group": "Lavaliers and wearable clip-on microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-072",
+    "name": "Audio-Technica ATR3350xiS",
+    "group": "Lavaliers and wearable clip-on microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-073",
+    "name": "Deity W.Lav Pro, locking 3.5mm TRS",
+    "group": "Lavaliers and wearable clip-on microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-074",
+    "name": "Saramonic LavMicro U3A, 6.6ft USB-C",
+    "group": "Lavaliers and wearable clip-on microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-075",
+    "name": "Sennheiser MKE 2-ew Gold, Black, locking 3.5mm",
+    "group": "Lavaliers and wearable clip-on microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-076",
+    "name": "Shure MoveMic Two Receiver Kit",
+    "group": "Lavaliers and wearable clip-on microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-077",
+    "name": "Shure MV7i Smart Mic and Interface",
+    "group": "Directional desk and shotgun microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-078",
+    "name": "RØDE X XDM-100",
+    "group": "Directional desk and shotgun microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-079",
+    "name": "Sennheiser Profile USB (table-stand package)",
+    "group": "Directional desk and shotgun microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-080",
+    "name": "Audio-Technica AT2040USB",
+    "group": "Directional desk and shotgun microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-081",
+    "name": "FIFINE AmpliTank K688 (shockmount, no stand)",
+    "group": "Directional desk and shotgun microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-082",
+    "name": "MAONO PD400X + desktop stand",
+    "group": "Directional desk and shotgun microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-083",
+    "name": "Shure SM7dB",
+    "group": "Studio, broadcast, meeting, and specialist dictation microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-084",
+    "name": "Electro-Voice RE20 (original finish)",
+    "group": "Studio, broadcast, meeting, and specialist dictation microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-085",
+    "name": "Shure Beta 58A",
+    "group": "Studio, broadcast, meeting, and specialist dictation microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-086",
+    "name": "Sennheiser e 945",
+    "group": "Studio, broadcast, meeting, and specialist dictation microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-087",
+    "name": "AKG C104",
+    "group": "Studio, broadcast, meeting, and specialist dictation microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-088",
+    "name": "LEWITT LCT 440 PURE (single)",
+    "group": "Studio, broadcast, meeting, and specialist dictation microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-089",
+    "name": "RØDE NT1 Signature Series (Black, SM6 kit)",
+    "group": "Studio, broadcast, meeting, and specialist dictation microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-090",
+    "name": "Audio-Technica AT2035",
+    "group": "Studio, broadcast, meeting, and specialist dictation microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-091",
+    "name": "sE Electronics V7 ENG",
+    "group": "Studio, broadcast, meeting, and specialist dictation microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-092",
+    "name": "Shure VP64A",
+    "group": "Studio, broadcast, meeting, and specialist dictation microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-093",
+    "name": "Jabra Speak2 75 UC (2775-209-01)",
+    "group": "Studio, broadcast, meeting, and specialist dictation microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-094",
+    "name": "HP Poly Sync 20+ M (B95VLAA#AC3)",
+    "group": "Studio, broadcast, meeting, and specialist dictation microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-095",
+    "name": "Anker PowerConf S3",
+    "group": "Studio, broadcast, meeting, and specialist dictation microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-096",
+    "name": "Audio-Technica ATR4697-USB",
+    "group": "Studio, broadcast, meeting, and specialist dictation microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-097",
+    "name": "Audio-Technica PRO49QL (16.4-inch)",
+    "group": "Studio, broadcast, meeting, and specialist dictation microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-098",
+    "name": "Philips SpeechMike Premium Touch SMP3700",
+    "group": "Studio, broadcast, meeting, and specialist dictation microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-099",
+    "name": "Philips SpeechMike Premium Air SMP4000 (push-button)",
+    "group": "Studio, broadcast, meeting, and specialist dictation microphones",
+    "technical": null
+  },
+  {
+    "id": "MIC-100",
+    "name": "Nuance PowerMic III, 9-foot cord",
+    "group": "Studio, broadcast, meeting, and specialist dictation microphones",
+    "technical": null
+  }
+]

@@ -15,7 +15,7 @@ import {
   FixtureSessionStore,
   type ApplyResult,
 } from "./FixtureSessionStore.js";
-import { getProduct, PREPARED_ATTACHMENTS } from "../fixtures/catalog.js";
+import { EVIDENCE, getProduct, PREPARED_ATTACHMENTS } from "../fixtures/catalog.js";
 const priorities = {
   best_value: "best-value",
   best_supported_quality: "best-quality",
@@ -196,6 +196,11 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
             )
               ? String(p.stage)
               : "understanding";
+            if (proposal.stage === "solution_types")
+              proposal.preferences = Object.entries({
+                ...this.get(a.sessionId)!.preferences,
+                audioDirectionPending: true,
+              }).map((entry) => JSON.stringify(entry));
             content = String(p.question ?? "What matters most?");
             break;
           case "set_constraints": {
@@ -220,6 +225,8 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
             }
             if (hard.compatibility)
               constraints.compatibility = hard.compatibility;
+            if (hard.minimumCapacityL !== undefined) constraints.minimumCapacityL = hard.minimumCapacityL;
+            if (hard.separateShoeCompartment !== undefined) constraints.separateShoeCompartment = hard.separateShoeCompartment;
             if (hard.requiredSpecifications)
               constraints.requiredSpecifications = hard.requiredSpecifications;
             const unsupported = Object.keys(hard).filter(
@@ -232,6 +239,8 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
                   "currency",
                   "compatibility",
                   "requiredSpecifications",
+                  "minimumCapacityL",
+                  "separateShoeCompartment",
                 ].includes(k),
             );
             if (unsupported.length)
@@ -245,6 +254,10 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
               ...this.get(a.sessionId)!.preferences,
               ...((p.preferences as object) ?? {}),
             };
+            if (Object.hasOwn((p.preferences as object) ?? {}, "solutionType")) {
+              prefs.audioDirectionPending = false;
+              if (s.stage === "solution_types") proposal.stage = "understanding";
+            }
             proposal.preferences = Object.entries(prefs).map((x) =>
               JSON.stringify(x),
             );
@@ -257,15 +270,63 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
                 ...((p.exclusions as string[]) ?? []),
               ]),
             ];
+            const excluded = new Set(proposal.excludedProductIds);
+            if (s.shortlist.some((id) => excluded.has(id))) {
+              // Exclusion and presentation must change atomically: the backend
+              // correctly rejects a shortlist that still contains an excluded
+              // product. Keep remaining order/ranks and let quote validation
+              // decide whether the existing offer selection remains eligible.
+              proposal.shortlist = s.shortlist.filter((id) => !excluded.has(id));
+              proposal.displayOrder = s.displayOrder.filter(
+                (id) => !excluded.has(id),
+              );
+              proposal.comparisonIds = s.comparisonIds.filter(
+                (id) => !excluded.has(id),
+              );
+              const keepEvidence = (id: string) => {
+                const evidence = EVIDENCE.find((entry) => entry.id === id);
+                return (
+                  !evidence ||
+                  evidence.subjectType !== "product" ||
+                  !excluded.has(evidence.subjectId)
+                );
+              };
+              proposal.evidenceIds = s.evidenceIds.filter(keepEvidence);
+              const removedFocus =
+                !!s.view?.focusProductId && excluded.has(s.view.focusProductId);
+              if (s.view) {
+                proposal.view = {
+                  ...s.view,
+                  cards: s.view.cards.filter(
+                    (card) => !excluded.has(card.productId),
+                  ),
+                  focusProductId: removedFocus ? null : s.view.focusProductId,
+                  evidenceIds: s.view.evidenceIds.filter(keepEvidence),
+                  activeVideoId: removedFocus ? null : s.view.activeVideoId,
+                  stage:
+                    removedFocus && s.view.stage === "evidence"
+                      ? "shortlist"
+                      : s.view.stage,
+                };
+              }
+              proposal.stage = !proposal.shortlist.length
+                ? "understanding"
+                : (s.stage === "comparison" &&
+                      proposal.comparisonIds.length < 2) ||
+                    (s.stage === "evidence" && removedFocus) ||
+                    s.stage === "summary"
+                  ? "shortlist"
+                  : s.stage;
+            }
             content =
-              "Updated your requirements; existing hard limits remain in force.";
+              "Got it. I’ll keep that in mind.";
             break;
           }
           case "set_priority":
             proposal.priority =
               priorities[p.priority as keyof typeof priorities];
             if (!proposal.priority) throw new Error("invalid_priority");
-            content = "Updated priority while keeping hard constraints.";
+            content = "Got it. I’ll focus on that.";
             proposal.stage = "buying_priorities";
             break;
           case "shortlist": {
@@ -311,7 +372,7 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
               cards: shown.map((e, i) => ({
                 productId: e.productId,
                 role: (s.priority ?? "best-value") as "best-value",
-                rank: (i + 1) as 1 | 2 | 3,
+                rank: i < 3 ? ((i + 1) as 1 | 2 | 3) : null,
                 reason: e.fitReason,
                 compromise: e.compromise,
                 evidenceIds: getProduct(e.productId)?.evidenceIds ?? [],
@@ -322,9 +383,11 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
             proposal.stage = shown.length ? "shortlist" : "understanding";
             content = shown.length
               ? eligible.length
-                ? `Here are ${shown.length} candidates. Gold/silver/bronze are contextual ranks for this shortlist — not awards.`
-                : `Here are ${shown.length} discoveries. Some still need a compatibility check before checkout.`
-              : "No checked offer meets the known hard constraints. Which requirement may change?";
+                ? `Here ${shown.length === 1 ? "is one option" : `are ${shown.length} options`} worth a look. Want to compare them or check the prices?`
+                : `Here ${shown.length === 1 ? "is one option" : `are ${shown.length} options`} to explore. We’ll need to check a few details before choosing.`
+              : "I haven’t found an offer that fits everything yet. Would you like to adjust the budget or look at other options?";
+            if (shown.length && this.get(a.sessionId)!.preferences["bagPriority"] === "capacity")
+              content = "Let’s focus on roomier bags for your work and gym gear. " + content;
             break;
           }
           case "focus":
@@ -345,19 +408,30 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
               throw new Error("not_visible");
             proposal.stage = "comparison";
             content =
-              "Comparing the selected visible products; their display order is unchanged.";
+              "Let’s compare these side by side.";
             break;
-          case "show_evidence":
+          case "show_evidence": {
             proposal.evidenceIds = p.evidenceIds as string[];
             proposal.stage = "evidence";
+            const subject = proposal.evidenceIds
+              .map((id) => EVIDENCE.find((e) => e.id === id))
+              .find((e) => e?.subjectType === "product" && s.shortlist.includes(e.subjectId));
+            proposal.view = {
+              stage: "evidence",
+              focusProductId: subject?.subjectId ?? s.view?.focusProductId ?? s.shortlist[0] ?? null,
+              cards: s.view?.cards ?? [],
+              evidenceIds: proposal.evidenceIds,
+              activeVideoId: null,
+            };
             content =
-              "Showing attributable product evidence separately from synthetic seller terms.";
+              "Here’s what we know about the product. The seller offers here are examples for the demo.";
             break;
+          }
           case "select_offer":
             proposal.selection = { offerId: String(p.offerId), quantity: 1 };
             proposal.stage = "offers";
             content =
-              "Offer selected after checking the complete total and your constraints.";
+              "This offer fits what you’ve asked for. Let’s check the total together.";
             break;
           case "save":
             this.core.saveChoice(
@@ -381,7 +455,7 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
               saved.id,
             );
             content =
-              "Restored the saved choice under your current constraints.";
+              "Here’s the option you saved. I’ve checked it against what you need now.";
             return;
           }
           case "cancel":
@@ -403,7 +477,7 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
               "Model proposals cannot authorize a purchase. Display the exact summary, then use a new explicit shopper confirmation.",
             );
         }
-        this.core.propose(a.sessionId, proposal);
+        this.core.propose(a.sessionId, proposal, { includeOffers: false });
       });
       const snapshot = this.get(a.sessionId)!;
       return {
