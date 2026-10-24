@@ -9,10 +9,16 @@ import type {
 } from "./contract";
 import type { SpeechAdapter, Playback } from "@/lib/voice/adapter";
 import { TransportError } from "./http-transport";
-import { LiveProductFocus } from "./live-product-focus";
+import {
+  LiveProductFocus,
+  spokenNavigation,
+  requestsChromeReview,
+} from "./live-product-focus";
 export type ClientState = {
   snapshot: Session | null;
   narrationProductId: string | null;
+  outputMuted: boolean;
+  voiceReviewRequest: { productId: string; requestId: string } | null;
   status: VoiceStatus;
   capturing: boolean;
   mode: "text" | "voice" | null;
@@ -42,6 +48,8 @@ export class SessionController {
   private state: ClientState = {
     snapshot: null,
     narrationProductId: null,
+    outputMuted: false,
+    voiceReviewRequest: null,
     status: "ready",
     capturing: false,
     mode: null,
@@ -66,6 +74,9 @@ export class SessionController {
   private mediaEvents: Promise<unknown> = Promise.resolve();
   private playback: Playback | null = null;
   private liveFocus = new LiveProductFocus();
+  private userNavigationKey: string | null = null;
+  private lastPresentedProductId: string | null = null;
+  private userReviewHandled = false;
   private activityTimer: ReturnType<typeof setTimeout> | null = null;
   private delayTimer: ReturnType<typeof setTimeout> | null = null;
   private activityAbort: AbortController | null = null;
@@ -83,12 +94,17 @@ export class SessionController {
     this.speech.dispose();
     this.speech = adapter;
     this.speech.setVoice?.(this.voice);
+    this.speech.setOutputMuted?.(this.state.outputMuted);
     this.speechKind = kind;
   }
   setVoice(voice: "marin" | "cedar" | "coral") {
     this.voice = voice;
     this.speech.setVoice?.(voice);
   }
+  setOutputMuted = (muted: boolean) => {
+    this.speech.setOutputMuted?.(muted);
+    this.update({ outputMuted: muted });
+  };
   private stopActivity() {
     if (this.activityTimer) clearTimeout(this.activityTimer);
     if (this.delayTimer) clearTimeout(this.delayTimer);
@@ -138,6 +154,8 @@ export class SessionController {
   };
   private update(patch: Partial<ClientState>) {
     if (this.disposed) return;
+    if (patch.narrationProductId)
+      this.lastPresentedProductId = patch.narrationProductId;
     this.state = {
       ...this.state,
       ...patch,
@@ -163,11 +181,31 @@ export class SessionController {
       !current ||
       snapshot.epoch !== current.epoch ||
       snapshot.revision !== current.revision;
-    if (changed && this.speech.fullDuplex) this.liveFocus.clear();
+    const canvasChanged =
+      changed &&
+      (!current ||
+        snapshot.epoch !== current.epoch ||
+        snapshot.view !== current.view ||
+        snapshot.focusedProductId !== current.focusedProductId ||
+        snapshot.displayOrder.join("|") !== current.displayOrder.join("|"));
+    const firstProductsArrived =
+      canvasChanged &&
+      current?.displayOrder.length === 0 &&
+      snapshot.displayOrder.length > 0 &&
+      snapshot.epoch === current.epoch;
+    if (canvasChanged && !firstProductsArrived && this.speech.fullDuplex) {
+      this.liveFocus.clear();
+      this.lastPresentedProductId = snapshot.focusedProductId;
+    }
     this.update({
       snapshot,
-      ...(changed && this.speech.fullDuplex
-        ? { narrationProductId: null }
+      ...(canvasChanged && this.speech.fullDuplex
+        ? {
+            narrationProductId:
+              firstProductsArrived && this.state.status === "speaking"
+                ? this.liveFocus.reconcile(snapshot)
+                : null,
+          }
         : {}),
     });
     return true;
@@ -538,9 +576,52 @@ export class SessionController {
         caption: (speaker, text) => {
           if (!current()) return;
           if (speaker === "user") {
+            if (!this.state.capturing) return;
             this.liveFocus.clear();
-            this.update({ requestText: text, narrationProductId: null });
+            const snapshot = this.state.snapshot;
+            const navigation =
+              snapshot &&
+              spokenNavigation(
+                text,
+                snapshot,
+                this.state.narrationProductId ?? this.lastPresentedProductId,
+              );
+            const newNavigation =
+              navigation && navigation.key !== this.userNavigationKey;
+            if (newNavigation) this.userNavigationKey = navigation.key;
+            const review =
+              snapshot &&
+              !this.state.livePending &&
+              !snapshot.summary &&
+              !snapshot.receipt &&
+              !snapshot.discoveryReference &&
+              requestsChromeReview(text) &&
+              !this.userReviewHandled;
+            const productId =
+              this.state.narrationProductId ??
+              this.lastPresentedProductId ??
+              snapshot?.focusedProductId ??
+              snapshot?.displayOrder[0];
+            if (review && productId) this.userReviewHandled = true;
+            this.update({
+              requestText: text,
+              narrationProductId: newNavigation
+                ? navigation.productId
+                : this.userNavigationKey
+                  ? this.state.narrationProductId
+                  : null,
+              ...(review && productId
+                ? {
+                    voiceReviewRequest: {
+                      productId,
+                      requestId: crypto.randomUUID(),
+                    },
+                  }
+                : {}),
+            });
           } else {
+            this.userNavigationKey = null;
+            this.userReviewHandled = false;
             const productId = this.liveFocus.accept(text, this.state.snapshot);
             this.update({
               liveCaption: text,

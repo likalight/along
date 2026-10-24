@@ -1,51 +1,49 @@
 .root {
-  width: min(1040px, 89%);
-  margin: 12px auto;
-  padding: 16px 20px;
   display: flex;
   align-items: center;
-  gap: 16px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: var(--surface, #302a22);
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 12px 0 4px;
   font-size: 13px;
-}
-.root div {
-  flex: 1;
-}
-.root strong {
-  font-weight: 500;
-}
-.root p {
-  margin: 6px 0 0;
   color: var(--muted);
-  line-height: 1.5;
 }
-.root button {
-  border: 1px solid var(--line);
+.root button,
+.root a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 8px;
   background: transparent;
-  color: inherit;
-  border-radius: 999px;
-  padding: 12px 16px;
+  color: var(--ink);
+  font: inherit;
   cursor: pointer;
+  text-underline-offset: 4px;
+}
+.root .watch {
+  padding-left: 0;
+}
+.root .resume {
+  background: var(--surface);
+}
+.root button:hover,
+.root a:hover {
+  color: var(--primary, #d1d4ac);
 }
 .root button:disabled {
   opacity: 0.5;
   cursor: wait;
 }
-.root a {
-  color: inherit;
+.root p {
+  flex-basis: 100%;
+  margin: 0;
+  line-height: 1.5;
 }
 .root button:focus-visible,
 .root a:focus-visible {
-  outline: 2px solid #9ccfff;
+  outline: 2px solid var(--focus, #d9c99e);
   outline-offset: 4px;
-}
-@media (max-width: 700px) {
-  .root {
-    flex-wrap: wrap;
-  }
-  .root div {
-    flex-basis: 100%;
-  }
 }

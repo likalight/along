@@ -21,6 +21,8 @@ import {
   Keyboard,
   ArrowRight,
   MessageSquare,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { SessionController } from "@/lib/session/controller";
 import { httpTransport } from "@/lib/session/http-transport";
@@ -108,7 +110,17 @@ export function SessionShell() {
     };
     const online = () => void controller.reconnect();
     const key = (e: KeyboardEvent) => {
-      if (e.key === "Escape") controller.interrupt();
+      if (e.key !== "Escape") return;
+      const settings = document.querySelector<HTMLDetailsElement>(
+        ".conversation-options[open]",
+      );
+      if (settings) {
+        settings.open = false;
+        settings.querySelector<HTMLElement>("summary")?.focus();
+        e.preventDefault();
+        return;
+      }
+      controller.interrupt();
     };
     window.addEventListener("offline", offline);
     window.addEventListener("online", online);
@@ -169,9 +181,6 @@ export function SessionShell() {
             <span className="brand-dot">.</span>
           </a>
         </header>
-        <p className="catalog-notice" role="note">
-          Demo catalog · simulated offers and orders
-        </p>
         <div hidden={!showContext}>
           {showContext && (
             <ContextOverview
@@ -187,11 +196,6 @@ export function SessionShell() {
             hasDraft={Boolean(draft.trim())}
           />
         </div>
-        <ProductVideoHandoff
-          controller={controller}
-          state={state}
-          connected={chrome === "connected"}
-        />
         <main
           className={`${opening ? "main opening" : "main active"} ${orbGreeting ? "orb-greeting" : ""}`}
         >
@@ -269,7 +273,11 @@ export function SessionShell() {
                         s?.view !== "summary" && (
                           <p className="assistant-reply">
                             <span className="sr-only">Along: </span>
-                            {state.liveCaption || s?.message}
+                            {state.liveCaption ||
+                              (state.status === "thinking" || state.livePending
+                                ? (state.activity?.label ??
+                                  "Finding options for you…")
+                                : s?.message)}
                           </p>
                         )}
                     </>
@@ -303,6 +311,11 @@ export function SessionShell() {
               </motion.div>
             </AnimatePresence>
           </section>
+          <ProductVideoHandoff
+            controller={controller}
+            state={state}
+            connected={chrome === "connected"}
+          />
           {s && s.history.length > 0 && (
             <details className="transcript">
               <summary>
@@ -385,6 +398,24 @@ export function SessionShell() {
                 <Keyboard size={17} />
                 {state.mode === "text" ? "Typing · mic off" : "Type instead"}
               </button>
+              <button
+                className="text-button speaker-toggle"
+                aria-label={state.outputMuted ? "Unmute Along" : "Mute Along"}
+                aria-pressed={state.outputMuted}
+                title={
+                  state.outputMuted
+                    ? "Unmute voice replies"
+                    : "Mute voice replies; keep listening"
+                }
+                onClick={() => controller.setOutputMuted(!state.outputMuted)}
+              >
+                {state.outputMuted ? (
+                  <VolumeX size={18} />
+                ) : (
+                  <Volume2 size={18} />
+                )}
+                <span>{state.outputMuted ? "Muted" : "Sound on"}</span>
+              </button>
               <details className="conversation-options">
                 <summary>Settings</summary>
                 <div className="options-panel">
@@ -429,6 +460,10 @@ export function SessionShell() {
                       </select>
                     </label>
                   )}
+                  <p className="voice-help">
+                    Preview environment · offers and orders are simulated. No
+                    payment is taken.
+                  </p>
                   <p className="voice-help">
                     {state.mode === "voice"
                       ? controller.speechKind === "live"
@@ -637,6 +672,9 @@ function ContentStage({
           data-summary-id={s.summary.id}
           data-summary-status={s.summary.status}
         >
+          <p className="voice-help">
+            Simulated checkout · no payment will be taken.
+          </p>
           <p className="summary-label">
             Your order ·{" "}
             {s.summary.status === "invalidated"

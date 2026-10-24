@@ -81,7 +81,7 @@ Preflight in the Chrome extension settings: connect the same local Along address
 
 Curated link: https://www.youtube.com/shorts/WCsWHqMdPJI — “Rode Wireless Pro - Review & Audio Test”, DansTubeTV. The page title and product match were checked. This is an external creator review, not measured proof of dictation quality in crowded areas. Playback depends on YouTube, connectivity and its own user controls; no copied video is distributed.
 
-Fallback: the in-app **Watch review in Chrome** button invokes the same extension path. Without the extension, **Open video directly** opens a separate tab and says so; this is not represented as a successful extension handoff. If a presenter closes the video manually, switch to the existing Along tab and resume there.
+Fallback: the in-app **Watch review** button invokes the same extension path. Without the extension, **Open in new tab** opens a separate tab and says so; this is not represented as a successful extension handoff. If a presenter closes the video manually, switch to the existing Along tab and resume there.
 
 Verification for this presentation flow:
 
@@ -102,3 +102,13 @@ Personal Chrome rehearsal, 25 October:
 The current production rehearsal verified cancellation before a pending typed request completed: the app reported “Stopped. No purchase was made.” A subsequent microphone session transcribed room speech, but did not establish a spoken shopping journey. It was paused, and a fresh independent demo session was prepared at the presenter’s request.
 
 Still required before claiming the full voice journey complete: an observed revised constraint applied in the live conversation; the presenter hearing the complete spoken purchase summary; explicit spoken approval bound to that current summary; and exactly one simulated receipt from that approval. Existing typed checkout evidence and provider fixtures do not substitute for this human rehearsal.
+
+## Voice and presentation refinement — 25 October
+
+The conversation now has a separate Sound on / Muted control. It mutes assistant output, not the microphone; the Live adapter preserves this state through audio sampling and reconnect/resume. Browser fallback suppresses spoken output without asserting that a summary was heard.
+
+Product presentation follows unambiguous spoken model names and explicit navigation. It preserves focus through unrelated backend revisions and reconciles names that arrive before the first shortlist. Short names omit comma-separated catalog configuration only when unique among visible products. Direct Chrome/YouTube navigation captions request only the current curated review; they do not select an offer or authorize checkout. The server also recognizes these phrases as video requests.
+
+The review action now follows the presented product and sits below it. The global demo strip and returned-video banner are removed. Simulation disclosure remains in Settings, order review and receipts. After a video, Back to Along returns to the same conversation, then Continue conversation enables voice. The YouTube tab does not listen for spoken return commands.
+
+Validation: targeted voice focus/playback/lifecycle checks, installed-extension review/return check, accepted-carousel navigation check, production build and TypeScript passed. In personal Chrome, the typed natural-language request “Take me to the Chrome tab” opened the real YouTube review and its Back control returned to the same session. Live human speech timing and the final spoken checkout still require presenter rehearsal; these checks do not claim otherwise.

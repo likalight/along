@@ -29,6 +29,8 @@ export function mentionedProduct(
       product.title,
       product.model,
       model,
+      model.split(",")[0].trim(),
+      `${product.brand} ${model.split(",")[0].trim()}`,
       `${product.brand} ${model}`,
     ]) {
       const alias = normalize(value);
@@ -144,6 +146,10 @@ export class LiveProductFocus {
     this.blocked = false;
   }
 
+  reconcile(snapshot: Session) {
+    return this.accept(this.caption, snapshot);
+  }
+
   accept(text: string, snapshot: Session | null) {
     if (!text.startsWith(this.caption)) {
       // The adapter caps caption history. Preserve the reset boundary when the
@@ -171,4 +177,47 @@ export class LiveProductFocus {
     if (productId) this.productId = productId;
     return this.productId;
   }
+}
+
+/** A reversible visual command, never a product selection or purchase instruction. */
+export function spokenNavigation(
+  text: string,
+  snapshot: Session,
+  currentId: string | null,
+) {
+  const words = normalize(text)
+    .replace(/^(?:please |can you |could you )/, "")
+    .replace(/ please$/, "");
+  const ids = snapshot.displayOrder;
+  if (!ids.length) return null;
+  const index = Math.max(
+    0,
+    ids.indexOf(currentId ?? snapshot.focusedProductId ?? ids[0]),
+  );
+  if (
+    /^(?:(?:show|go|move|take me) (?:me |to )?(?:the )?)?next(?: (?:one|product|option))?$/.test(
+      words,
+    )
+  )
+    return { key: "next", productId: ids[(index + 1) % ids.length] };
+  if (
+    /^(?:(?:show|go|move|take me) (?:me |to )?(?:the )?)?(?:previous|previous one|previous product|previous option)$/.test(
+      words,
+    )
+  )
+    return {
+      key: "previous",
+      productId: ids[(index + ids.length - 1) % ids.length],
+    };
+  if (/^(?:show|focus|go to|take me to|look at|what about)\b/.test(words)) {
+    const id = mentionedProduct(words, snapshot);
+    if (id) return { key: id, productId: id };
+  }
+  return null;
+}
+
+export function requestsChromeReview(text: string) {
+  return /^(?:please |can you |could you )?(?:take me|go|switch|open|return|bring me)(?: back)?(?: to)?(?: the)? (?:chrome|youtube)(?: tab| review| video)?(?: please)?[.!?]*$/i.test(
+    text.trim(),
+  );
 }

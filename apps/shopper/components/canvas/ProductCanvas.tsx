@@ -21,7 +21,12 @@ import {
 } from "@/lib/canvas/contracts";
 import styles from "./canvas.module.css";
 import { AUDIO_SOLUTION_CHOICES } from "@/lib/canvas/solution-choices";
-import { customerCopy, customerDestinationLabel, customerNotes, customerSellerLabel } from "@/lib/canvas/customer-copy";
+import {
+  customerCopy,
+  customerDestinationLabel,
+  customerNotes,
+  customerSellerLabel,
+} from "@/lib/canvas/customer-copy";
 import { consumerDetails } from "@/lib/canvas/consumer-details";
 import { ProductCarousel } from "./ProductCarousel";
 import { productImageFallback } from "@/lib/canvas/product-media";
@@ -384,14 +389,15 @@ export function ProductCanvas({
           )}
           {lowestOffer && (
             <p className={styles.offerPrice}>
-              {money(deliveredTotal(lowestOffer), lowestOffer.currency)} delivered
+              {money(deliveredTotal(lowestOffer), lowestOffer.currency)}{" "}
+              delivered
             </p>
           )}
           {metrics?.rating != null && (
             <p className={styles.metricHint}>
               {metrics.rating}/5 ·{" "}
-              {metrics.ratingCount?.toLocaleString() ?? "unavailable"}{" "}
-              source ratings
+              {metrics.ratingCount?.toLocaleString() ?? "unavailable"} source
+              ratings
             </p>
           )}
           <div className={styles.cardActions}>
@@ -523,7 +529,10 @@ export function ProductCanvas({
         </div>
       )}
       {s.view === "solution_types" && (
-        <section className={styles.directionChoices} aria-label="Microphone setups">
+        <section
+          className={styles.directionChoices}
+          aria-label="Microphone setups"
+        >
           {solutions.map((choice) => (
             <button
               key={choice.id}
@@ -531,7 +540,10 @@ export function ProductCanvas({
               disabled={busy}
               onClick={() => intent(choice.command)}
             >
-              <span><strong>{choice.title}</strong><span>{choice.text}</span></span>
+              <span>
+                <strong>{choice.title}</strong>
+                <span>{choice.text}</span>
+              </span>
               <ArrowUpRight size={17} aria-hidden="true" />
             </button>
           ))}
@@ -541,8 +553,7 @@ export function ProductCanvas({
       {s.view === "buying_priorities" && (
         <section aria-label="Choose a buying priority">
           <div className={styles.choices}>
-          {priorities.map(
-            (choice, index) => (
+            {priorities.map((choice, index) => (
               <motion.article
                 key={choice.id}
                 className={styles.choice}
@@ -553,7 +564,9 @@ export function ProductCanvas({
                   delay: stable ? 0 : index * 0.1,
                 }}
               >
-                <span className={styles.directionLabel}>{index + 1} · {choice.tag}</span>
+                <span className={styles.directionLabel}>
+                  {index + 1} · {choice.tag}
+                </span>
                 <h3>{choice.title}</h3>
                 <p>{choice.text}</p>
                 <p className={styles.compromise}>
@@ -563,8 +576,7 @@ export function ProductCanvas({
                   Explore this direction <ArrowUpRight size={15} />
                 </button>
               </motion.article>
-            ),
-          )}
+            ))}
           </div>
         </section>
       )}
@@ -589,7 +601,7 @@ export function ProductCanvas({
                 <span>
                   {s.view === "comparison"
                     ? "Compare products"
-                    : `${products.length} options`}
+                    : `${products.length} ${products.length === 1 ? "option" : "options"}`}
                 </span>
                 <div>
                   {products.length >= 2 && (
@@ -690,8 +702,8 @@ export function ProductCanvas({
                                   : label === "Delivered total"
                                     ? "Select seller; not yet known"
                                     : r?.rating == null
-                                          ? "Not available"
-                                          : `${r.rating}/5 · ${r.writtenReviewCount ?? "unknown"} source reviews`}
+                                      ? "Not available"
+                                      : `${r.rating}/5 · ${r.writtenReviewCount ?? "unknown"} source reviews`}
                           </td>
                         );
                       })}
@@ -729,15 +741,22 @@ export function ProductCanvas({
                       s.evidenceIds.includes(ev.id) &&
                       ev.subjectType === "product" &&
                       ev.subjectId === focused.id &&
-                      !(ev.classification === "proxy" && /review/i.test(ev.sourceType)),
+                      !(
+                        ev.classification === "proxy" &&
+                        /review/i.test(ev.sourceType)
+                      ),
                   )
                   .map((ev) => (
                     <article className={styles.evidenceItem} key={ev.id}>
                       <div className={styles.evidenceMeta}>
                         <span>{ev.sourceType}</span>
                       </div>
-                      {customerCopy(ev.claim) && <p>{customerCopy(ev.claim)}</p>}
-                      {ev.excerpt && customerCopy(ev.excerpt) && <blockquote>{customerCopy(ev.excerpt)}</blockquote>}
+                      {customerCopy(ev.claim) && (
+                        <p>{customerCopy(ev.claim)}</p>
+                      )}
+                      {ev.excerpt && customerCopy(ev.excerpt) && (
+                        <blockquote>{customerCopy(ev.excerpt)}</blockquote>
+                      )}
                       <p className={styles.scope}>
                         {ev.media?.creator ? `${ev.media.creator} · ` : ""}
                         Checked {ev.checkedOn}
@@ -925,7 +944,9 @@ export function ProductCanvas({
                           {money(o.requiredSetupMinor, o.currency)} required
                           setup
                         </p>
-                        <p>Destination: {customerDestinationLabel(o.destination)}</p>
+                        <p>
+                          Destination: {customerDestinationLabel(o.destination)}
+                        </p>
                         <p>
                           {o.availability === "in_stock"
                             ? "In stock"
@@ -952,7 +973,9 @@ export function ProductCanvas({
                         </span>
                       </div>
                       <div>
-                        {customerCopy(o.returnTerms) && <p>{customerCopy(o.returnTerms)}</p>}
+                        {customerCopy(o.returnTerms) && (
+                          <p>{customerCopy(o.returnTerms)}</p>
+                        )}
                         {customerNotes(o.conditions).map((c) => (
                           <p className={styles.scope} key={c}>
                             {c}
@@ -970,9 +993,7 @@ export function ProductCanvas({
                           )
                           .map((e) => (
                             <p className={styles.sellerEvidence} key={e.id}>
-                              <strong>
-                                Seller details
-                              </strong>{" "}
+                              <strong>Seller details</strong>{" "}
                               {customerCopy(e.claim)}
                               <span className={styles.scope}>
                                 {" "}
@@ -1037,13 +1058,14 @@ export function ProductCanvas({
           </button>
         </p>
       )}
-      {products.length > 0 && !["understanding", "shortlist", "saved_choice"].includes(s.view) && (
-        <footer className={styles.canvasFooter}>
-          <button disabled={busy} onClick={() => intent("Back to shortlist")}>
-            Back to products <ArrowUpRight size={14} />
-          </button>
-        </footer>
-      )}
+      {products.length > 0 &&
+        !["understanding", "shortlist", "saved_choice"].includes(s.view) && (
+          <footer className={styles.canvasFooter}>
+            <button disabled={busy} onClick={() => intent("Back to shortlist")}>
+              Back to products <ArrowUpRight size={14} />
+            </button>
+          </footer>
+        )}
     </section>
   );
 }

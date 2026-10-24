@@ -58,6 +58,7 @@ export class GptLiveAdapter implements SpeechAdapter {
   } | null = null;
   private assistantCaptionStart = -1;
   private speaking = false;
+  private outputMuted = false;
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
   private abort: AbortController | null = null;
   private callbacks: SpeechCallbacks | null = null;
@@ -75,6 +76,11 @@ export class GptLiveAdapter implements SpeechAdapter {
   setVoice(voice: VoiceChoice) {
     if (voice !== this.voice && this.callId) this.close();
     this.voice = voice;
+  }
+
+  setOutputMuted(muted: boolean) {
+    this.outputMuted = muted;
+    if (this.audio) this.audio.muted = muted || this.playbackGate.muted;
   }
 
   private async control(
@@ -300,7 +306,7 @@ export class GptLiveAdapter implements SpeechAdapter {
         this.callbacks?.bargeIn();
       }
       if (result.discardCaption) this.pendingAssistantCaption = null;
-      if (this.audio) this.audio.muted = result.muted;
+      if (this.audio) this.audio.muted = this.outputMuted || result.muted;
       if (result.resumed) {
         this.callbacks?.playbackResumed?.();
         if (this.pendingAssistantCaption) {
@@ -377,6 +383,7 @@ export class GptLiveAdapter implements SpeechAdapter {
     stream.getTracks().forEach((track) => peer.addTrack(track, stream));
     const audio = new Audio();
     audio.autoplay = true;
+    audio.muted = this.outputMuted;
     this.audio = audio;
     peer.ontrack = (event) => {
       if (this.peer !== peer) return;
@@ -506,7 +513,7 @@ export class GptLiveAdapter implements SpeechAdapter {
     ++this.playbackEpoch;
     this.pendingAssistantCaption = null;
     this.playbackGate.reset();
-    if (this.audio) this.audio.muted = false;
+    if (this.audio) this.audio.muted = this.outputMuted;
     this.stream?.getAudioTracks().forEach((track) => {
       track.enabled = true;
     });

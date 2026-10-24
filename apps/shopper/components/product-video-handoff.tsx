@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Play, ArrowUpRight, Volume2 } from "lucide-react";
 import { PRODUCT_VIDEOS, type ProductVideo } from "@coupang/contract";
 import type { ClientState, SessionController } from "@/lib/session/controller";
 import styles from "./product-video-handoff.module.css";
@@ -16,6 +17,8 @@ export function ProductVideoHandoff({
   const [video, setVideo] = useState<ProductVideo | null>(null);
   const [note, setNote] = useState("");
   const [opening, setOpening] = useState(false);
+  const [fallback, setFallback] = useState(false);
+  const [returned, setReturned] = useState(false);
   const latest = useRef({ state, connected });
   latest.current = { state, connected };
   const seen = useRef(new Set<string>());
@@ -29,6 +32,8 @@ export function ProductVideoHandoff({
     (selected: ProductVideo) => {
       if (pending.current) return;
       setVideo(selected);
+      setFallback(false);
+      setReturned(false);
       // Stop capture AND playback before any external audio can start.
       controller.pauseForExternalVideo();
       const current = latest.current.state.snapshot;
@@ -47,17 +52,17 @@ export function ProductVideoHandoff({
         pair.sessionId !== current.sessionId ||
         pair.epoch !== current.epoch
       ) {
-        setNote(
-          "Connect the Chrome companion in Settings to watch with Back to Along. You can also open the review in a separate tab.",
-        );
+        setFallback(true);
+        setNote("Connect Chrome in Settings, or open the review in a new tab.");
         return;
       }
       const id = crypto.randomUUID();
       setOpening(true);
-      setNote("Opening the review in Chrome · microphone paused");
+      setNote("Opening review…");
       const timer = setTimeout(() => {
         pending.current = null;
         setOpening(false);
+        setFallback(true);
         setNote(
           "Chrome did not reply. Reconnect the extension in Settings, then try again.",
         );
@@ -90,9 +95,10 @@ export function ProductVideoHandoff({
         clearTimeout(attempt.timer);
         pending.current = null;
         setOpening(false);
+        setFallback(!event.data.ok);
         setNote(
           event.data.ok
-            ? "The review is open in Chrome. Use Back to Along when you’re finished."
+            ? "Review open · microphone paused"
             : String(event.data.error || "Could not open the review."),
         );
       }
@@ -109,9 +115,9 @@ export function ProductVideoHandoff({
           return;
         }
         if (event.data.extensionId !== pair?.extensionId) return;
-        setNote(
-          "Welcome back. Your choices are unchanged. Tap Talk to Along to continue.",
-        );
+        setReturned(true);
+        setFallback(false);
+        setNote("");
       }
     };
     window.addEventListener("message", receive);
@@ -144,55 +150,65 @@ export function ProductVideoHandoff({
     sessionId,
     open,
   ]);
+  useEffect(() => {
+    const request = state.voiceReviewRequest;
+    if (!request) return;
+    const key = `${sessionId}:voice:${request.requestId}`;
+    if (seen.current.has(key)) return;
+    seen.current.add(key);
+    const selected = PRODUCT_VIDEOS.find(
+      (item) => item.productId === request.productId,
+    );
+    if (selected) open(selected);
+  }, [state.voiceReviewRequest, sessionId, open]);
   // A button remains available for a deterministic rehearsal and accessibility.
   const focused =
-    state.snapshot?.focusedProductId ?? state.snapshot?.displayOrder?.[0];
+    state.narrationProductId ??
+    state.snapshot?.focusedProductId ??
+    state.snapshot?.displayOrder?.[0];
   const available =
     !state.snapshot?.discoveryReference &&
     !state.snapshot?.summary &&
     !state.snapshot?.receipt
       ? PRODUCT_VIDEOS.find((item) => item.productId === focused)
       : undefined;
-  if (
-    state.snapshot?.summary ||
-    state.snapshot?.receipt ||
-    (!video && !available)
-  )
+  if (state.snapshot?.summary || state.snapshot?.receipt || !available)
     return null;
-  const selected = video ?? available!;
+  const selected = available;
+  const currentVideo = video?.id === selected.id;
+  const canResume = returned && currentVideo && !state.capturing;
   return (
     <aside className={styles.root} aria-label="Product video">
-      <div>
-        <strong>{selected.title}</strong>
-        <p role="status">
-          {note || `${selected.creator} · External review on YouTube`}
-        </p>
-      </div>
       <button
+        className={styles.watch}
         disabled={opening || state.livePending || state.status === "thinking"}
         onClick={() => open(selected)}
+        title={`${selected.title} · ${selected.creator}`}
       >
-        {opening ? "Opening…" : "Watch review in Chrome"}
+        <Play size={15} aria-hidden="true" />
+        {opening ? "Opening…" : "Watch review"}
       </button>
-      {video && (
-        <>
-          <a
-            href={selected.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => controller.pauseForExternalVideo()}
-          >
-            Open video directly ↗
-          </a>
-          <button
-            onClick={() => {
-              setVideo(null);
-              setNote("");
-            }}
-          >
-            Dismiss
-          </button>
-        </>
+      {canResume && (
+        <button
+          className={styles.resume}
+          onClick={() => {
+            setReturned(false);
+            void controller.chooseMode("voice");
+          }}
+        >
+          <Volume2 size={16} aria-hidden="true" /> Continue conversation
+        </button>
+      )}
+      {currentVideo && note && <p role="status">{note}</p>}
+      {currentVideo && fallback && (
+        <a
+          href={selected.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => controller.pauseForExternalVideo()}
+        >
+          Open in new tab <ArrowUpRight size={14} aria-hidden="true" />
+        </a>
       )}
     </aside>
   );
