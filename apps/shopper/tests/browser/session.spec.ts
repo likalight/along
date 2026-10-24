@@ -352,8 +352,11 @@ test("switching from interrupted voice summary requires fresh text confirmation"
   await expect(page.locator(".voice-status")).toContainText("Speaking");
   await page.getByRole("button", { name: "Interrupt response" }).click();
   await page.getByRole("button", { name: "I’d rather type" }).click();
-  await expect(summary).toBeVisible();
+  await expect(
+    page.getByText(/interrupted|text mode|review the summary/i).first(),
+  ).toBeVisible();
   await say(page, "review summary");
+  await expect(summary).toContainText(/TEXT CONFIRMATION|Full summary displayed/i);
   await say(page, "confirm simulated purchase");
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
     /choice made with confidence|Your choice, clearly/i,

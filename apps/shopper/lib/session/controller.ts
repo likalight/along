@@ -352,6 +352,16 @@ export class SessionController {
         return;
       this.update({ snapshot: accepted.snapshot, status: "ready", error: null });
       if (modality === "voice") this.narrate(accepted.snapshot);
+      // Text turns that land on a summary must finish presentation ack before
+      // the next confirm — otherwise interrupt→text→confirm races APPROVAL_NOT_READY.
+      if (
+        modality === "text" &&
+        (accepted.snapshot.view === "summary" ||
+          accepted.snapshot.view === "recovery") &&
+        accepted.snapshot.summary
+      ) {
+        await this.presentSummary();
+      }
     } catch (e) {
       if (generation !== this.generation) return;
       if (e instanceof TransportError && e.snapshot)
