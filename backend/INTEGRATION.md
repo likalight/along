@@ -1,5 +1,7 @@
 # Along integration contract v1
 
+For the combined Next.js shopper frontend, see [the root integration handoff](../INTEGRATION.md). This document describes the standalone port-4318 HTTP transport; do not mix its sessions with the Next.js runtime.
+
 The implementation baseline is [issue #2](https://github.com/likalight/along/issues/2). Use `IntegrationClient` and `/v1/integration` for public field names. The internal `/v1` routes and `ConciergeClient` address the same store using legacy aliases.
 
 ## Connect

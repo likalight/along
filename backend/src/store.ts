@@ -1135,6 +1135,18 @@ export class SessionStore {
       return this.beginTurn(id, x.baseRevision, x);
     });
   }
+  usePreparedImage(id: string, expected: number, imageId: string) {
+    const s = this.get(id);
+    this.revision(s, expected);
+    this.mutable(s);
+    requireThat(
+      this.profile.preparedImages.some((p) => p.id === imageId),
+      "UNKNOWN_ATTACHMENT",
+      "Unknown prepared image.",
+    );
+    if (!s.attachmentIds.includes(imageId)) s.attachmentIds.push(imageId);
+    return this.commit(s);
+  }
   addAttachment(
     id: string,
     expected: number,
@@ -1182,6 +1194,15 @@ export class SessionStore {
       404,
     );
     return { ...a, bytes: Buffer.from(a.bytes) };
+  }
+  /** Drop a session reference; idempotent if it was never attached or already gone. */
+  removeAttachment(id: string, expected: number, attachmentId: string) {
+    const s = this.get(id);
+    this.revision(s, expected);
+    this.mutable(s);
+    s.attachmentIds = s.attachmentIds.filter((x) => x !== attachmentId);
+    this.attachments.delete(attachmentId);
+    return this.commit(s);
   }
   switchMode(id: string, expected: number, mode: unknown) {
     const s = this.get(id);

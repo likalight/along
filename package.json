@@ -1,40 +1,22 @@
 {
-  "name": "along-web",
-  "version": "0.1.0",
+  "name": "along",
   "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @coupang/web",
+    "build": "npm run sync:catalog && npm run build -w @concierge/backend && npm run build -w @coupang/contract && npm run build -w @coupang/agent && npm run build -w @coupang/web && npm run build -w @along/shopper",
+    "test": "npm run test -w @coupang/agent",
+    "typecheck": "npm run typecheck -w @coupang/contract && npm run typecheck -w @coupang/agent && npm run typecheck -w @coupang/web && npm run typecheck -w @along/shopper",
+    "sync:catalog": "node scripts/sync-catalog.mjs",
+    "dev:shopper": "npm run dev -w @along/shopper",
+    "test:e2e": "npm run test:e2e -w @along/shopper",
+    "test:canvas": "npm run test:canvas -w @along/shopper"
+  },
   "engines": {
     "node": ">=22.18"
-  },
-  "scripts": {
-    "dev": "next dev --hostname 127.0.0.1",
-    "build": "next build",
-    "start": "next start --hostname 127.0.0.1",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:e2e": "playwright test",
-    "test:canvas": "playwright test --config playwright.canvas.config.ts",
-    "format": "prettier --write .",
-    "format:check": "prettier --check ."
-  },
-  "dependencies": {
-    "@react-three/drei": "^10.7.7",
-    "@react-three/fiber": "^9.4.0",
-    "lucide-react": "^1.31.0",
-    "motion": "^12.23.24",
-    "next": "^16.3.4",
-    "react": "^19.2.6",
-    "react-dom": "^19.2.6",
-    "three": "^0.180.0"
-  },
-  "devDependencies": {
-    "@playwright/test": "^1.56.0",
-    "@types/node": "^22.19.19",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
-    "@types/three": "^0.180.0",
-    "prettier": "^3.9.10",
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.0"
-  },
-  "type": "module"
+  }
 }

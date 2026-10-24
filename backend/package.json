@@ -1,5 +1,5 @@
 {
-  "name": "@along/backend",
+  "name": "@concierge/backend",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,6 +9,7 @@
     "check": "tsc --noEmit",
     "test": "node --experimental-strip-types --test test/*.test.ts",
     "demo": "node --experimental-strip-types scripts/demo.ts",
+    "build": "tsc -p tsconfig.build.json && node scripts/copy-build-assets.mjs",
     "verify": "npm run check && npm test && npm run demo"
   },
   "devDependencies": {
@@ -17,5 +18,35 @@
   },
   "engines": {
     "node": ">=22.18"
+  },
+  "exports": {
+    "./store": {
+      "types": "./dist/backend/src/store.d.ts",
+      "import": "./dist/backend/src/store.js"
+    },
+    "./integration": {
+      "types": "./dist/backend/src/integration.d.ts",
+      "import": "./dist/backend/src/integration.js"
+    },
+    "./catalog": {
+      "types": "./dist/backend/src/team-catalog.d.ts",
+      "import": "./dist/backend/src/team-catalog.js"
+    },
+    "./contracts": {
+      "types": "./dist/backend/src/contracts.d.ts",
+      "import": "./dist/backend/src/contracts.js"
+    },
+    "./agreed-catalog": {
+      "types": "./dist/backend/src/agreed-catalog.d.ts",
+      "import": "./dist/backend/src/agreed-catalog.js"
+    },
+    "./quotes": {
+      "types": "./dist/backend/src/catalog.d.ts",
+      "import": "./dist/backend/src/catalog.js"
+    },
+    "./along-catalog": {
+      "types": "./dist/backend/src/along-catalog.d.ts",
+      "import": "./dist/backend/src/along-catalog.js"
+    }
   }
 }

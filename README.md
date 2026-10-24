@@ -65,18 +65,15 @@ The active fixture contains **24 products**: 12 audio configurations, six bags, 
 
 ## Getting started
 
-The shared catalog, session backend, and fixture-based shopper shell are ready to inspect and test. Wiring the shell to the backend and live voice provider remains separate integration work; there is no complete hosted demo yet.
-
-### Run the session shell
-
-From the repository root:
+The integrated shopper interface runs locally against the authoritative backend. Live AI/voice provider transport and a hosted demo remain pending. See [the combined handoff](./INTEGRATION.md) for verified behavior and limitations.
 
 ```sh
 npm ci
-npm run dev
+npm run build
+npm run start -w @along/shopper -- --port 4322
 ```
 
-Open [the local shell](http://127.0.0.1:3000). It supports voice/text journeys, photo/link references, interruption, and simulated confirmation against an explicitly labelled server fixture. See the [session shell guide](./docs/session-shell.md) for commands and integration limits.
+Open http://127.0.0.1:4322 and choose “I’d rather type”. The diagnostic harness lives in `apps/web`; the shopper interface lives in `apps/shopper`.
 
 ### Run the catalog checks
 
@@ -174,9 +171,9 @@ Along is an early hackathon project, not a production marketplace.
 | Product direction and integration contract | Agreed in [issue #2](https://github.com/likalight/along/issues/2). |
 | Catalog, provenance, scenarios, and validation | Implemented in [PR #16](https://github.com/likalight/along/pull/16) and integrated through [PR #15](https://github.com/likalight/along/pull/15). |
 | Session backend and simulated approval | Implemented with voice/text approval, multimodal state, and CI in [PR #15](https://github.com/likalight/along/pull/15). See the [acceptance matrix](./backend/ACCEPTANCE.md). |
-| Shopper session shell | Implemented with deterministic fixtures in [PR #19](https://github.com/likalight/along/pull/19); see the [shell guide](./docs/session-shell.md). Live integration remains pending. |
-| Product canvas and evidence | Implemented with deterministic fixtures in [PR #18](https://github.com/likalight/along/pull/18); try `/canvas-preview` and see the [canvas guide](./docs/product-canvas.md). Live catalog and voice wiring remain pending. |
-| End-to-end demo rehearsal | Pending; the target is a seven-minute presentation. |
+| Shopper interface | Session shell + product canvas integrated in `apps/shopper` (see [shell](./apps/shopper/docs/session-shell.md) and [canvas](./apps/shopper/docs/product-canvas.md)), with canonical offers and authenticated backend state. |
+| Live AI/voice integration | GPT-Live mint when `OPENAI_API_KEY` is set; otherwise authenticated `not_connected` with labeled browser speech / text fallback. |
+| End-to-end demo rehearsal | Text journey verified through ranked shortlist tiles, offers, and simulated receipt. Live spoken journey requires `OPENAI_API_KEY`. |
 
 The agreed frontend direction is **Next.js App Router + TypeScript**, **Motion for React**, and an **ElevenLabs UI Orb**. The orb is a visual component; it does not establish the selected speech/model provider or a paid service commitment.
 

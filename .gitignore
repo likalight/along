@@ -1,8 +1,8 @@
-node_modules/
-.next/
-out/
-playwright-report/
-test-results/
+node_modules
+.next
+dist
 *.tsbuildinfo
-.env*
+.env
+.env.local
 .DS_Store
+coverage
