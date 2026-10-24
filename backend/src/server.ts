@@ -12,7 +12,7 @@ import {
 } from "node:http";
 import { pathToFileURL } from "node:url";
 import { eligibleOffers } from "./catalog.ts";
-import { teamProfile } from "./team-catalog.ts";
+import { alongProfile } from "./along-catalog.ts";
 import type { CatalogProfile } from "./contracts.ts";
 import { SessionStore, safeEqual } from "./store.ts";
 import {
@@ -31,7 +31,9 @@ export function createApp(options: {
   store?: SessionStore;
   profile?: CatalogProfile;
 }) {
-  const profile = options.profile ?? options.store?.profile ?? teamProfile;
+  const profile = options.profile ?? options.store?.profile ?? alongProfile;
+  if (options.store && options.profile && options.store.profile !== options.profile)
+    throw new Error("The HTTP catalog and session store must share one profile.");
   const { catalog, scenarios, preparedImages } = profile;
   const store = options.store ?? new SessionStore(undefined, profile);
   const origins = new Set(
@@ -42,6 +44,16 @@ export function createApp(options: {
     ],
   );
   const integrated = new WeakSet<ServerResponse>();
+  function trustedBridge(req: IncomingMessage) {
+    const supplied = req.headers["x-agent-token"];
+    requireThat(
+      typeof supplied === "string" && options.agentToken.length >= 24 &&
+        safeEqual(supplied, options.agentToken),
+      "AGENT_UNAUTHORIZED",
+      "This route requires the trusted AI/voice server.",
+      403,
+    );
+  }
   function json(res: ServerResponse, status: number, body: unknown) {
     res.writeHead(status, {
       "content-type": "application/json; charset=utf-8",
@@ -83,6 +95,7 @@ export function createApp(options: {
     res.setHeader("x-content-type-options", "nosniff");
     res.setHeader("referrer-policy", "no-referrer");
     const origin = req.headers.origin;
+    let authenticatedSessionId: string | undefined;
     try {
       if (origin) {
         requireThat(
@@ -144,6 +157,17 @@ export function createApp(options: {
             new URL("../public/" + path.join("/"), import.meta.url),
           ),
         );
+        return;
+      }
+      if (req.method === "GET" && [
+        "catalog/images/bag.svg", "catalog/images/bedding.svg", "catalog/images/audio.svg",
+      ].includes(path.join("/"))) {
+        const asset = await readFile(new URL("../../catalog/public/" + path.join("/"), import.meta.url));
+        res.writeHead(200, {
+          "content-type": "image/svg+xml",
+          "content-security-policy": "default-src 'none'; sandbox",
+        });
+        res.end(asset);
         return;
       }
       if (req.method === "GET" && path.join("/") === "v1/prepared-images") {
@@ -211,6 +235,7 @@ export function createApp(options: {
         ? req.headers.authorization.slice(7)
         : "";
       store.authenticate(id, bearer);
+      authenticatedSessionId = id;
       const action = path.slice(3).join("/");
       const agentActions = [
         "proposals",
@@ -220,15 +245,7 @@ export function createApp(options: {
         "confirm",
       ];
       if (agentActions.includes(action)) {
-        const supplied = req.headers["x-agent-token"];
-        requireThat(
-          typeof supplied === "string" &&
-            options.agentToken.length >= 24 &&
-            safeEqual(supplied, options.agentToken),
-          "AGENT_UNAUTHORIZED",
-          "This route requires the trusted AI/voice server.",
-          403,
-        );
+        trustedBridge(req);
       }
       if (req.method === "GET" && !action) {
         json(res, 200, { session: store.get(id) });
@@ -240,14 +257,18 @@ export function createApp(options: {
           "content-type": "text/event-stream",
           connection: "keep-alive",
         });
-        const emit = (event: any) =>
-          res.write(
+        const emit = (event: any) => {
+          const writable = res.write(
             `data: ${JSON.stringify(integrated.has(res) && event.type === "session.snapshot" ? { type: "session.updated", sessionId: id, epoch: event.session.epoch, eventId: `state-${event.session.epoch}-${event.session.revision}`, turnId: event.session.turn?.id ?? null, revision: event.session.revision, snapshot: sessionView(event.session) } : event)}\n\n`,
           );
+          // Slow consumers reconnect to the latest snapshot rather than accumulating
+          // an unbounded queue of stale display/approval state in memory.
+          if (!writable) res.end();
+        };
         emit({ type: "session.snapshot", session: store.get(id) });
         const listener = (event: any) => {
           emit(event);
-          if (event.type === "session.expired") res.end();
+          if (event.type === "session.expired" || event.type === "session.ended") res.end();
         };
         store.events.on(id, listener);
         const heartbeat = setInterval(
@@ -299,8 +320,19 @@ export function createApp(options: {
         405,
       );
       const b = await body(req);
+      if ((action === "inputs" && b.modality === "voice") ||
+          (action === "presentation" && b.event !== "displayed") ||
+          (action === "lifecycle" && typeof b.type === "string" && b.type.startsWith("audio.")))
+        trustedBridge(req);
       let result: unknown;
       switch (action) {
+        case "lifecycle":
+          result = { session: store.lifecycle(id, b) };
+          break;
+        case "end":
+          keys(b, ["expectedRevision"]);
+          result = store.end(id, b.expectedRevision as number);
+          break;
         case "inputs":
           result = { session: store.input(id, b) };
           break;
@@ -334,8 +366,21 @@ export function createApp(options: {
           };
           break;
         case "cancel":
-          keys(b, ["turnId"]);
-          result = { session: store.cancel(id, b.turnId as string) };
+          if (profile.catalog.canonical) {
+            keys(b, ["epoch", "eventId", "expectedRevision", "turnId"]);
+            requireThat(
+              ["epoch", "eventId", "expectedRevision", "turnId"].every(field => b[field] !== undefined),
+              "INVALID_CANCELLATION_ENVELOPE",
+              "Cancellation requires epoch, eventId, expectedRevision and turnId from the current snapshot.",
+            );
+            result = { session: store.lifecycle(id, {
+              sessionId: id, epoch: b.epoch, eventId: b.eventId,
+              revision: b.expectedRevision, turnId: b.turnId, type: "turn.cancelled",
+            }) };
+          } else {
+            keys(b, ["turnId"]);
+            result = { session: store.cancel(id, b.turnId as string) };
+          }
           break;
         case "reset":
           keys(b, ["expectedRevision"]);
@@ -355,9 +400,20 @@ export function createApp(options: {
           };
           break;
         case "presentation":
+          requireThat(
+            !profile.catalog.canonical || ["epoch", "eventId", "expectedRevision", "summaryRevision"].every(field => b[field] !== undefined),
+            "INVALID_PRESENTATION_ENVELOPE",
+            "Presentation requires epoch, eventId, expectedRevision and summaryRevision for the current displayed summary.",
+          );
           result = { session: store.presentation(id, b) };
           break;
         case "approval":
+          requireThat(
+            !profile.catalog.canonical,
+            "LEGACY_APPROVAL_DISABLED",
+            "Use /confirm with a fresh shopper input, epoch, eventId, turnId, baseRevision and summaryRevision. Legacy approval is unavailable for this catalog.",
+            409,
+          );
           result = store.approve(id, b);
           break;
         default:
@@ -378,11 +434,22 @@ export function createApp(options: {
           "backend error",
           e instanceof Error ? e.message : "unknown",
         );
+      let details = error.details;
+      // Conflicting decisions are re-evaluated from the same accepted state
+      // returned to an authenticated shopper, never a partially applied proposal.
+      if (authenticatedSessionId && (error.status === 409 || error.status === 422)) {
+        try {
+          details = {
+            ...(details && typeof details === "object" ? details : {}),
+            session: store.get(authenticatedSessionId),
+          };
+        } catch { /* Expired/ended sessions have no resumable snapshot. */ }
+      }
       json(res, error.status, {
         error: {
           code: error.code,
           message: error.message,
-          ...(error.details !== undefined ? { details: error.details } : {}),
+          ...(details !== undefined ? { details } : {}),
         },
       });
     }

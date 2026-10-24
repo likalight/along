@@ -13,6 +13,22 @@ const constraintsSchema = {
   type: "object",
   additionalProperties: false,
   properties: {
+    deadline: { type: "string" },
+    productId: { type: "string" },
+    variantId: { type: "string" },
+    laptopInches: { type: "number" },
+    separateShoeCompartment: { type: "boolean" },
+    minimumCapacityL: { type: "number" },
+    bedWidthIn: { type: "number" },
+    bedLengthIn: { type: "number" },
+    mattressDepthIn: { type: "number" },
+    composition: { type: "string" },
+    hostConnection: { type: "string" },
+    availableHardwareIds: stringList,
+    bagMaxDimensionsCm: {
+      type: "object", additionalProperties: false,
+      properties: { height: { type: "number" }, width: { type: "number" }, depth: { type: "number" } },
+    },
     compatibility: {
       type: "object",
       additionalProperties: false,
@@ -65,6 +81,10 @@ export const shoppingToolDefinitions = [
         preferences: stringList,
         excludedProductIds: stringList,
         shortlist: stringList,
+        displayOrder: stringList,
+        comparisonIds: stringList,
+        priority: { type: ["string", "null"] },
+        stage: { type: "string", enum: ["opening", "understanding", "solution_types", "buying_priorities", "shortlist", "comparison", "evidence", "saved_choice", "offers", "recovery"] },
         evidenceIds: stringList,
         destination: { type: "string", maxLength: 200 },
         view: {
@@ -146,7 +166,7 @@ export const shoppingToolDefinitions = [
   {
     name: "prepare_purchase_summary",
     description:
-      "Prepare the current selected offer’s exact purchase summary. Render and speak the returned spokenText verbatim. This does NOT approve or create an order. Shopper confirmation is handled separately by the trusted voice bridge.",
+      "Prepare the current selected offer’s exact purchase summary. Display the full returned spokenText; also speak it verbatim in voice mode. This does NOT approve or create an order. Fresh shopper confirmation is handled separately by the trusted input bridge.",
     parameters: { type: "object", properties: {}, additionalProperties: false },
   },
 ] as const;
@@ -209,7 +229,13 @@ export function createShoppingTools(client: ConciergeClient, initial: Session) {
             current.selection?.quantity ?? 1,
             current.excludedProductIds,
           );
-          active(await client.snapshot());
+          const latest = active(await client.snapshot());
+          if (latest.revision !== current.revision)
+            throw new BackendError(409, {
+              code: "STALE_REVISION",
+              message: "Accepted state changed during search. Re-read it before presenting recommendations.",
+              details: { session: modelSessionView(latest) },
+            });
           return {
             ...results,
             revision: current.revision,
@@ -223,6 +249,10 @@ export function createShoppingTools(client: ConciergeClient, initial: Session) {
             "preferences",
             "excludedProductIds",
             "shortlist",
+            "displayOrder",
+            "comparisonIds",
+            "priority",
+            "stage",
             "selection",
             "evidenceIds",
             "destination",
@@ -242,7 +272,9 @@ export function createShoppingTools(client: ConciergeClient, initial: Session) {
           return {
             session: modelSessionView(current),
             instruction:
-              "Render and speak summary.spokenText verbatim. Do not claim an order exists.",
+              current.presentationMode === "voice"
+                ? "Render and speak summary.spokenText verbatim. Do not claim an order exists."
+                : "Display the complete summary.spokenText in text mode. Do not claim an order exists.",
           };
         }
         default:

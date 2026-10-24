@@ -6,7 +6,9 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { nonTechProfile, quoteOffer, eligibleOffers } from "./catalog.ts";
+import { inflateSync } from "node:zlib";
+import { quoteOffer, eligibleOffers } from "./catalog.ts";
+import { alongProfile } from "./along-catalog.ts";
 import {
   requireThat,
   object,
@@ -34,7 +36,86 @@ export function safeEqual(a: string, b: string) {
 }
 const money = (n: number, currency: string) =>
   `${currency} ${(n / 100).toFixed(2)}`;
+const intentText = (text: string) => text.toLowerCase().replace(/[.,!?“”"']/g, "").trim().replace(/\s+/g, " ");
+const stopIntents = new Set(["stop", "cancel", "cancel purchase", "cancel this purchase", "cancel this simulated purchase", "do not buy", "dont buy", "decline"]);
+const boundedDimensions = (width: number, height: number) => width > 0 && height > 0 && width <= 8192 && height <= 8192 && width * height <= 16_777_216;
+const crcTable = Array.from({ length: 256 }, (_, initial) => {
+  let value = initial;
+  for (let i = 0; i < 8; i++) value = (value & 1) ? (0xedb88320 ^ (value >>> 1)) : value >>> 1;
+  return value >>> 0;
+});
+/** Structural validation only: image interpretation remains outside the trusted state layer. */
+function validImage(bytes: Buffer, contentType: string): boolean {
+  try {
+    if (contentType === "image/png") {
+      if (!bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return false;
+      let offset = 8, chunks = 0, header = false, ended = false;
+      const compressed: Buffer[] = [];
+      while (offset + 12 <= bytes.length) {
+        const size = bytes.readUInt32BE(offset), kind = bytes.toString("ascii", offset + 4, offset + 8);
+        if (size > bytes.length - offset - 12 || ++chunks > 10000) return false;
+        const data = bytes.subarray(offset + 8, offset + 8 + size);
+        let crc = 0xffffffff;
+        for (const byte of bytes.subarray(offset + 4, offset + 8 + size)) crc = crcTable[(crc ^ byte) & 255]! ^ (crc >>> 8);
+        if (((crc ^ 0xffffffff) >>> 0) !== bytes.readUInt32BE(offset + 8 + size)) return false;
+        if (!header) {
+          if (kind !== "IHDR" || size !== 13 || !boundedDimensions(data.readUInt32BE(0), data.readUInt32BE(4))) return false;
+          const depths: Record<number, number[]> = { 0: [1, 2, 4, 8, 16], 2: [8, 16], 3: [1, 2, 4, 8], 4: [8, 16], 6: [8, 16] };
+          if (!depths[data[9]!] ?.includes(data[8]!) || data[10] !== 0 || data[11] !== 0 || ![0, 1].includes(data[12]!)) return false;
+          header = true;
+        } else if (kind === "IHDR") return false;
+        if (kind === "IDAT") compressed.push(data);
+        offset += size + 12;
+        if (kind === "IEND") { ended = size === 0; break; }
+      }
+      if (!ended || offset !== bytes.length || !compressed.length) return false;
+      return inflateSync(Buffer.concat(compressed), { maxOutputLength: 64 * 1024 * 1024 }).length > 0;
+    }
+    if (contentType === "image/jpeg") {
+      if (bytes[0] !== 255 || bytes[1] !== 216 || bytes[bytes.length - 2] !== 255 || bytes[bytes.length - 1] !== 217) return false;
+      let offset = 2, dimensions = false;
+      while (offset + 4 <= bytes.length) {
+        if (bytes[offset++] !== 255) return false;
+        while (bytes[offset] === 255) offset++;
+        const marker = bytes[offset++];
+        if (!marker || marker === 216 || marker === 217) return false;
+        const size = bytes.readUInt16BE(offset);
+        if (size < 2 || offset + size > bytes.length) return false;
+        if ([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf].includes(marker)) {
+          if (size < 8 || !boundedDimensions(bytes.readUInt16BE(offset + 5), bytes.readUInt16BE(offset + 3))) return false;
+          dimensions = true;
+        }
+        if (marker === 0xda) return dimensions && size >= 6 && offset + size < bytes.length - 2;
+        offset += size;
+      }
+      return false;
+    }
+    if (contentType === "image/webp") {
+      if (bytes.toString("ascii", 0, 4) !== "RIFF" || bytes.toString("ascii", 8, 12) !== "WEBP" || bytes.readUInt32LE(4) !== bytes.length - 8) return false;
+      let offset = 12, frame = false;
+      while (offset + 8 <= bytes.length) {
+        const kind = bytes.toString("ascii", offset, offset + 4), size = bytes.readUInt32LE(offset + 4);
+        if (size > bytes.length - offset - 8) return false;
+        const data = bytes.subarray(offset + 8, offset + 8 + size);
+        if (kind === "VP8 ") {
+          if (size < 10 || (data[0]! & 1) !== 0 || !data.subarray(3, 6).equals(Buffer.from([0x9d, 1, 0x2a])) || !boundedDimensions(data.readUInt16LE(6) & 0x3fff, data.readUInt16LE(8) & 0x3fff)) return false;
+          frame = true;
+        }
+        if (kind === "VP8L") {
+          if (size < 5 || data[0] !== 0x2f) return false;
+          const bits = data.readUInt32LE(1);
+          if ((bits >>> 29) !== 0 || !boundedDimensions((bits & 0x3fff) + 1, ((bits >>> 14) & 0x3fff) + 1)) return false;
+          frame = true;
+        }
+        offset += 8 + size + (size % 2);
+      }
+      return frame && offset === bytes.length;
+    }
+    return false;
+  } catch { return false; }
+}
 export class SessionStore {
+  private playback = new Map<string, { epoch: number; turnId: string; playbackId: string; summaryId: string | null; summaryRevision: number | null; kind: "assistant" | "video"; videoId?: string }>();
   private attachments = new Map<
     string,
     { sessionId: string; epoch: number; contentType: string; bytes: Buffer }
@@ -44,6 +125,7 @@ export class SessionStore {
     { fingerprint: string; result: unknown }
   >();
   private clearSessionData(id: string) {
+    this.playback.delete(id);
     for (const [key, asset] of this.attachments)
       if (asset.sessionId === id) this.attachments.delete(key);
     for (const key of this.processed.keys())
@@ -58,7 +140,7 @@ export class SessionStore {
   readonly profile: CatalogProfile;
   constructor(
     ttlMs = 2 * 60 * 60 * 1000,
-    profile: CatalogProfile = nonTechProfile,
+    profile: CatalogProfile = alongProfile,
   ) {
     this.profile = profile;
     this.ttlMs = ttlMs;
@@ -108,6 +190,7 @@ export class SessionStore {
       preferences: [],
       excludedProductIds: [],
       shortlist: [],
+      displayOrder: [],
       selection: null,
       evidenceIds: [],
       turn: null,
@@ -181,11 +264,15 @@ export class SessionStore {
       "STALE_TURN",
       "Turn is cancelled, superseded, or unknown.",
       409,
+      { session: clone(s) },
     );
   }
   private invalidate(s: Session) {
     s.summary = null;
     s.lastOutcome = null;
+    if (s.turn) s.turn.approvalWindow = null;
+    this.playback.delete(s.id);
+    if (s.mediaOwner === "assistant") s.mediaOwner = null;
   }
   beginTurn(id: string, expected: number, input?: InputEnvelope) {
     const s = this.get(id);
@@ -194,6 +281,7 @@ export class SessionStore {
     if (s.summary && !(s.summary.approvalNonce && s.summary.displayed))
       this.invalidate(s);
     if (input) {
+      if (input.modality === "image" || input.modality === "link") this.invalidate(s);
       s.history.push({
         turnId: input.turnId,
         eventId: input.eventId,
@@ -213,6 +301,7 @@ export class SessionStore {
       }
     }
     s.mediaOwner = null;
+    this.playback.delete(id);
     if (input) this.record(id).usedTurnIds.add(input.turnId);
     s.turn = {
       id: input?.turnId ?? randomUUID(),
@@ -223,6 +312,11 @@ export class SessionStore {
         ? { summaryId: s.summary.id, nonce: s.summary.approvalNonce }
         : null,
     };
+    if (input && (input.modality === "text" || input.modality === "voice") && input.text && stopIntents.has(intentText(input.text))) {
+      this.invalidate(s);
+      s.turn.status = "cancelled";
+      s.lastOutcome = "cancelled";
+    }
     return this.commit(s);
   }
   cancel(id: string, turnId: string) {
@@ -231,6 +325,7 @@ export class SessionStore {
     this.mutable(s);
     s.turn!.status = "cancelled";
     this.invalidate(s);
+    s.mediaOwner = null;
     s.lastOutcome = "cancelled";
     return this.commit(s);
   }
@@ -260,6 +355,7 @@ export class SessionStore {
       preferences: [],
       excludedProductIds: [],
       shortlist: [],
+      displayOrder: [],
       selection: null,
       evidenceIds: [],
       turn: null,
@@ -268,6 +364,14 @@ export class SessionStore {
       lastOutcome: null,
     });
     return this.commit(s);
+  }
+  end(id: string, expected: number) {
+    const s = this.get(id);
+    this.revision(s, expected);
+    this.records.delete(id);
+    this.clearSessionData(id);
+    this.events.emit(id, { type: "session.ended" });
+    return { sessionId: id, ended: true };
   }
   private validateView(value: unknown) {
     object(value);
@@ -376,6 +480,8 @@ export class SessionStore {
       "INVALID_VIEW",
       "Duplicate product card.",
     );
+    const ranks = value.cards.map((c) => c.rank).filter((rank) => rank !== null);
+    requireThat(new Set(ranks).size === ranks.length, "INVALID_VIEW", "Recommendation ranks must be unique; focus does not change ranks.");
   }
   propose(id: string, raw: unknown) {
     object(raw);
@@ -387,6 +493,7 @@ export class SessionStore {
       "preferences",
       "excludedProductIds",
       "shortlist",
+      "displayOrder",
       "selection",
       "evidenceIds",
       "destination",
@@ -404,6 +511,7 @@ export class SessionStore {
       "preferences",
       "excludedProductIds",
       "shortlist",
+      "displayOrder",
       "evidenceIds",
     ] as const)
       if (raw[key] !== undefined)
@@ -428,6 +536,12 @@ export class SessionStore {
             ...s.constraints.compatibility,
             ...incoming.compatibility,
           },
+          ...(s.constraints.bagMaxDimensionsCm || incoming.bagMaxDimensionsCm ? {
+            bagMaxDimensionsCm: {
+              ...s.constraints.bagMaxDimensionsCm,
+              ...incoming.bagMaxDimensionsCm,
+            },
+          } : {}),
         },
       };
     }
@@ -463,8 +577,6 @@ export class SessionStore {
           "evidence",
           "saved_choice",
           "offers",
-          "summary",
-          "receipt",
           "recovery",
         ].includes(raw.stage as string),
         "INVALID_VIEW",
@@ -520,6 +632,7 @@ export class SessionStore {
       "preferences",
       "excludedProductIds",
       "shortlist",
+      "displayOrder",
       "selection",
       "evidenceIds",
       "destination",
@@ -530,6 +643,7 @@ export class SessionStore {
     ] as const)
       if (p[key] !== undefined) Object.assign(s, { [key]: clone(p[key]) });
     if (p.shortlist && !p.view) s.view = null;
+    if (p.shortlist && !p.displayOrder) s.displayOrder = [...p.shortlist];
     if (p.view && !p.stage)
       s.stage =
         p.view.stage === "priorities"
@@ -541,12 +655,21 @@ export class SessionStore {
       const visibleIds = p.view.cards.map((c) => c.productId);
       requireThat(
         !p.shortlist ||
-          JSON.stringify(p.shortlist) === JSON.stringify(visibleIds),
+          (p.shortlist.length === visibleIds.length && p.shortlist.every((pid) => visibleIds.includes(pid))),
         "VIEW_ORDER_CONFLICT",
-        "Shortlist must follow the visible product card order.",
+        "Visible product cards must match the accepted shortlist.",
       );
-      s.shortlist = visibleIds;
+      if (!p.shortlist && !s.shortlist.length) s.shortlist = visibleIds;
+      requireThat(s.shortlist.length === visibleIds.length && s.shortlist.every((pid) => visibleIds.includes(pid)), "VIEW_ORDER_CONFLICT", "Focus and presentation cannot replace the accepted shortlist.");
+      if (!p.displayOrder && !s.displayOrder.length) s.displayOrder = [...visibleIds];
     }
+    requireThat(
+      s.displayOrder.length === s.shortlist.length && s.displayOrder.every((pid) => s.shortlist.includes(pid)),
+      "INVALID_DISPLAY_ORDER",
+      "Display order must contain each shortlisted product exactly once.",
+    );
+    if (s.view?.cards.length)
+      s.view.cards.sort((a, b) => s.displayOrder.indexOf(a.productId) - s.displayOrder.indexOf(b.productId));
     requireThat(
       s.shortlist.every((x) => !s.excludedProductIds.includes(x)),
       "EXCLUDED_SHORTLIST",
@@ -616,7 +739,8 @@ export class SessionStore {
       422,
       q.conflicts,
     );
-    const spokenText = `This is a simulated purchase only. ${q.quantity} of ${q.product.name}, variant ${q.product.variant}, sold by ${q.offer.sellerName}. Items ${money(q.subtotal, q.currency)}, shipping ${money(q.shipping!, q.currency)}, other fees ${money(q.otherFees!, q.currency)}, required setup ${money(q.setupCost!, q.currency)}; total ${money(q.total!, q.currency)}. Destination: ${q.destination}. Delivery: ${q.offer.deliveryConditions} Setup: ${q.offer.setupConditions ?? "No additional setup cost in this fixture."} Returns: ${q.offer.returnConditions} Conditions: ${q.offer.conditions.join(" ")} Material uncertainties: ${q.offer.uncertainties.length ? q.offer.uncertainties.join("; ") : "none recorded in this proxy fixture"}. All offer details are synthetic demo data. To approve, ${s.presentationMode === "text" ? "type" : "say"} “Confirm this simulated purchase.” You can also change it or cancel.`;
+    const spokenText = `This is a simulated purchase only. ${q.quantity} of ${q.product.name}, variant ${q.product.variant}, sold by ${q.offer.sellerName}. Items ${money(q.subtotal, q.currency)}, shipping ${money(q.shipping!, q.currency)}, other fees ${money(q.otherFees!, q.currency)}${q.tax !== undefined ? `, tax ${money(q.tax!, q.currency)}` : ""}, required setup ${money(q.setupCost!, q.currency)}; total ${money(q.total!, q.currency)}. Destination: ${q.destination}. Delivery: ${q.offer.deliveryConditions} Setup: ${q.offer.setupConditions ?? "No additional setup cost in this fixture."} Returns: ${q.offer.returnConditions} Conditions: ${q.offer.conditions.join(" ")} Material uncertainties: ${q.offer.uncertainties.length ? q.offer.uncertainties.join("; ") : "none recorded in this proxy fixture"}. All offer details are synthetic demo data. To approve, ${s.presentationMode === "text" ? "type" : "say"} “Confirm this simulated purchase.” You can also change it or cancel.`;
+    this.invalidate(s);
     s.stage = "summary";
     s.summary = {
       id: randomUUID(),
@@ -628,14 +752,27 @@ export class SessionStore {
       textHash: hash(spokenText),
       displayed: false,
       playback: "pending",
+      playbackId: null,
       approvalNonce: null,
     };
     return this.commit(s);
   }
   presentation(id: string, raw: unknown) {
     object(raw);
-    keys(raw, ["summaryId", "turnId", "textHash", "event"]);
+    keys(raw, ["summaryId", "turnId", "textHash", "event", "epoch", "eventId", "expectedRevision", "summaryRevision", "playbackId"]);
+    const envelope = raw;
+    const guarded = ["epoch", "eventId", "expectedRevision", "summaryRevision"].some((key) => envelope[key] !== undefined);
+    const apply = () => {
     const s = this.get(id);
+    if (guarded) {
+      this.revision(s, envelope.expectedRevision);
+      requireThat(s.summary?.revision === envelope.summaryRevision, "STALE_SUMMARY", "Summary revision changed.", 409);
+    }
+    return this.present(s, envelope);
+    };
+    return guarded ? this.once(id, envelope.epoch as number, envelope.eventId as string, envelope, apply) : apply();
+  }
+  private present(s: Session, raw: Record<string, unknown>) {
     this.mutable(s);
     const m = s.summary;
     requireThat(
@@ -672,7 +809,10 @@ export class SessionStore {
         "Playback must start from pending.",
         409,
       );
+      requireThat(raw.playbackId === undefined || (typeof raw.playbackId === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(raw.playbackId)), "INVALID_PLAYBACK", "Use a bounded playback ID.");
+      m.playbackId = raw.playbackId as string ?? randomUUID();
       m.playback = "playing";
+      s.mediaOwner = "assistant";
     }
     if (raw.event === "playback_completed") {
       requireThat(
@@ -681,11 +821,16 @@ export class SessionStore {
         "Playback must be started and uninterrupted.",
         409,
       );
+      requireThat(raw.playbackId === undefined || raw.playbackId === m.playbackId, "STALE_PLAYBACK", "Playback identity changed.", 409);
       m.playback = "complete";
+      s.mediaOwner = null;
     }
     if (raw.event === "playback_interrupted") {
+      requireThat(raw.playbackId === undefined || raw.playbackId === m.playbackId, "STALE_PLAYBACK", "Playback identity changed.", 409);
       m.playback = "interrupted";
       m.approvalNonce = null;
+      if (s.turn) s.turn.approvalWindow = null;
+      s.mediaOwner = null;
       s.lastOutcome = "summary_interrupted";
     }
     if (
@@ -696,6 +841,64 @@ export class SessionStore {
     )
       m.approvalNonce = token();
     return this.commit(s);
+  }
+  /** Trusted bridge lifecycle events. Every accepted callback is bound to the current epoch, turn and revision. */
+  lifecycle(id: string, raw: unknown) {
+    object(raw);
+    keys(raw, ["sessionId", "epoch", "eventId", "turnId", "revision", "type", "playbackId", "summaryId", "summaryRevision", "videoId"]);
+    requireThat(raw.sessionId === id, "WRONG_SESSION", "Lifecycle session mismatch.", 409);
+    const event = raw;
+    return this.once(id, event.epoch as number, event.eventId as string, event, () => {
+      const s = this.get(id);
+      this.revision(s, event.revision);
+      this.mutable(s);
+      requireThat(["audio.started", "audio.completed", "audio.interrupted", "turn.cancelled", "video.started", "video.stopped"].includes(event.type as string), "INVALID_EVENT", "Unknown lifecycle event.");
+      if (event.type === "turn.cancelled") {
+        this.active(s, event.turnId);
+        return this.cancel(id, event.turnId as string);
+      }
+      requireThat(typeof event.playbackId === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(event.playbackId), "INVALID_PLAYBACK", "Use a bounded playback ID.");
+      if (event.type === "video.started") {
+        this.active(s, event.turnId);
+        const accepted = this.media(id, s.revision, event.type, event.videoId);
+        this.playback.set(id, { epoch: s.epoch, turnId: event.turnId as string, playbackId: event.playbackId, summaryId: null, summaryRevision: null, kind: "video", videoId: event.videoId as string });
+        return accepted;
+      }
+      if (event.type === "video.stopped") {
+        const running = this.playback.get(id);
+        requireThat(running?.kind === "video" && running.epoch === s.epoch && running.turnId === event.turnId && running.playbackId === event.playbackId && running.videoId === event.videoId, "STALE_PLAYBACK", "Video playback identity changed.", 409);
+        const accepted = this.media(id, s.revision, event.type, event.videoId);
+        this.playback.delete(id);
+        return accepted;
+      }
+      this.active(s, event.turnId);
+      if (event.type === "audio.started") {
+        requireThat(s.mediaOwner === null && !this.playback.has(id), "MEDIA_BUSY", "Another media stream owns playback.", 409);
+        if (s.summary) {
+          requireThat(s.summary.id === event.summaryId && s.summary.revision === event.summaryRevision, "STALE_SUMMARY", "Audio must identify the exact current summary.", 409);
+          const accepted = this.present(s, { summaryId: event.summaryId, turnId: event.turnId, textHash: s.summary.textHash, event: "playback_started", playbackId: event.playbackId });
+          this.playback.set(id, { epoch: s.epoch, turnId: event.turnId as string, playbackId: event.playbackId, summaryId: event.summaryId as string, summaryRevision: event.summaryRevision as number, kind: "assistant" });
+          return accepted;
+        }
+        requireThat(event.summaryId === undefined && event.summaryRevision === undefined, "STALE_SUMMARY", "Summary no longer exists.", 409);
+        this.playback.set(id, { epoch: s.epoch, turnId: event.turnId as string, playbackId: event.playbackId, summaryId: null, summaryRevision: null, kind: "assistant" });
+        s.mediaOwner = "assistant";
+        return this.commit(s);
+      }
+      const running = this.playback.get(id);
+      requireThat(running?.kind === "assistant" && running.epoch === s.epoch && running.turnId === event.turnId && running.playbackId === event.playbackId, "STALE_PLAYBACK", "Audio playback identity changed.", 409);
+      let accepted: Session;
+      if (running.summaryId) {
+        requireThat(running.summaryId === event.summaryId && running.summaryRevision === event.summaryRevision && s.summary?.revision === event.summaryRevision, "STALE_SUMMARY", "Audio summary revision changed.", 409);
+        accepted = this.present(s, { summaryId: event.summaryId, turnId: event.turnId, textHash: s.summary!.textHash, event: event.type === "audio.completed" ? "playback_completed" : "playback_interrupted", playbackId: event.playbackId });
+      } else {
+        requireThat(!s.summary && event.summaryId === undefined && event.summaryRevision === undefined, "STALE_SUMMARY", "Non-summary audio cannot complete a purchase summary.", 409);
+        s.mediaOwner = null;
+        accepted = this.commit(s);
+      }
+      this.playback.delete(id);
+      return accepted;
+    });
   }
   approve(id: string, raw: unknown, typed = false) {
     object(raw);
@@ -749,10 +952,12 @@ export class SessionStore {
         "UNTRUSTED_APPROVAL",
         "Typed approval must exactly match a fresh shopper text input, not an agent proposal.",
       );
+    if (!typed && (this.profile.catalog.canonical || s.turn?.input))
+      requireThat(s.turn?.input?.modality === "voice" && s.turn.input.text === o.transcript, "UNTRUSTED_APPROVAL", "Voice approval must match the current trusted shopper voice turn.");
     requireThat(
       typed ||
         (o.final === true &&
-          typeof o.confidence === "number" &&
+          typeof o.confidence === "number" && Number.isFinite(o.confidence) &&
           o.confidence >= 0.9 &&
           o.confidence <= 1 &&
           o.source === "shopper" &&
@@ -765,11 +970,8 @@ export class SessionStore {
       "INVALID_APPROVAL",
       "Invalid approval transcript.",
     );
-    const normalized = o.transcript
-      .toLowerCase()
-      .replace(/[.,!?“”"']/g, "")
-      .trim()
-      .replace(/\s+/g, " ");
+    requireThat(!/[“”"‘’']/.test(o.transcript), "AMBIGUOUS_APPROVAL", "Quoted content is not a deliberate purchase instruction.");
+    const normalized = intentText(o.transcript);
     const accepted = [
       "confirm this simulated purchase",
       "yes confirm this simulated purchase",
@@ -825,6 +1027,7 @@ export class SessionStore {
       "STALE_EPOCH",
       "Reset invalidated this event.",
       409,
+      { session: clone(s) },
     );
     requireThat(
       typeof eventId === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(eventId),
@@ -901,7 +1104,7 @@ export class SessionStore {
       requireThat(
         x.visibleRevision === s.revision &&
           strings(x.visibleProductIds, 50) &&
-          JSON.stringify(x.visibleProductIds) === JSON.stringify(s.shortlist),
+          JSON.stringify(x.visibleProductIds) === JSON.stringify(s.displayOrder),
         "STALE_DISPLAY",
         "Clarify positional references against the latest accepted display.",
         409,
@@ -925,7 +1128,7 @@ export class SessionStore {
         );
       if (x.modality === "link")
         requireThat(
-          !!x.url && !!this.profile.knownLinks?.[x.url],
+          typeof x.url === "string" && !!this.profile.knownLinks && Object.hasOwn(this.profile.knownLinks, x.url) && this.profile.catalog.products.some((product) => product.id === this.profile.knownLinks![x.url!]),
           "UNSUPPORTED_LINK",
           "Only curated product links are supported. No URL was fetched.",
         );
@@ -946,19 +1149,10 @@ export class SessionStore {
       "INVALID_IMAGE_SIZE",
       "Images must be at most 2 MiB.",
     );
-    const png = bytes
-      .subarray(0, 8)
-      .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
-    const jpeg = bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
-    const webp =
-      bytes.toString("ascii", 0, 4) === "RIFF" &&
-      bytes.toString("ascii", 8, 12) === "WEBP";
     requireThat(
-      (contentType === "image/png" && png) ||
-        (contentType === "image/jpeg" && jpeg) ||
-        (contentType === "image/webp" && webp),
+      validImage(bytes, contentType),
       "INVALID_IMAGE_TYPE",
-      "Only PNG/JPEG/WebP with matching signatures. SVG and arbitrary documents are rejected.",
+      "Only structurally valid PNG/JPEG/WebP images up to 8192 pixels per side and 16 megapixels. SVG, malformed images and arbitrary documents are rejected.",
     );
     requireThat(
       s.attachmentIds.length < 5,
@@ -970,7 +1164,7 @@ export class SessionStore {
       sessionId: id,
       epoch: s.epoch,
       contentType,
-      bytes,
+      bytes: Buffer.from(bytes),
     });
     s.attachmentIds.push(attachmentId);
     return {
@@ -987,7 +1181,7 @@ export class SessionStore {
       "Image no longer belongs to this session.",
       404,
     );
-    return a;
+    return { ...a, bytes: Buffer.from(a.bytes) };
   }
   switchMode(id: string, expected: number, mode: unknown) {
     const s = this.get(id);
@@ -1025,7 +1219,10 @@ export class SessionStore {
       this.invalidate(s);
       if (s.turn) s.turn.status = "cancelled";
       s.mediaOwner = "video";
-    } else s.mediaOwner = null;
+    } else {
+      requireThat(s.mediaOwner === "video", "STALE_PLAYBACK", "No current video owns playback.", 409);
+      s.mediaOwner = null;
+    }
     return this.commit(s);
   }
   saveChoice(

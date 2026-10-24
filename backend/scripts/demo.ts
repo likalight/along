@@ -1,10 +1,11 @@
-/** Real HTTP rehearsal: can run against your running backend or a disposable local instance. */
+/** Deterministic HTTP rehearsal. Presentation callbacks are emulated, never claimed as live voice proof. */
+import assert from "node:assert/strict";
 import { once } from "node:events";
 import { randomBytes } from "node:crypto";
 import { createApp } from "../src/server.ts";
-import { ConciergeClient } from "../src/client.ts";
-const agentToken =
-  process.env.AGENT_API_TOKEN ?? randomBytes(32).toString("hex");
+import { IntegrationClient, type ShoppingSnapshot } from "../src/integration-client.ts";
+
+const agentToken = process.env.AGENT_API_TOKEN ?? randomBytes(32).toString("hex");
 let server: ReturnType<typeof createApp>["server"] | undefined;
 let base = process.env.BACKEND_URL;
 if (!base) {
@@ -14,77 +15,41 @@ if (!base) {
   base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
 }
 try {
-  const c = new ConciergeClient(base, { agentToken });
-  let s = await c.create("cafe-dictation");
-  console.log("1. Created cafe-dictation session", s.id);
-  const offers = await c.search({
-    ...s.constraints,
-    budgetMinor: 15000,
-    deliveryWithinDays: 1,
-    compatibility: { hostConnection: "USB-C" },
-  });
-  for (const q of [...offers.eligible, ...offers.ineligible].filter(
-    (q: any) => q.product.id === "MIC-020",
-  ))
-    console.log(
-      "2. Seller comparison",
-      q.offer.sellerName,
-      q.total,
-      q.eligible ? "eligible" : q.conflicts.map((x: any) => x.code).join(","),
-    );
-  s = await c.turn(s.revision);
-  s = (
-    await c.propose({
-      expectedRevision: s.revision,
-      turnId: s.turn!.id,
-      needs: ["Microphone for cafe dictation"],
-      constraints: {
-        category: "audio-accessories",
-        currency: "USD",
-        budgetMinor: 15000,
-        deliveryWithinDays: 1,
-        compatibility: { hostConnection: "USB-C" },
-      },
-      shortlist: ["MIC-020"],
-      selection: { offerId: "MIC-020-express", quantity: 1 },
-    })
-  ).session;
-  s = await c.summarize(s.revision, s.turn!.id);
-  console.log("3. Exact summary to speak AND display:", s.summary!.spokenText);
-  for (const event of [
-    "displayed",
-    "playback_started",
-    "playback_completed",
-  ] as const)
-    s = await c.presentation(s.summary!, event);
-  console.log(
-    "4. Rehearsal emulated frontend playback callbacks (no real audio in this CLI).",
-  );
-  s = await c.turn(s.revision);
-  const observation = {
-    expectedRevision: s.revision,
-    turnId: s.turn!.id,
-    summaryId: s.summary!.id,
-    approvalNonce: s.turn!.approvalWindow!.nonce,
-    transcript: "Confirm this simulated purchase.",
-    final: true,
-    confidence: 0.99,
-    source: "shopper" as const,
-    echoDetected: false,
-  };
-  const first = await c.approve(observation),
-    duplicate = await c.approve(observation);
-  console.log(
-    "5. SIMULATED receipt",
-    first.receipt.id,
-    "total",
-    first.receipt.quote.total,
-    "cents",
-  );
-  console.log(
-    "6. Retry returned same receipt:",
-    first.receipt.id === duplicate.receipt.id,
-  );
+  for (const scenario of [
+    { id: "cafe-dictation", offerId: "MIC-044-B", total: 14800, modality: "voice" as const },
+    { id: "work-gym", offerId: "BAG-001-B", total: 11900, modality: "text" as const },
+    { id: "warm-room", offerId: "BED-003-B", total: 6399, modality: "text" as const },
+  ]) {
+    const client: IntegrationClient = new IntegrationClient(base, { agentToken });
+    let session: ShoppingSnapshot = await client.create(scenario.id);
+    session = await client.input(session, scenario.modality, { text: "I need it tomorrow." });
+    session = await client.action(session, "set_constraints", { constraints: { deliveryWithinDays: 1 } });
+    const offers = await client.request("/catalog/search", { constraints: session.hardConstraints });
+    assert(offers.eligible.some((q: any) => q.offer.id === scenario.offerId));
+    assert(offers.ineligible.some((q: any) => q.offer.id === scenario.offerId.replace(/B$/, "A") &&
+      q.conflicts.some((x: any) => x.code === "DELIVERY_CONFLICT")));
+    session = await client.action(session, "select_offer", { offerId: scenario.offerId, quantity: 1 });
+    session = await client.action(session, "prepare_summary", {});
+    assert.equal(session.summary!.totalMinor, scenario.total);
+    session = await client.presentation(session.summary!, "displayed");
+    if (scenario.modality === "voice") {
+      session = await client.presentation(session.summary!, "playback_started");
+      session = await client.presentation(session.summary!, "playback_completed");
+    }
+    const transcript = "Confirm this simulated purchase.";
+    session = await client.input(session, scenario.modality, { text: transcript });
+    const evidence = scenario.modality === "voice"
+      ? { transcript, final: true, confidence: 0.99, source: "shopper" as const, echoDetected: false }
+      : undefined;
+    const eventId = crypto.randomUUID();
+    const first = await client.confirm(session, scenario.modality, evidence, eventId);
+    const duplicate = await client.confirm(session, scenario.modality, evidence, eventId);
+    assert.equal(first.receipt.id, duplicate.receipt.id);
+    assert.equal(first.receipt.simulated, true);
+    assert.equal(first.receipt.acceptedOrder.totalMinor, scenario.total);
+    console.log(`${scenario.id}: ${scenario.modality} path; USD ${(scenario.total / 100).toFixed(2)}; duplicate confirmation returned one simulated receipt.`);
+  }
+  console.log("All three HTTP journeys passed. Display/playback callbacks were emulated; live speech and frontend rehearsal remain separate.");
 } finally {
   server?.closeAllConnections();
   server?.close();

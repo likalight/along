@@ -1,4 +1,6 @@
 import type { CatalogData, CatalogProfile } from "./contracts.ts";
+import { alongProfile, quoteAlongOffer } from "./along-catalog.ts";
+import { validateCatalog as validateCanonicalCatalog } from "../../catalog/src/validation.ts";
 import type {
   Product,
   Offer,
@@ -167,7 +169,7 @@ evidence.splice(
 products.find((p) => p.id === "cotton-basic")!.evidenceIds = [
   "ev-cotton-basic-spec",
 ];
-export const catalog: CatalogData = {
+const legacyCatalog: CatalogData = {
   version: "1",
   currency: "SGD",
   notice:
@@ -176,7 +178,7 @@ export const catalog: CatalogData = {
   offers,
   evidence,
 };
-export const preparedImages = [
+const legacyPreparedImages = [
   {
     id: "bag-style",
     url: "/reference/bag-style.svg",
@@ -195,7 +197,7 @@ export const preparedImages = [
       "The mattress is 35 cm deep; do not infer it from the image.",
   },
 ];
-export const scenarios: Scenario[] = [
+const legacyScenarios: Scenario[] = [
   {
     id: "work-gym",
     title: "Work and gym bag",
@@ -231,14 +233,20 @@ export const scenarios: Scenario[] = [
       "Cheaper offer is late; express offer costs SGD 89. Revised budget produces a conflict, not silent relaxation.",
   },
 ];
+export const catalog = alongProfile.catalog;
+export const scenarios = alongProfile.scenarios;
+export const preparedImages = alongProfile.preparedImages;
+
 export function quoteOffer(
   offerId: string,
   quantity: number,
   constraints: Constraints = {},
   excluded: string[] = [],
   data: CatalogData = catalog,
-  destination = "Demo destination, Singapore",
+  destination = data.canonical?.destination ?? "Demo destination, Singapore",
 ): Quote {
+  if (data.canonical)
+    return quoteAlongOffer(offerId, quantity, constraints, excluded, data, destination);
   const { products, offers } = data;
   const offer = offers.find((o) => o.id === offerId);
   if (!offer) throw new Error("UNKNOWN_OFFER");
@@ -410,13 +418,14 @@ export function eligibleOffers(
   quantity = 1,
   excluded: string[] = [],
   data: CatalogData = catalog,
-  destination = "Demo destination, Singapore",
+  destination = data.canonical?.destination ?? "Demo destination, Singapore",
 ) {
   return data.offers.map((o) =>
     quoteOffer(o.id, quantity, constraints, excluded, data, destination),
   );
 }
 export function validateCatalog(data: CatalogData = catalog) {
+  if (data.canonical) validateCanonicalCatalog(data.canonical);
   const { products, offers, evidence } = data;
   const unique = (items: { id: string }[]) => {
     if (new Set(items.map((x) => x.id)).size !== items.length)
@@ -465,8 +474,8 @@ export function validateCatalog(data: CatalogData = catalog) {
 validateCatalog();
 
 export const nonTechProfile: CatalogProfile = {
-  catalog,
-  scenarios,
-  preparedImages,
+  catalog: legacyCatalog,
+  scenarios: legacyScenarios,
+  preparedImages: legacyPreparedImages,
   destination: "Demo destination, Singapore",
 };

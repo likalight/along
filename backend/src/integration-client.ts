@@ -16,6 +16,8 @@ export class IntegrationClient {
       agentToken?: string;
     } = {},
   ) {
+    if (options.agentToken && "window" in globalThis)
+      throw new Error("agentToken is a server-only credential; use a trusted backend bridge.");
     this.baseUrl = baseUrl.replace(/\/$/, "") + "/v1/integration";
     Object.assign(this, options);
   }
@@ -73,7 +75,7 @@ export class IntegrationClient {
         visibleRevision: snapshot.revision,
         visibleProductIds: snapshot.displayOrder,
         source: "shopper",
-      })
+      }, modality === "voice")
     ).session;
   }
   async action(
@@ -106,15 +108,36 @@ export class IntegrationClient {
       | "playback_started"
       | "playback_completed"
       | "playback_interrupted",
+    snapshot?: ShoppingSnapshot,
   ): Promise<ShoppingSnapshot> {
+    const current = snapshot ?? await this.snapshot();
     return (
       await this.request(this.path("presentation"), {
         summaryId: summary.id,
         turnId: summary.responseTurnId,
         textHash: summary.textHash,
         event,
-      })
+        epoch: current.epoch,
+        expectedRevision: current.revision,
+        summaryRevision: summary.revision,
+        eventId: crypto.randomUUID(),
+      }, event !== "displayed")
     ).session;
+  }
+  async lifecycle(
+    snapshot: ShoppingSnapshot,
+    type: "audio.started" | "audio.completed" | "audio.interrupted" | "turn.cancelled" | "video.started" | "video.stopped",
+    identity: { playbackId?: string; summaryId?: string; summaryRevision?: number; videoId?: string; eventId?: string } = {},
+  ): Promise<ShoppingSnapshot> {
+    return (await this.request(this.path("lifecycle"), {
+      sessionId: snapshot.sessionId,
+      epoch: snapshot.epoch,
+      eventId: identity.eventId ?? crypto.randomUUID(),
+      turnId: snapshot.turn?.id,
+      revision: snapshot.revision,
+      type,
+      ...identity,
+    }, type.startsWith("audio."))).session;
   }
   async mode(
     snapshot: ShoppingSnapshot,
@@ -129,7 +152,12 @@ export class IntegrationClient {
   }
   async cancel(snapshot: ShoppingSnapshot): Promise<ShoppingSnapshot> {
     return (
-      await this.request(this.path("cancel"), { turnId: snapshot.turn?.id })
+      await this.request(this.path("cancel"), {
+        epoch: snapshot.epoch,
+        eventId: crypto.randomUUID(),
+        expectedRevision: snapshot.revision,
+        turnId: snapshot.turn?.id,
+      })
     ).session;
   }
   async reset(snapshot: ShoppingSnapshot): Promise<ShoppingSnapshot> {
@@ -138,6 +166,12 @@ export class IntegrationClient {
         expectedRevision: snapshot.revision,
       })
     ).session;
+  }
+  async end(snapshot: ShoppingSnapshot) {
+    const result = await this.request(this.path("end"), { expectedRevision: snapshot.revision });
+    this.sessionId = undefined;
+    this.accessToken = undefined;
+    return result;
   }
   async upload(snapshot: ShoppingSnapshot, image: Blob) {
     const r = await fetch(this.baseUrl + this.path("attachments"), {
@@ -198,7 +232,7 @@ export class IntegrationClient {
     signal?: AbortSignal,
   ): AsyncGenerator<
     | { type: "session.updated"; snapshot: ShoppingSnapshot; revision: number }
-    | { type: "session.expired" }
+    | { type: "session.expired" | "session.ended" }
   > {
     const r = await fetch(this.baseUrl + this.path("events"), {
       headers: this.headers(),

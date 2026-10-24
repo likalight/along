@@ -1,57 +1,52 @@
-# Shopping concierge backend
+# Along backend
 
-Implements backend work for issues #6–9. Local demo service with **simulated purchases only**. No payment, merchant, model or speech-provider calls. Node 22.18+ (Node 24 recommended), TypeScript, no runtime dependencies.
+Authoritative shopping sessions, catalog validation, and explicit approval for **simulated purchases**. Implements issues [#6](https://github.com/likalight/along/issues/6), [#7](https://github.com/likalight/along/issues/7), [#8](https://github.com/likalight/along/issues/8), and [#9](https://github.com/likalight/along/issues/9) against the accepted [contract v1](https://github.com/likalight/along/issues/2).
 
-## Run
+Node.js **22.18+**, TypeScript, and no runtime package dependencies. The default profile imports the shared `catalog/` package: 24 products, 48 synthetic USD offers, and attributed evidence.
+
+## Run the checks and rehearsal
 
 ```sh
 cd backend
 npm ci
-# Create a local agent secret; keep it in the AI server, NEVER frontend environment variables.
+npm run verify
+```
+
+Verification runs TypeScript checks, deterministic session/HTTP regression tests, and all three HTTP purchase journeys. The rehearsal covers café audio (voice, USD 148), work/gym bag (text, USD 119), and bedsheets (text, USD 63.99), including late-offer rejection and receipt idempotency. It **emulates** display/playback callbacks; it is not a live microphone, vision, or frontend rehearsal.
+
+CI runs the backend on Node 22 and 24 and validates the shared catalog separately. See [ACCEPTANCE.md](./ACCEPTANCE.md) for the criterion-by-criterion review.
+
+## Start the local service
+
+```sh
+# Create the private bridge token once. This fails if .env already exists.
 node -e "require('node:fs').writeFileSync('.env','AGENT_API_TOKEN='+require('node:crypto').randomBytes(32).toString('hex')+'\n',{mode:0o600,flag:'wx'})"
 npm run dev
 ```
 
-Default `http://127.0.0.1:4318`. Configure `PORT`, `HOST`, and comma-separated `ALLOWED_ORIGINS` if needed. Default CORS allows localhost:5173, 127.0.0.1:5173, localhost:3000. Binding to loopback is intentional for the closed demo. This is a single-process ephemeral store, not a production multi-instance backend. Sessions expire after two hours and disappear on process restart. Restart is never represented as reconnect recovery.
+The default URL is `http://127.0.0.1:4318`. Configure `HOST`, `PORT`, and comma-separated `ALLOWED_ORIGINS` when needed. Default origins are localhost:3000, localhost:5173, and 127.0.0.1:5173. Keep `AGENT_API_TOKEN` in the trusted application/voice server; never put it in browser environment variables or model context.
 
-```sh
-npm run check
-npm test
-npm run demo
-```
+Sessions are held in one process, expire after two hours, and disappear on restart. Reset changes the epoch and clears shopper context and assets. Explicit end deletes the session. Reconnection receives the latest snapshot, never an action replay.
 
-`demo` starts a disposable real HTTP server, compares competing offers, submits a valid selection, obtains an exact summary, **emulates** the UI/audio callbacks, and confirms a simulated purchase twice to demonstrate idempotency. It does not claim actual microphone/audio integration. Set `BACKEND_URL` and `AGENT_API_TOKEN` to rehearse an existing service.
+## Integration
 
-## Integration contract
+- [INTEGRATION.md](./INTEGRATION.md): public contract, modalities, lifecycle, and approval.
+- [src/integration-client.ts](./src/integration-client.ts): client for `/v1/integration`.
+- [API.md](./API.md): legacy/internal `/v1` routes used by provider-neutral agent tools.
+- [src/along-catalog.ts](./src/along-catalog.ts): lossless shared-catalog adapter and compatibility validation.
+- [src/store.ts](./src/store.ts): atomic state transitions, display order, cancellation, summaries, and receipts.
+- [../catalog/README.md](../catalog/README.md): data provenance, sources, known links, media limits, and fixture generation.
 
-- [INTEGRATION.md](./INTEGRATION.md): current issue #2 public contract, routes, scenarios and live wiring.
-- [src/integration-client.ts](./src/integration-client.ts): frontend/server client for the agreed field names.
-- [API.md](./API.md): internal API for the provider-neutral agent tools.
-- [src/contracts.ts](./src/contracts.ts): frontend/AI shared types.
-- [src/client.ts](./src/client.ts): framework-neutral fetch client and streaming snapshots.
-- [src/team-catalog.ts](./src/team-catalog.ts): active 24-product audio/bags/bedding profile with 48 labelled synthetic offers.
-- [data/microphones-reference.json](./data/microphones-reference.json): 50 non-purchasable source research records with provenance.
-- [src/catalog.ts](./src/catalog.ts): pure quote/eligibility functions and isolated legacy SGD regression profile.
-- [src/store.ts](./src/store.ts): authoritative state, revisions, turn cancellation, exact summaries and approval.
+The canonical public product, offer, and evidence records preserve the shared catalog's fields without flattening review metrics or confusing research reference prices with payable totals. Legacy profiles in `catalog.ts`, `voice-catalog.ts`, and `team-catalog.ts` remain only for isolated historical regression tests; the HTTP server and default store use Along's shared profile.
 
-The default follows the updated agreed issue #2: 12 audio, six bag and six bedsheet configurations. Lighting is deferred. Source specifications/reviews retain team-supplied URLs and unknown values; they were not independently reverified by this backend. Seller totals, stock, taxes and delivery are synthetic. The scenario clock is frozen at 24 October 2026, 10:00 Asia/Singapore, to fictional DEMO-DESTINATION. Reference prices are not executable offers. Relative SVGs are labelled illustrations, not product photographs.
+## Scope and assumptions
 
-To regenerate the 50-record reference data from the supplied attachment:
+- Three scenarios: `cafe-dictation`, `work-gym`, and `warm-room`.
+- One product/variant, one seller, and **one bundle per order**. Shared shipping and hardware fixtures support quantity one; other quantities are explicitly rejected.
+- Frozen clock: **24 October 2026, 10:00, Asia/Singapore**. Delivery is synthetic to `DEMO-DESTINATION-01 (fictional service zone; not Singapore stock)`.
+- USD integer cents only in the prepared catalog. Shipping, hardware, and explicit fixture tax are included exactly once. Unknown essentials block approval.
+- Photos and bounded input history are memory-only. Raw audio is not stored. Maximum five PNG/JPEG/WebP images per session, 2 MiB each, with format/structure and dimension limits.
+- Links resolve through a local curated allowlist; no arbitrary URL is fetched. External content is evidence, never an instruction or approval.
+- Missing videos remain explicit. No paid provider, retailer checkout, real order, payment, or messaging service is called.
 
-```sh
-node --experimental-strip-types scripts/import-microphones.ts /absolute/path/microphone-demo-data.md
-```
-
-## Verified locally
-
-The HTTP checks exercise complete purchase + concurrent retry; budget changes; stale, cancelled and reset turns; ambiguous/uncertain/echo/background approval; interrupted summary; unknown prices and invalid identifiers; role separation and CORS; and live snapshot streaming/reconnect. Amounts are integer cents with explicit USD/SGD currency, shipping/other fees charged once per order, item subtotal multiplied by quantity. `null` mandatory fees block approval.
-
-Ordered product cards, honest missing reviews/videos, destination changes and USD totals are also checked. Frontend/voice integration is still required. In particular, the voice team must attest final shopper recognition and echo status, while the UI must report actual rendered summary and audio **playback end**, not audio generation completion. The backend cannot independently prove a human heard audio or that an upstream speech classification is truthful. Provider credentials stay in the voice server.
-
-## Scope limits
-
-- One product/variant and seller offer per simulated order, quantity 1–99.
-- Exact-match specifications plus explicit laptop diagonal, mattress dimensions/depth and host connector compatibility checks. Unknown essential setup, package or fit blocks checkout.
-- Catalog is process-static; updating fixtures requires restart, which expires sessions.
-- The conservative English voice/text approval phrases are documented in INTEGRATION.md. Unrecognized or uncertain speech must reprompt, never force approval.
-- Shared-host production auth, persisted receipts, real fulfillment and production voice verification are outside this closed hackathon demo.
+The trusted bridge must report actual final shopper recognition and real playback completion. The backend checks those attestations but cannot independently establish that a human heard audio. Live provider/UI proof remains with the frontend and voice integration workstreams.

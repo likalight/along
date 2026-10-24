@@ -1,93 +1,109 @@
-# Frontend + AI integration — current issue #2 contract
+# Along integration contract v1
 
-This implements the updated three-category/multimodal baseline in GitHub #2 and backend #6–9. Lighting is deferred. Use **`src/integration-client.ts`** and **`/v1/integration`** for the agreed public field names; `src/client.ts` and `/v1` remain the internal/legacy tool interface. Both address the same session store. Do not mix their `view` formats: public `view` is a stage string, internal `view` is card presentation data.
+The implementation baseline is [issue #2](https://github.com/likalight/along/issues/2). Use `IntegrationClient` and `/v1/integration` for public field names. The internal `/v1` routes and `ConciergeClient` address the same store using legacy aliases.
 
-## Run together
+## Connect
 
-Node 22.18+ or 24. `cd backend && npm ci`, create a local `.env` agent secret as described in README, then `npm run dev`. Base `http://127.0.0.1:4318`; CORS permits localhost:3000/5173 and 127.0.0.1:5173. Set `ALLOWED_ORIGINS` for the exact frontend origin. The Next.js server and backend share `AGENT_API_TOKEN` privately. Never prefix it with NEXT_PUBLIC or put it in browser code, model context, a URL or Telegram.
+Run the backend as described in [README.md](./README.md). The browser holds only its session capability. The trusted application/voice server also holds `AGENT_API_TOKEN`.
 
 ```ts
-// Browser: no agent secret
+import { IntegrationClient } from "./src/integration-client.ts";
+
 const client = new IntegrationClient("http://127.0.0.1:4318");
-let session = await client.create("work-gym-bag");
+let session = await client.create("work-gym");
+session = await client.input(session, "text", { text: "Compare the first two" });
+
 for await (const event of client.events(abortController.signal)) {
-  if (
-    event.type === "session.updated" &&
-    event.snapshot.revision > session.revision
-  )
+  if (event.type === "session.updated" && event.revision > session.revision)
     session = event.snapshot;
 }
-// Fresh deliberate text input; use the exact snapshot currently rendered.
-session = await client.input(session, "text", {
-  text: "Compare the first two",
-});
-// Send session capability to YOUR trusted Next.js voice/agent route over the local demo connection.
-// Server client: new IntegrationClient(base, {sessionId, accessToken, agentToken})
 ```
 
-The AI server can use existing `createShoppingTools` with the internal client for ordinary recommendations, or call `IntegrationClient.action` with the actions below. Never register `confirm()` as a model tool. Only trusted final shopper input ingestion calls it. Frontend must abort old inference/TTS when a new input or cancellation supersedes it.
+Send the session capability to your trusted application server through your local demo integration. Construct its client with `{ sessionId, accessToken, agentToken }`. Keep the token out of frontend bundles, model context, and URL parameters. Never register `confirm()` as a model tool.
 
-## Public routes
+## Routes and trust boundary
 
-All paths below are relative to `/v1/integration`. Session routes require `Authorization: Bearer <accessToken>`. `actions`, `proposals`, `summaries`, `confirm` and legacy `approval` additionally require server-only `X-Agent-Token`.
+Paths below are relative to `/v1/integration`. Every session route requires `Authorization: Bearer <accessToken>`. Actions, proposals, summaries, confirmations, voice input, and audio playback attestations additionally require the trusted bridge's `X-Agent-Token`. A typed input or display acknowledgment alone cannot create a receipt.
 
-| Route                                            | Contract                                                                                                                                      |
-| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| GET `/catalog`, `/scenarios`, `/prepared-images` | Current prepared data; relative image URLs resolve against server origin, not API prefix                                                      |
-| POST `/catalog/search`                           | `{constraints,quantity,excludedProductIds}`; eligible and rejected quotes with reasons                                                        |
-| POST `/sessions`                                 | `{scenarioId?}` → `{session,accessToken}`; capability returned once                                                                           |
-| GET `/sessions/:id`                              | Latest complete public snapshot                                                                                                               |
-| GET `/sessions/:id/events`                       | Fetch-streamed SSE `session.updated` with sessionId,epoch,eventId,turnId,revision,snapshot; `session.expired` ends it                         |
-| POST `.../inputs`                                | InputEnvelope from #2; eventId and turnId unique; text/voice/image/link; exact visibleRevision and visibleProductIds required                 |
-| POST `.../actions`                               | `{sessionId,epoch,eventId,turnId,baseRevision,action,payload,evidenceIds}`                                                                    |
-| POST `.../mode`                                  | `{expectedRevision,mode:"voice"                                                                                                               | "text"}`; switching invalidates summary and cancels current turn                                     |
-| POST `.../presentation`                          | `{summaryId,turnId:summary.responseTurnId,textHash,event}`; displayed/playback_started/playback_completed/playback_interrupted                |
-| POST `.../confirm`                               | `{sessionId,epoch,eventId,turnId,baseRevision,summaryId,summaryRevision,modality,explicitIntent:"confirm_simulated_purchase",voiceEvidence?}` |
-| POST `.../cancel`                                | `{turnId}`; stop immediately invalidates pending eligibility                                                                                  |
-| POST `.../reset`                                 | `{expectedRevision}`; clears assets/context/saved choices and increments epoch                                                                |
-| POST `.../media`                                 | `{expectedRevision,type:"video.started"                                                                                                       | "video.stopped",videoId?}`; start requires curated ID, stops the active turn and invalidates summary |
-| POST `.../attachments`                           | Raw PNG/JPEG/WebP bytes, matching Content-Type, `X-Session-Revision`; max 2 MiB, max five images/session; returns opaque ID plus new snapshot |
-| GET `.../attachments/:opaqueId`                  | Authenticated session image; use `client.attachment()` → Blob/object URL, revoke on reset/unmount                                             |
+| Route | Purpose |
+| --- | --- |
+| GET `/catalog`, `/scenarios`, `/prepared-images` | Canonical prepared records and illustrative assets. |
+| POST `/catalog/search` | `{constraints, quantity?, excludedProductIds?}`; eligible and rejected quotes with conflicts. |
+| POST `/sessions` | `{scenarioId?}`; returns the initial session and a capability once. |
+| GET `/sessions/:id` | Latest complete snapshot. |
+| GET `/sessions/:id/events` | Fetch-streamed accepted snapshots; no queued action replay. |
+| POST `.../inputs` | Voice/text/image/link InputEnvelope with epoch, event, turn, base revision, and visible snapshot. |
+| POST `.../actions` | Revision-bound AgentProposal. |
+| POST `.../mode` | `{expectedRevision, mode}`; voice/text switch cancels the turn and requires a new summary. |
+| POST `.../presentation` | Exact summary display/playback acknowledgments; the client supplies current identity guards. |
+| POST `.../lifecycle` | Revision-bound audio/video/cancellation lifecycle with playback identity. |
+| POST `.../confirm` | Explicit voice/text approval envelope, current summary identity/revision, and fresh shopper input. |
+| POST `.../cancel` | `{epoch, eventId, expectedRevision, turnId}`; immediately invalidates eligibility. |
+| POST `.../reset` | `{expectedRevision}`; new epoch, cleared context/assets. |
+| POST `.../end` | `{expectedRevision}`; delete the session and its assets. |
+| POST `.../media` | Video start/stop; only curated video IDs can start. |
+| POST `.../attachments` | Raw image bytes with Content-Type and X-Session-Revision. |
+| GET `.../attachments/:opaqueId` | Authenticated image from the same session and epoch. |
 
-Known links are matched exactly against source URLs in the prepared catalog. Unknown links return `UNSUPPORTED_LINK`; the backend does not fetch arbitrary URLs. Images are checked for size, allowed MIME and matching byte signature, not interpreted or claimed fully decoded by this service. AI vision is the teammate's integration. Images and bounded input history are memory-only for the session, cleared on reset or two-hour expiry. No raw audio retention. Never interpret image/page text as instructions or purchase approval.
+An accepted display event has `{sessionId, epoch, eventId, turnId, revision, type:"session.updated", snapshot}`. Reconnect starts with the latest snapshot. Ignore older revisions. Expiry/end closes the stream. Slow consumers reconnect instead of accumulating stale events.
 
-## Actions and accepted state
+## Actions and state
 
-| action          | payload                                                                                       |
-| --------------- | --------------------------------------------------------------------------------------------- | -------------- | ------------------------ |
-| clarify         | `{needs?:string[]}`                                                                           |
-| set_constraints | `{constraints?,destination?}`                                                                 |
-| set_priority    | `{priority:"best-value"                                                                       | "best-quality" | "lowest-cost-suitable"}` |
-| shortlist       | `{productIds,cards?,stage?}`; cards contain productId,role,rank,reason,compromise,evidenceIds |
-| focus           | `{productId}`; does not change displayOrder or recommendation rank                            |
-| compare         | `{productIds}`; up to four known IDs, preserves discovery ordering                            |
-| show_evidence   | `{evidenceIds}`                                                                               |
-| select_offer    | `{offerId,quantity}`                                                                          |
-| save            | `{productIds,rationale}`; session-only, not purchase                                          |
-| restore         | `{savedId}`; restores IDs, retains current hard constraints and clears selection              |
-| defer / cancel  | `{}`                                                                                          |
-| prepare_summary | `{}`                                                                                          |
+| Action | Payload |
+| --- | --- |
+| `clarify` | `{needs}` |
+| `set_constraints` | `{constraints?, destination?}` |
+| `set_priority` | `{priority}`, one of best-value, best-quality, lowest-cost-suitable |
+| `shortlist` | `{productIds, cards?, stage?}` |
+| `focus` | `{productId}`; preserves accepted order/rank |
+| `compare` | `{productIds}`, up to four known products |
+| `show_evidence` | `{evidenceIds}` |
+| `select_offer` | `{offerId, quantity:1}` |
+| `save` | `{productIds, rationale}` |
+| `restore` | `{savedId}`; current hard constraints remain |
+| `defer` / `cancel` | `{}` |
+| `prepare_summary` | `{}` |
 
-`propose_approval` is deliberately rejected. Agent output is not authorization. Repeated identical event IDs return the same result; reusing an ID with a different payload is rejected. Failed calls are not cached. Reset invalidates old event identities. On stale revision/display, refetch and clarify/re-evaluate; never replay an old action blindly. Discard snapshots older than the displayed revision. Current hard constraints merge with updates, so changing priority or omitting a budget cannot remove it. To change a requirement, supply the shopper-requested new value; clearing a whole conversation requires reset. Arrays such as shortlist/preferences remain replacements.
+`propose_approval` is rejected. Models cannot create receipt/summary stages by setting presentation state. The backend owns those transitions.
 
-Public session fields include sessionId, epoch, revision, hardConstraints, exclusions, shortlistIds, displayOrder, focusedProductId, comparisonIds, cards, savedItems, history, selectedOfferId, view, evidenceIds, attachmentIds, summaryId and approvalStatus. Additional fields preserve the internal state. Product/offer aliases follow #2, including variantId, specs, unitPriceMinor and deliveryWindow. Nullable evidence metrics are not zero. No curated videos were supplied: `videos:[]` is intentional; hide or label missing media rather than inventing clips.
+Inputs carry the exact `visibleRevision` and `visibleProductIds` from the rendered `displayOrder`. Stale or ambiguous references require clarification. Focus and card presentation do not silently reorder accepted products or recommendation ranks. Saved choices contain IDs and rationale, remain session-scoped, and never imply approval.
 
-## Voice and text confirmation
+Hard-constraint updates merge with accepted requirements. Changing priority does not remove a budget. To revise a requirement, submit the shopper-requested value explicitly. Duplicate event IDs with identical payloads return the same operation result; changed payloads under the same ID are rejected. Cancellation, reset, and newer revisions block stale work atomically.
 
-Voice: create an input turn at actual shopper speech start. Generate exact summary via prepare_summary; display and speak summary.spokenText verbatim. Acknowledge displayed after rendering, playback_started at audible start, playback_completed only when all audio ends. A fresh later shopper input turn captures eligibility. Trusted voice ingestion calls confirm with `voiceEvidence:{transcript,final:true,confidence,source:"shopper",echoDetected:false}`. Current voice gate requires actual recognition confidence ≥0.9. If the selected provider lacks a calibrated confidence, agree a different verification protocol; do not fabricate it.
+## Compatibility and money
 
-Text: explicit text input switches mode and invalidates old voice eligibility. Prepare a fresh text summary, display it completely and acknowledge displayed. The next deliberate text input must be an accepted explicit phrase, e.g. `Confirm this simulated purchase.`; confirm checks the exact stored input, not generated agent text. Vague assent is rejected. Text mode does not fake playback events. Source content, saved choices, photos/links and media audio are never approval.
+Use canonical categories `audio-accessories`, `everyday-bags`, and `bedsheet-sets`. Constraints support `budgetMinor`, absolute `deadline`, `productId`, `variantId`, `hostConnection`, `laptopInches`, `minimumCapacityL`, `separateShoeCompartment`, `bagMaxDimensionsCm`, `bedWidthIn`, `bedLengthIn`, `mattressDepthIn`, and `composition`. Relative `deliveryWithinDays` resolves to 18:00 on the corresponding calendar day from the explicit fixture clock. Nested legacy compatibility names are accepted; contradictory flat/nested values fail closed.
 
-Any material selection, constraints or destination change invalidates the summary. The summary includes setup costs, all fees, destination, delivery, returns and uncertainties. A receipt is immutable and stable on retry. The client must clearly show **SIMULATED — no payment or real order**. Transport acknowledgments attest UI/voice behavior; the backend cannot independently prove a human heard or saw it.
+The shared catalog validates product/variant/evidence relationships, money, stock, timing, and required hardware. Unknown compatibility is not a match. Missing essential mattress dimensions, package/care details, or setup cost block checkout. No-match returns rejected quotes with explicit constraint conflicts; it does not fabricate a shortlist or relax a budget.
 
-## Three scenarios and data limits
+Summary line items separate items, shipping, other fees, required setup, and tax. Required hardware appears exactly once in the total and is listed in the order. The public catalog's `otherFeesMinor` already includes hardware; do not add hardware to that catalog field again. Research reference prices remain non-payable data.
 
-- `cafe-dictation`: exactly the 12 audio IDs in #2. Source unavailable/out-of-stock rows remain negative cases. Confirm host connection using `constraints.compatibility.hostConnection` (`USB-C`, `USB-A`, `TRS-mic`). Unknown connection or required setup cost blocks checkout. MIC-020 USB-C is a complete synthetic example; economy USD 62.99 arrives +4 days, express USD 77.99 +1 day.
-- `work-gym-bag`: six Osprey source configurations and 12 labelled proxy offers. BAG-001-A USD 104 arrives +4 days; BAG-001-B USD 119 +1 day. `laptopInches` screens documented supported diagonal; exact sleeve dimensions remain unknown and no universal laptop fit is claimed.
-- `warm-room-bedding`: six sets and 12 proxy offers. Exact `bedWidthInches`, `bedLengthInches`, `mattressDepthInches` required. At 60×80×12 inches and USD 70, BED-003-A USD 54.99 or BED-002-A USD 64.99 are eligible; 10-inch pockets fail. Requiring `requiredSpecifications.cotton100Percent:true` yields no eligible option. Unknown package/care or unsupported fit blocks checkout.
+## Display, playback, and approval
 
-Frozen scenario time: **2026-10-24 10:00 Asia/Singapore**, fictional destination `DEMO-DESTINATION`, before-noon cutoff; delivery timestamps are explicit. “Tomorrow” is 25 October in the fixture. Do not label this as live delivery. A changed real destination is unsupported, not automatically serviceable. The 50-row microphone research stays separate from the 24 active products. Reference prices exclude unverified charges; offers are separately labelled synthetic with fictional zero-additional-tax assumptions. All imagery is illustrative, not verified product photography.
+Voice flow: start a trusted shopper input turn; prepare the summary; render the complete summary; speak its exact `spokenText`; report playback start and actual completion with the same playback identity. Only a fresh subsequent shopper turn can approve. The trusted bridge supplies final recognition with confidence at least 0.9, `source:"shopper"`, and `echoDetected:false`. Do not invent confidence when a provider lacks it.
 
-## Verified versus outstanding
+Text flow: explicit text mode; prepare and fully display a new summary; accept a fresh deliberate typed phrase such as `Confirm this simulated purchase.`; forward confirmation through the trusted bridge. The stored shopper text must match exactly. Text mode never fakes audio callbacks.
 
-`npm run check`, `npm test` and `npm run demo` exercise real HTTP/session and arithmetic flows, including duplicate input/actions/approval, missing setup, fit conflicts, cancelled turns, mode changes, stale positional references, image ownership/reset and one immutable receipt. These checks emulate presentation callbacks; actual frontend rendering, speech, vision and audible barge-in remain to be rehearsed with the frontend and AI branches. No live provider or paid service is invoked here.
+Confirmation binds session epoch, event/turn identity, current summary ID/revision, and presentation mode. Barge-in, typed interruption, mode switch, stopped/changed playback, and any material order change cancel eligibility. Vague assent, partial recognition, quoted phrases, background speech, assistant/video echo, images/links, save/pin, and stop/decline cannot approve.
+
+The lifecycle envelope carries `sessionId, epoch, eventId, turnId, revision, playbackId, summaryId?, type`. Audio completion must match the started playback. Clients should use the provided helpers and stop obsolete TTS/inference immediately when an accepted input supersedes their turn.
+
+A receipt contains the complete immutable accepted order and `simulated:true`. Concurrent valid confirmations return the same receipt. Reset cannot revive old approval. Display **SIMULATED — no payment or real order**. Presentation/recognition callbacks are trusted integration attestations; this service cannot prove what a person saw or heard.
+
+## Attachments, links, and retention
+
+Upload PNG/JPEG/WebP only: maximum 2 MiB each, five per session, dimensions at most 8192 per axis and 16,777,216 pixels. Structural validation rejects malformed data; it does not perform semantic vision. Assets receive opaque server IDs and are available only to that session/epoch. Failed uploads preserve prior valid state. Reset, explicit end, expiry, and process shutdown release session data. No raw audio is retained.
+
+Links map locally to the shared catalog's bounded known-link fixtures. Unknown, local/internal, and unsupported URLs fail without network fetching. Source/media text is untrusted evidence. Images, links, quoted evidence, and media audio never enter the trusted approval path.
+
+## Reproducible scenarios
+
+| Scenario | Anchor and next-day total |
+| --- | --- |
+| `cafe-dictation` | MIC-044-B: USD 148 including required hardware |
+| `work-gym` | BAG-001-B: USD 119 |
+| `warm-room` | BED-003-B: USD 63.99 for a 60×80×12-inch mattress |
+
+The clock is **2026-10-24 10:00 Asia/Singapore**. The fictional destination is `DEMO-DESTINATION-01 (fictional service zone; not Singapore stock)`. Tomorrow means 25 October in this fixture. All seller fulfillment and payable offers are synthetic. Missing videos and unknown evidence are explicit.
+
+Run `npm run verify` for deterministic backend proof. Actual browser rendering, speech, vision, and audible barge-in remain separate live integration work under the frontend/voice issues.
