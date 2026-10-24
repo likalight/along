@@ -10,8 +10,8 @@ test("100-product index is retained verbatim with reproducible hash and full act
   assert.equal(createHash("sha256").update(bytes).digest("hex"), microphoneArchive.sourceSha256);
   assert.equal(microphoneArchive.records.length, 100);
   const data = getCatalog();
-  assert.equal(data.products.length, 148);
-  assert.equal(data.offers.length, 296);
+  assert.equal(data.products.length, 200);
+  assert.equal(data.offers.length, 400);
   assert.equal(data.products.filter(p => p.id.startsWith("MIC-")).length, 100);
   for (const product of data.products) assert.equal(data.offers.filter(o => o.productId === product.id).length, 2);
   assert.equal(data.products.some(p => p.id === "MIC-018"), true);

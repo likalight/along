@@ -22,7 +22,11 @@ async function review(mode: "voice" | "text" = "voice") {
   const cookie = connected.headers.get("set-cookie")!.split(";")[0];
   const { store } = getRuntime();
   let s = store.core.get(initial.sessionId);
-  const quote = store.quotes(s.id).find((candidate) => candidate.eligible)!;
+  // Exercise the authoritative review with one known product; enumerating the
+  // entire catalog here repeats full integrity validation for every offer.
+  const quote = store
+    .quotes(s.id, "BAG-001")
+    .find((candidate) => candidate.eligible)!;
   s = store.core.input(s.id, {
     sessionId: s.id,
     epoch: s.epoch,
@@ -287,6 +291,51 @@ it("client supplied trusted flags and Live completion actions cannot invoke the 
   });
   expect(response.status).toBe(409);
   expect(h.store.core.get(h.s.id)).toEqual(h.s);
+});
+
+it("blocks server-only completion of a previous review after a browser reference is imported", async () => {
+  const h = await review();
+  h.store.importDiscovery(
+    h.s.id,
+    {
+      handoffId: "discovery-after-review",
+      mode: "live",
+      source: {
+        title: "Bag inspiration",
+        url: "https://www.youtube.com/watch?v=example",
+      },
+      candidate: {
+        id: "bag-search",
+        title: "A similar bag",
+        url: "https://www.coupang.com/np/search?q=bag",
+        price: null,
+        match: "similar",
+        linkKind: "search",
+        reasons: ["Similar shape"],
+        unknowns: ["Laptop fit"],
+      },
+    },
+    { epoch: h.s.epoch, baseRevision: h.s.revision },
+  );
+  const completion = vi.spyOn(h.store.core, "completeLiveDemo");
+  try {
+    expect(() =>
+      completeLiveDemoCheckout({
+        sessionId: h.s.id,
+        epoch: h.s.epoch,
+        expectedRevision: h.s.revision,
+        summaryId: h.s.summary!.id,
+        summaryRevision: h.s.summary!.revision,
+        responseTurnId: h.s.summary!.responseTurnId,
+        delegationId: "old-order-confirmation",
+        transcript: "Please buy it",
+      }),
+    ).toThrow("not a catalog order");
+    expect(completion).not.toHaveBeenCalled();
+    expect(h.store.core.get(h.s.id).receipt).toBeNull();
+  } finally {
+    completion.mockRestore();
+  }
 });
 
 it("checks the authoritative receipt after a lost completion acknowledgement without resubmitting", async () => {

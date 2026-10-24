@@ -15,7 +15,8 @@ export function customerDestinationLabel(destination: string): string {
 export function customerCopy(text: string): string {
   const value = text.trim();
   if (!value) return "";
-  // These are implementation disclosures, not product or purchase conditions.
+  // The persistent catalog/receipt notices disclose the simulation. Product
+  // notes keep the concrete uncertainty without repeating that global notice.
   if (
     /^(?:Simulated purchase only;|All offer prices, destination eligibility|Tax is explicitly zero in this fictional scenario)/i.test(
       value,
@@ -36,6 +37,8 @@ export function customerCopy(text: string): string {
     return "Colour availability needs confirmation.";
   if (/^Demo color differs from the linked retail variant/i.test(value))
     return "The colour shown may differ from the linked product variant.";
+  if (/^Demo color, seller, price and delivery are authored fixtures, not verified retail offers\.$/i.test(value))
+    return "Colour availability, seller pricing and delivery still need verification.";
   if (
     /^Demo package assumptions are separate from sourced specifications/i.test(
       value,

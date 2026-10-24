@@ -220,6 +220,7 @@ export function project(id: string): Session {
       : undefined;
   return {
     ...s,
+    conversationMode: c.presentationMode,
     narrationSegments: acceptedSegments,
     focusedProductId:
       s.focusedProductId ??

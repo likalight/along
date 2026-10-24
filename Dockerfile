@@ -6,6 +6,7 @@ WORKDIR /app
 
 COPY package.json package-lock.json ./
 COPY apps/shopper/package.json apps/shopper/
+COPY apps/extension/package.json apps/extension/
 COPY apps/web/package.json apps/web/
 COPY packages/agent/package.json packages/agent/
 COPY packages/contract/package.json packages/contract/
@@ -43,6 +44,7 @@ COPY --from=builder --chown=along:along /app/backend ./backend
 
 # apps/web package.json keeps workspace graph intact for npm -w
 COPY --from=builder --chown=along:along /app/apps/web/package.json ./apps/web/package.json
+COPY --from=builder --chown=along:along /app/apps/extension/package.json ./apps/extension/package.json
 
 USER along
 EXPOSE 3000

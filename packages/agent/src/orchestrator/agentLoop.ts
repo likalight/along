@@ -33,6 +33,7 @@ import { type Route, resolveReference } from "../intent/router.js";
 import type { FixtureSessionStore } from "../session/FixtureSessionStore.js";
 import type { SessionThread } from "../thread/SessionThread.js";
 import { reduce } from "../thread/reduce.js";
+import { discoveryReply } from "../discovery/reference.js";
 
 export interface LoopResult {
   narrationSegments?: Array<{ text: string; productId: string | null }>;
@@ -113,6 +114,38 @@ export async function agentLoop(opts: {
   if (cancel.aborted) return { proposals, speakable, cancelled: true };
 
   switch (route) {
+    case "catalog_product": {
+      const id = input.text?.match(/\b(?:MIC|BAG|BED)-\d{3}\b/i)?.[0].toUpperCase();
+      const product = id ? getProduct(id) : undefined;
+      if (!product) {
+        speakable.push({ turnId: input.turnId, revision: snapshot.revision, channel: "commentary", content: "That catalog product is unavailable. No offer has been selected." });
+        break;
+      }
+      const shown = push({ ...baseProposal(input, "catalog-product"), action: "shortlist",
+        payload: { entries: [{ productId: product.id, fitReason: "The catalog product you explicitly chose to explore.",
+          compromise: product.limitations[0] ?? "Offers are simulated; the external listing is not verified." }] }, evidenceIds: [] });
+      if (shown && snapshot.shortlistIds.includes(product.id)) {
+        const focused = push({ ...baseProposal(input, "catalog-focus"), action: "focus", payload: { productId: product.id }, evidenceIds: [] });
+        if (focused) {
+          speakable.length = 0;
+          speakable.push({ turnId: input.turnId, revision: snapshot.revision, channel: "commentary",
+            content: `Here is ${product.title}. This is the catalog item you chose, with simulated offers. Your requirements still apply; opening it does not select an offer or approve a purchase.` });
+        }
+      }
+      break;
+    }
+    case "discovery_return": {
+      snapshot = store.clearDiscovery(input.sessionId) ?? snapshot;
+      speakable.push({ turnId: input.turnId, revision: snapshot.revision, channel: "commentary",
+        content: "Back to your catalog conversation. Your requirements, saved choices and comparison order are preserved." });
+      break;
+    }
+    case "discovery_followup": {
+      if (snapshot.discoveryReference)
+        speakable.push({ turnId: input.turnId, revision: snapshot.revision, channel: "commentary",
+          content: discoveryReply(snapshot.discoveryReference, snapshot, input.text ?? "") });
+      break;
+    }
     case "stop_decline": {
       push({
         ...baseProposal(input, "cancel"),

@@ -26,6 +26,18 @@ export type ClientState = {
   liveCaption: string;
   livePending: boolean;
 };
+/** Queued references must not replace a draft, voice task or order review. */
+export function canAutoImportDiscovery(state: ClientState, hasDraft: boolean) {
+  return (
+    state.connected &&
+    !!state.snapshot &&
+    !hasDraft &&
+    !state.capturing &&
+    !state.livePending &&
+    state.status === "ready" &&
+    !["summary", "recovery"].includes(state.snapshot.view)
+  );
+}
 export class SessionController {
   private state: ClientState = {
     snapshot: null,
@@ -48,6 +60,8 @@ export class SessionController {
   private pending: AbortController | null = null;
   private identity: Identity | null = null;
   private disposed = false;
+  private voiceActivated = false;
+  private voicePauseGeneration = 0;
   private cancellation: Promise<unknown> = Promise.resolve();
   private mediaEvents: Promise<unknown> = Promise.resolve();
   private playback: Playback | null = null;
@@ -158,12 +172,17 @@ export class SessionController {
     });
     return true;
   }
-  async connect() {
+  async connect(sessionId?: string) {
     const generation = this.generation;
     try {
-      const snapshot = await this.transport.connect();
+      const snapshot = await this.transport.connect(sessionId);
       if (generation === this.generation && this.acceptSnapshot(snapshot))
-        this.update({ connected: true });
+        this.update({
+          connected: true,
+          ...(sessionId && snapshot.conversationMode
+            ? { mode: snapshot.conversationMode }
+            : {}),
+        });
     } catch (e) {
       if (generation === this.generation) this.fail(e);
     }
@@ -183,6 +202,80 @@ export class SessionController {
           turnId: crypto.randomUUID(),
           revision: s.revision,
         };
+  }
+  /** A user-selected extension reference joins this conversation, never as executable page text. */
+  async receiveDiscovery(handoffId: string): Promise<boolean> {
+    if (!this.state.snapshot || !this.transport.discovery) return false;
+    const paused = this.state.status === "paused";
+    const voicePauseGeneration = this.voicePauseGeneration;
+    const resumeVoice =
+      this.state.mode === "voice" &&
+      (this.state.capturing ||
+        (this.voiceActivated &&
+          ["speaking", "thinking"].includes(this.state.status)));
+    // An explicitly imported reference supersedes the task, not just its speech.
+    // Live barge-in deliberately leaves delegated work running, so interrupt()
+    // would allow an older recommendation to overwrite this new reference.
+    this.cancelTurn();
+    const generation = this.generation;
+    this.update({ status: "thinking", error: null, liveCaption: "" });
+    try {
+      await this.speech.prepareTurn?.();
+      await this.cancellation;
+      await this.mediaEvents;
+      if (generation !== this.generation) return false;
+      const latest = await this.transport.connect(
+        this.state.snapshot.sessionId,
+      );
+      if (generation !== this.generation) return false;
+      if (!this.acceptSnapshot(latest))
+        throw new Error(
+          "The conversation changed. Reconnect and try the discovery again.",
+        );
+      this.update({ livePending: false });
+      const result = await this.transport.discovery(
+        this.currentIdentity(),
+        handoffId,
+      );
+      if (generation !== this.generation) return false;
+      if (!this.acceptSnapshot(result.snapshot))
+        throw new Error(
+          "This discovery belongs to another conversation or has expired.",
+        );
+      this.identity = {
+        sessionId: result.snapshot.sessionId,
+        epoch: result.snapshot.epoch,
+        revision: result.snapshot.revision,
+        turnId: result.turnId,
+      };
+      this.update({
+        status:
+          paused || voicePauseGeneration !== this.voicePauseGeneration
+            ? "paused"
+            : "ready",
+        error: null,
+      });
+      if (this.speech.fullDuplex) {
+        // The existing server-side call receives the reference and its limits;
+        // never synthesize a second voice response or new approval evidence.
+        await this.speech.sync?.();
+        if (generation !== this.generation) return false;
+        if (resumeVoice && voicePauseGeneration === this.voicePauseGeneration)
+          await this.listenLive();
+      } else if (
+        resumeVoice &&
+        voicePauseGeneration === this.voicePauseGeneration
+      )
+        this.narrate(result.snapshot);
+      return true;
+    } catch (error) {
+      if (generation === this.generation) {
+        if (error instanceof TransportError && error.snapshot)
+          this.acceptSnapshot(error.snapshot);
+        this.fail(error);
+      }
+      return false;
+    }
   }
   private matches(i: Playback) {
     const s = this.state.snapshot;
@@ -229,12 +322,14 @@ export class SessionController {
     this.cancelTurn();
   };
   pauseListening = () => {
+    this.voicePauseGeneration++;
     this.liveFocus.clear(true);
     this.speech.stop();
     this.update({ capturing: false, status: "paused" });
   };
   /** Release microphone and provider resources when the mounted UI goes away. */
   closeVoice = () => {
+    this.voicePauseGeneration++;
     this.liveFocus.clear(true);
     this.speech.dispose();
     this.update({ capturing: false, status: "paused" });
@@ -392,6 +487,7 @@ export class SessionController {
             this.update({ capturing: false, status: "paused" });
         },
       });
+      this.voiceActivated = true;
     } catch (e) {
       if (generation === this.generation) this.fail(e);
     }
@@ -479,6 +575,7 @@ export class SessionController {
         },
       });
       starting = false;
+      if (current()) this.voiceActivated = true;
       if (current() && this.getSnapshot().status === "reconnecting")
         this.update({ status: this.state.capturing ? "listening" : "paused" });
     } catch (error) {

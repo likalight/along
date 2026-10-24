@@ -45,6 +45,11 @@ export function PurchaseComplete({
         </motion.div>
         <p>Order confirmed</p>
         <h2>You’re all set.</h2>
+        {receipt.simulated && (
+          <p className={styles.purchaseDisclosure}>
+            Simulated order · no payment was taken
+          </p>
+        )}
       </div>
 
       <div className={styles.purchaseItem}>
