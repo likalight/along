@@ -303,40 +303,28 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
           case "shortlist": {
             const entries = (p.entries ??
               []) as SessionSnapshot["shortlistEntries"];
-            const related = [
-              ...((p.closeMatches as string[]) ?? []),
-              ...((p.relatedDiscoveries as string[]) ?? []),
-            ];
-            // Discovery may show related tiles that are not yet checkout-eligible.
-            // Hard category/incompatibility still drops a product; soft/unknown stays.
-            // HOST_CONNECTION_REQUIRED is soft until the shopper confirms host hardware
-            // (café demo would otherwise land empty after "best value").
-            const soft = (code: string) =>
-              /UNKNOWN|DELIVERY|OVER_BUDGET|SHOE_COMPARTMENT|LAPTOP_FIT|SPECIFICATION_CONFLICT|HOST_CONNECTION_REQUIRED/i.test(
-                code,
-              );
-            const discovery = entries.filter((e) => {
-              const quotes = this.quotes(a.sessionId, e.productId);
-              if (!quotes.length) return related.includes(e.productId);
-              return quotes.some((q) =>
-                q.conflicts.every(
-                  (c) =>
-                    soft(c.code) ||
-                    [
-                      "HOST_UNKNOWN",
-                      "BED_DIMENSIONS_UNKNOWN",
-                      "MATTRESS_DEPTH_UNKNOWN",
-                    ].includes(c.code),
-                ),
-              );
-            });
-            const eligible = discovery.filter((e) =>
-              this.quotes(a.sessionId, e.productId).some((q) => q.eligible),
+            // Discovery can precede user-supplied sizing/connection details, but
+            // never relax a stated budget, delivery deadline, exclusion or fit.
+            const clarificationOnly = new Set([
+              "HOST_CONNECTION_REQUIRED",
+              "BED_MEASUREMENTS_REQUIRED",
+            ]);
+            const discovery = entries.filter((e) =>
+              this.quotes(a.sessionId, e.productId).some((q) =>
+                q.conflicts.every((c) => clarificationOnly.has(c.code)),
+              ),
             );
-            const shown = (eligible.length >= 3 ? eligible : discovery).slice(
-              0,
-              5,
+            const pending = new Set(
+              discovery
+                .filter(
+                  (e) =>
+                    !this.quotes(a.sessionId, e.productId).some(
+                      (q) => q.eligible,
+                    ),
+                )
+                .map((e) => e.productId),
             );
+            const shown = discovery.slice(0, 5);
             proposal.shortlist = shown.map((e) => e.productId);
             proposal.view = {
               stage: "shortlist",
@@ -346,7 +334,9 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
                 role: (s.priority ?? "best-value") as "best-value",
                 rank: (i + 1) as 1 | 2 | 3,
                 reason: e.fitReason,
-                compromise: e.compromise,
+                compromise: pending.has(e.productId)
+                  ? `${e.compromise} Confirm your ${s.constraints.category === "audio-accessories" ? "device connection" : "bed measurements"} before selecting an offer.`
+                  : e.compromise,
                 evidenceIds: getProduct(e.productId)?.evidenceIds ?? [],
               })),
               evidenceIds: [],
@@ -354,9 +344,9 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
             };
             proposal.stage = shown.length ? "shortlist" : "understanding";
             content = shown.length
-              ? eligible.length
-                ? `Here are ${shown.length} candidates. Gold/silver/bronze are contextual ranks for this shortlist — not awards.`
-                : `Here are ${shown.length} discoveries. Some still need a compatibility check before checkout.`
+              ? pending.size
+                ? `Here ${shown.length === 1 ? "is 1 possibility" : `are ${shown.length} possibilities`} within your stated limits. ${pending.size} still ${pending.size === 1 ? "needs" : "need"} your device connection or bed measurements before checkout.`
+                : `Here ${shown.length === 1 ? "is 1 candidate that meets" : `are ${shown.length} candidates that meet`} your stated limits. Ranks are contextual to this shortlist — not awards.`
               : "No checked offer meets the known hard constraints. Which requirement may change?";
             break;
           }
