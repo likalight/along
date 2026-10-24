@@ -3,15 +3,17 @@
   "private": true,
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/*",
+    "backend"
   ],
   "scripts": {
     "dev": "npm run dev -w @coupang/web",
-    "build": "npm run build -w @coupang/contract && npm run build -w @coupang/agent && npm run build -w @coupang/web",
+    "build": "npm run sync:catalog && npm run build -w @concierge/backend && npm run build -w @coupang/contract && npm run build -w @coupang/agent && npm run build -w @coupang/web",
     "test": "npm run test -w @coupang/agent",
-    "typecheck": "npm run typecheck -w @coupang/contract && npm run typecheck -w @coupang/agent && npm run typecheck -w @coupang/web"
+    "typecheck": "npm run typecheck -w @coupang/contract && npm run typecheck -w @coupang/agent && npm run typecheck -w @coupang/web",
+    "sync:catalog": "node scripts/sync-catalog.mjs"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.18"
   }
 }

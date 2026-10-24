@@ -12,7 +12,7 @@ import {
 } from "node:http";
 import { pathToFileURL } from "node:url";
 import { eligibleOffers } from "./catalog.ts";
-import { teamProfile } from "./team-catalog.ts";
+import { agreedProfile } from "./agreed-catalog.ts";
 import type { CatalogProfile } from "./contracts.ts";
 import { SessionStore, safeEqual } from "./store.ts";
 import {
@@ -31,7 +31,7 @@ export function createApp(options: {
   store?: SessionStore;
   profile?: CatalogProfile;
 }) {
-  const profile = options.profile ?? options.store?.profile ?? teamProfile;
+  const profile = options.profile ?? options.store?.profile ?? agreedProfile;
   const { catalog, scenarios, preparedImages } = profile;
   const store = options.store ?? new SessionStore(undefined, profile);
   const origins = new Set(
@@ -124,6 +124,9 @@ export function createApp(options: {
       if (
         req.method === "GET" &&
         [
+          "catalog/images/audio.svg",
+          "catalog/images/bag.svg",
+          "catalog/images/bedding.svg",
           "reference/bag-style.svg",
           "reference/bedding-style.svg",
           "reference/lamp-blue.svg",

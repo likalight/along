@@ -21,7 +21,7 @@ try {
     ...s.constraints,
     budgetMinor: 15000,
     deliveryWithinDays: 1,
-    compatibility: { hostConnection: "USB-C" },
+    compatibility: { hostConnection: "usb-a" },
   });
   for (const q of [...offers.eligible, ...offers.ineligible].filter(
     (q: any) => q.product.id === "MIC-020",
@@ -43,10 +43,10 @@ try {
         currency: "USD",
         budgetMinor: 15000,
         deliveryWithinDays: 1,
-        compatibility: { hostConnection: "USB-C" },
+        compatibility: { hostConnection: "usb-a" },
       },
       shortlist: ["MIC-020"],
-      selection: { offerId: "MIC-020-express", quantity: 1 },
+      selection: { offerId: "MIC-020-B", quantity: 1 },
     })
   ).session;
   s = await c.summarize(s.revision, s.turn!.id);

@@ -1,3 +1,4 @@
+import { parseBudget } from "../intent/requirements.js";
 import type { AgentProposal, SessionSnapshot } from "@coupang/contract";
 import { PRODUCTS } from "../fixtures/catalog.js";
 
@@ -20,10 +21,14 @@ export function buildBeddingShortlist(
   snapshot: SessionSnapshot,
 ): SessionSnapshot["shortlistEntries"] {
   const size = String(
-    snapshot.hardConstraints["bedSize"] ?? snapshot.preferences["bedSize"] ?? "queen",
+    snapshot.hardConstraints["bedSize"] ??
+      snapshot.preferences["bedSize"] ??
+      "queen",
   );
   const material = String(
-    snapshot.preferences["material"] ?? snapshot.hardConstraints["material"] ?? "",
+    snapshot.preferences["material"] ??
+      snapshot.hardConstraints["material"] ??
+      "",
   );
 
   let pool = PRODUCTS.filter(
@@ -66,8 +71,8 @@ export function parseBeddingPrefs(text: string): {
   if (/percale/i.test(text)) out.material = "cotton-percale";
   if (/bamboo/i.test(text)) out.material = "bamboo-blend";
   if (/sateen/i.test(text)) out.material = "cotton-sateen";
-  const budget = text.match(/\$?\s?(\d{2,4})\b/);
-  if (budget) out.budgetMinor = Number(budget[1]) * 100;
+  const budget = parseBudget(text);
+  if (budget !== undefined) out.budgetMinor = budget;
   return out;
 }
 

@@ -8,7 +8,7 @@ import { teamProfile } from "../src/team-catalog.ts";
 import { quoteOffer } from "../src/catalog.ts";
 async function harness(t: any) {
   const agentToken = randomUUID(),
-    { server } = createApp({ agentToken });
+    { server } = createApp({ agentToken, profile: teamProfile });
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
   t.after(() => {

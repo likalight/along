@@ -28,3 +28,5 @@ export {
   buildBeddingShortlist,
   parseBeddingPrefs,
 } from "./scenarios/bedding.js";
+
+export {AuthoritativeSessionStore} from "./session/AuthoritativeSessionStore.js";

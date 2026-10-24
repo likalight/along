@@ -45,7 +45,7 @@ export function buildAudioShortlist(
   let pool = PRODUCTS.filter(
     (p) =>
       p.category === "audio" &&
-      p.id !== "MIC-047" &&
+      offersForProduct(p.id).length > 0 &&
       !snapshot.exclusions.includes(p.id) &&
       (!solutionType || p.solutionType === solutionType),
   );
@@ -98,10 +98,7 @@ export function buildAudioShortlist(
   }));
 }
 
-function fitReason(
-  p: (typeof PRODUCTS)[0],
-  priority: BuyingPriority,
-): string {
+function fitReason(p: (typeof PRODUCTS)[0], priority: BuyingPriority): string {
   if (priority === "lowest_cost_suitable") {
     return `${p.title} has the lowest complete fixture total among eligible ${p.solutionType} options checked.`;
   }

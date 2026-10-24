@@ -1,3 +1,4 @@
+import { parseBudget, parseCompatibility } from "../intent/requirements.js";
 import type {
   AgentProposal,
   InputEvent,
@@ -72,7 +73,11 @@ export async function agentLoop(opts: {
     if (cancel.aborted) return false;
     reduce(thread, {
       type: "tool_call",
-      data: { turnId: input.turnId, intent: proposal.action, payload: proposal.payload },
+      data: {
+        turnId: input.turnId,
+        intent: proposal.action,
+        payload: proposal.payload,
+      },
     });
     const result = store.apply(proposal);
     reduce(
@@ -105,16 +110,15 @@ export async function agentLoop(opts: {
         payload: { reason: "shopper_stop" },
         evidenceIds: [],
       });
-      push({
-        ...baseProposal(input, "defer"),
-        action: "defer",
-        payload: {},
-        evidenceIds: [],
-      });
+
       break;
     }
     case "save": {
-      const ref = resolveReference(input.text ?? "", snapshot, input.visibleProductIds);
+      const ref = resolveReference(
+        input.text ?? "",
+        snapshot,
+        input.visibleProductIds,
+      );
       const productId =
         ref.productId ?? snapshot.focusedProductId ?? snapshot.displayOrder[0];
       if (!productId) {
@@ -203,10 +207,7 @@ export async function agentLoop(opts: {
       });
       const snap = store.get(input.sessionId)!;
       const solutionType = snap.preferences["solutionType"] as
-        | "headset"
-        | "clip_on"
-        | "directional_desktop"
-        | undefined;
+        "headset" | "clip_on" | "directional_desktop" | undefined;
       const entries = buildAudioShortlist(snap, solutionType, priority);
       push({
         ...baseProposal(input, "shortlist"),
@@ -223,7 +224,11 @@ export async function agentLoop(opts: {
       break;
     }
     case "ordinal_ref": {
-      const ref = resolveReference(input.text ?? "", snapshot, input.visibleProductIds);
+      const ref = resolveReference(
+        input.text ?? "",
+        snapshot,
+        input.visibleProductIds,
+      );
       if (ref.ambiguous || !ref.productId) {
         push({
           ...baseProposal(input, "clarify"),
@@ -384,18 +389,19 @@ function runGuidedNeed(
   route: Route,
 ) {
   const text = input.text ?? "";
-  const scenario =
-    snapshot.scenarioId ?? inferScenario(text, snapshot).id;
+  const scenario = snapshot.scenarioId ?? inferScenario(text, snapshot).id;
 
   if (scenario === "cafe_dictation") {
-    const st = parseSolutionType(text) ?? (snapshot.preferences["solutionType"] as
-      | "headset"
-      | "clip_on"
-      | "directional_desktop"
-      | undefined);
-    const budget = text.match(/\$?\s?(\d{2,4})\b/);
-    const hard: Record<string, unknown> = {};
-    if (budget) hard["budgetMinor"] = Number(budget[1]) * 100;
+    const st =
+      parseSolutionType(text) ??
+      (snapshot.preferences["solutionType"] as
+        "headset" | "clip_on" | "directional_desktop" | undefined);
+    const budget = parseBudget(text);
+    const hard: Record<string, unknown> = {
+      category: "audio",
+      compatibility: parseCompatibility(text),
+    };
+    if (budget !== undefined) hard["budgetMinor"] = budget;
     if (/tomorrow|need it tomorrow/i.test(text)) hard["maxDeliveryDays"] = 1;
 
     push({
@@ -422,7 +428,8 @@ function runGuidedNeed(
       patchScenario(store, input.sessionId, "cafe_dictation");
       return;
     }
-    const priority = parsePriority(text) ?? snapshot.buyingPriority ?? "best_value";
+    const priority =
+      parsePriority(text) ?? snapshot.buyingPriority ?? "best_value";
     push({
       ...baseProposal(input, "priority"),
       action: "set_priority",
@@ -459,7 +466,14 @@ function runGuidedNeed(
 
   if (scenario === "bag_inspiration") {
     const prefs = parseBagPrefs(text);
-    if (!prefs.shape && !prefs.color && route !== "strong_intent") {
+    if (
+      !prefs.shape &&
+      !prefs.color &&
+      !prefs.budgetMinor &&
+      !prefs.needTomorrow &&
+      !Object.keys(parseCompatibility(text)).length &&
+      route !== "strong_intent"
+    ) {
       push(bagClarifyShapeColour(baseProposal(input, "ask-bag")));
       patchScenario(store, input.sessionId, "bag_inspiration");
       return;
@@ -472,7 +486,11 @@ function runGuidedNeed(
         hardConstraints: {
           ...(prefs.budgetMinor ? { budgetMinor: prefs.budgetMinor } : {}),
           ...(prefs.needTomorrow ? { maxDeliveryDays: 1 } : {}),
-          ...(prefs.shape ? { shape: prefs.shape } : {}),
+          category: "bags",
+          compatibility: parseCompatibility(text),
+          ...(/separate.*shoes?|shoe compartment/i.test(text)
+            ? { requiredSpecifications: { separateShoeCompartment: true } }
+            : {}),
         },
         preferences: {
           ...(prefs.color ? { color: prefs.color } : {}),
@@ -493,7 +511,10 @@ function runGuidedNeed(
       },
       evidenceIds: [],
     });
-    if (prefs.needTomorrow) {
+    if (
+      prefs.needTomorrow &&
+      store.get(input.sessionId)!.shortlistIds.includes("BAG-001")
+    ) {
       const fast = offersForProduct("BAG-001").find(
         (o) => o.deliveryWindow?.latestOffsetDays === 1,
       );
@@ -512,7 +533,12 @@ function runGuidedNeed(
 
   // bedding
   const prefs = parseBeddingPrefs(text);
-  if (!prefs.bedSize && route !== "strong_intent") {
+  if (
+    !prefs.bedSize &&
+    !prefs.budgetMinor &&
+    !Object.keys(parseCompatibility(text)).length &&
+    route !== "strong_intent"
+  ) {
     push(beddingOpeningProposal(baseProposal(input, "ask-bed")));
     patchScenario(store, input.sessionId, "warm_bedding");
     return;
@@ -523,7 +549,11 @@ function runGuidedNeed(
     payload: {
       needs: ["bedsheets for a warm room"],
       hardConstraints: {
-        ...(prefs.bedSize ? { bedSize: prefs.bedSize } : {}),
+        category: "bedding",
+        compatibility: parseCompatibility(text),
+        ...(/100\s*%?\s*(percent )?cotton/i.test(text)
+          ? { requiredSpecifications: { cotton100Percent: true } }
+          : {}),
         ...(prefs.budgetMinor ? { budgetMinor: prefs.budgetMinor } : {}),
       },
       preferences: {
@@ -569,27 +599,12 @@ function handleImage(
   }
 
   if (!correction) {
-    const inference = {
-      attachmentId,
-      inferredNeeds: ["backpack-like silhouette", "dark/navy colourway"],
-      confidence: "medium" as const,
-      unknownFields: ["exact capacity", "laptop sleeve", "designer"],
-      source: "image_inference" as const,
-    };
-    reduce(thread, { type: "image_inference", data: inference });
-    const prior = store.get(input.sessionId)!;
-    store.patch(input.sessionId, {
-      imageInferences: [...prior.imageInferences, inference],
-      scenarioId: "bag_inspiration",
-    });
-    // Don't promote to hard constraints yet
     push({
       ...baseProposal(input, "ask"),
       action: "clarify",
       payload: {
         question:
-          "I see a backpack-like navy reference — should shape, colour, or something else drive hard requirements? I won't invent dimensions or designer credit.",
-        inference,
+          "This is a prepared illustration, not a vision result. Which shape or colour do you like? Tell me the required dimensions, capacity and material; I cannot infer them from this image.",
       },
       evidenceIds: [],
     });
@@ -664,7 +679,10 @@ function patchStage(
   store.patch(sessionId, { scenarioStage: stage });
 }
 
-function pickCompareIds(input: InputEvent, snapshot: SessionSnapshot): string[] {
+function pickCompareIds(
+  input: InputEvent,
+  snapshot: SessionSnapshot,
+): string[] {
   const text = input.text ?? "";
   const order =
     input.visibleProductIds.length > 0
@@ -683,10 +701,7 @@ function extractExclusion(text: string, snapshot: SessionSnapshot): string[] {
   return ref.productId ? [ref.productId] : [];
 }
 
-function progressiveNotes(
-  category: string,
-  text: string,
-): string {
+function progressiveNotes(category: string, text: string): string {
   if (category === "audio") {
     return "Hearing-side ANC is distinct from microphone output processing; customer music/call reviews do not establish café dictation WER.";
   }

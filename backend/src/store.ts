@@ -932,6 +932,18 @@ export class SessionStore {
       return this.beginTurn(id, x.baseRevision, x);
     });
   }
+  usePreparedImage(id: string, expected: number, imageId: string) {
+    const s = this.get(id);
+    this.revision(s, expected);
+    this.mutable(s);
+    requireThat(
+      this.profile.preparedImages.some((p) => p.id === imageId),
+      "UNKNOWN_ATTACHMENT",
+      "Unknown prepared image.",
+    );
+    if (!s.attachmentIds.includes(imageId)) s.attachmentIds.push(imageId);
+    return this.commit(s);
+  }
   addAttachment(
     id: string,
     expected: number,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 type Snapshot = {
   sessionId: string;
@@ -24,6 +24,9 @@ type Snapshot = {
 type Speakable = { content: string; channel: string; revision: number };
 
 export function HarnessConsole() {
+  const [summary, setSummary] = useState<any>(null);
+  const [receipt, setReceipt] = useState<any>(null);
+  const [offers, setOffers] = useState<any[]>([]);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [speakable, setSpeakable] = useState<Speakable[]>([]);
   const [text, setText] = useState("");
@@ -47,11 +50,14 @@ export function HarnessConsole() {
         body: JSON.stringify({
           scenarioId: scenario || null,
           preparedAttachmentId:
-            scenario === "bag_inspiration" ? "att-bag-navy-ref" : undefined,
+            scenario === "bag_inspiration" ? "IMG-BAG-INSPIRATION" : undefined,
         }),
       });
       const data = await res.json();
       setSnapshot(data.snapshot);
+      setSummary(data.summary ?? null);
+      setReceipt(data.receipt ?? null);
+      setOffers(data.offers ?? []);
       setSpeakable([]);
       setRoute(null);
       await fetch("/api/voice/mint", {
@@ -80,13 +86,19 @@ export function HarnessConsole() {
           text,
           modality,
           attachmentId:
-            modality === "image" ? "att-bag-navy-ref" : undefined,
+            modality === "image" ? "IMG-BAG-INSPIRATION" : undefined,
           visibleProductIds: snapshot.displayOrder,
+          visibleRevision: snapshot.revision,
         }),
       });
       const data = await res.json();
+      if (data.snapshot) {
+        setSnapshot(data.snapshot);
+        setSummary(data.summary ?? null);
+        setReceipt(data.receipt ?? null);
+        setOffers(data.offers ?? []);
+      }
       if (!res.ok) throw new Error(data.error ?? "turn failed");
-      setSnapshot(data.snapshot);
       setSpeakable(data.speakable ?? []);
       setRoute(data.route);
       setText("");
@@ -97,33 +109,70 @@ export function HarnessConsole() {
     }
   }
 
-  async function simulateVideo() {
+  async function action(action: string, payload: Record<string, unknown> = {}) {
     if (!snapshot) return;
-    await fetch("/api/lifecycle", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        sessionId: snapshot.sessionId,
-        epoch: snapshot.epoch,
-        turnId: "ui",
-        revision: snapshot.revision,
-        type: "video.started",
-      }),
-    });
-    const res = await fetch("/api/lifecycle", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        sessionId: snapshot.sessionId,
-        epoch: snapshot.epoch,
-        turnId: "ui",
-        revision: snapshot.revision,
-        type: "video.stopped",
-      }),
-    });
-    const data = await res.json();
-    setSnapshot(data.snapshot);
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await fetch("/api/action", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          sessionId: snapshot.sessionId,
+          epoch: snapshot.epoch,
+          visibleRevision: snapshot.revision,
+          visibleProductIds: snapshot.displayOrder,
+          action,
+          payload,
+        }),
+      });
+      const d = await r.json();
+      if (d.snapshot) {
+        setSnapshot(d.snapshot);
+        setSummary(d.summary);
+        setReceipt(d.receipt);
+        setOffers(d.offers ?? []);
+        setSpeakable(d.speakable ?? []);
+      }
+      if (!r.ok) throw new Error(d.error);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "action failed");
+    } finally {
+      setBusy(false);
+    }
   }
+  useEffect(() => {
+    if (
+      !snapshot ||
+      !summary ||
+      summary.status !== "presenting" ||
+      summary.presentationMode !== "text"
+    )
+      return;
+    let active = true;
+    fetch("/api/presentation", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        sessionId: snapshot.sessionId,
+        summaryId: summary.id,
+        turnId: summary.responseTurnId,
+        textHash: summary.textHash,
+        event: "displayed",
+      }),
+    })
+      .then(async (r) => {
+        const d = await r.json();
+        if (active && r.ok) {
+          setSnapshot(d.snapshot);
+          setSummary(d.summary);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [summary?.id]);
 
   return (
     <div style={{ display: "grid", gap: "1.25rem" }}>
@@ -144,7 +193,11 @@ export function HarnessConsole() {
           <select
             value={scenario}
             onChange={(e) => setScenario(e.target.value as typeof scenario)}
-            style={{ padding: "0.55rem 0.7rem", borderRadius: 10, border: "1px solid var(--line)" }}
+            style={{
+              padding: "0.55rem 0.7rem",
+              borderRadius: 10,
+              border: "1px solid var(--line)",
+            }}
           >
             <option value="cafe_dictation">Café dictation</option>
             <option value="bag_inspiration">Bag inspiration</option>
@@ -167,22 +220,74 @@ export function HarnessConsole() {
         >
           Start Chat
         </button>
-        {snapshot && (
-          <button
-            type="button"
-            onClick={simulateVideo}
-            style={{
-              padding: "0.65rem 1rem",
-              borderRadius: 999,
-              border: "1px solid var(--line)",
-              background: "white",
-            }}
-          >
-            Simulate video pause
-          </button>
-        )}
       </section>
 
+      <p>
+        Integration rehearsal • curated source snapshots and synthetic USD
+        offers • text mode only; live voice pending.
+      </p>
+      {summary && (
+        <section
+          aria-label="Purchase summary"
+          style={{ padding: 20, border: "2px solid #2f6fed", borderRadius: 16 }}
+        >
+          <h2>Exact simulated purchase summary</h2>
+          <p style={{ whiteSpace: "pre-wrap" }}>{summary.spokenText}</p>
+          <p>Presentation: {summary.status}</p>
+          {!receipt && (
+            <p>
+              To confirm, type: <strong>Confirm this simulated purchase</strong>
+              . Changing any purchase requirement invalidates this summary.
+            </p>
+          )}
+        </section>
+      )}
+      {receipt && (
+        <section aria-label="Simulated receipt">
+          <h2>{receipt.label}</h2>
+          <p>Receipt {receipt.id}</p>
+        </section>
+      )}
+      {snapshot && !receipt && (
+        <section aria-label="Checked offers">
+          <h2>Checked offers</h2>
+          <div style={{ display: "grid", gap: 10 }}>
+            {offers
+              .filter((o) => snapshot.displayOrder.includes(o.product.id))
+              .map((o) => (
+                <article
+                  key={o.offer.id}
+                  style={{
+                    padding: 12,
+                    border: "1px solid #ccc",
+                    borderRadius: 10,
+                  }}
+                >
+                  <strong>{o.product.name}</strong>
+                  <p>
+                    {o.offer.id} · USD {(o.total / 100).toFixed(2)} complete
+                    total · {o.offer.deliveryDays} day(s), fixed demo clock
+                  </p>
+                  <p>{o.conflicts.map((c: any) => c.message).join(" ")}</p>
+                  <button
+                    disabled={busy || !o.eligible}
+                    onClick={() =>
+                      action("select_offer", { offerId: o.offer.id })
+                    }
+                  >
+                    Choose {o.offer.id}
+                  </button>
+                </article>
+              ))}
+          </div>
+          <button disabled={busy} onClick={() => action("prepare_summary")}>
+            Prepare purchase summary
+          </button>{" "}
+          <button disabled={busy} onClick={() => action("cancel")}>
+            Cancel
+          </button>
+        </section>
+      )}
       {error && (
         <p style={{ color: "#b42318", margin: 0 }} role="alert">
           {error}
@@ -206,7 +311,9 @@ export function HarnessConsole() {
               minHeight: 280,
             }}
           >
-            <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+            <div
+              style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}
+            >
               <div
                 aria-hidden
                 style={{
@@ -221,7 +328,7 @@ export function HarnessConsole() {
               <div>
                 <strong>Voice orb</strong>
                 <div style={{ fontSize: 13, color: "var(--muted)" }}>
-                  Duplex adapter · spoken replies for all modalities
+                  Text rehearsal · live voice pending
                 </div>
               </div>
             </div>
@@ -229,7 +336,7 @@ export function HarnessConsole() {
             <div style={{ marginTop: "1rem", display: "grid", gap: "0.5rem" }}>
               {speakable.length === 0 ? (
                 <p style={{ color: "var(--muted)" }}>
-                  Send a turn — commentary below is what GPT-Live would speak.
+                  Send a turn to inspect accepted state and proposed narration.
                 </p>
               ) : (
                 speakable.map((s, i) => (
@@ -262,11 +369,19 @@ export function HarnessConsole() {
               <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
                 <select
                   value={modality}
-                  onChange={(e) => setModality(e.target.value as typeof modality)}
-                  style={{ padding: "0.5rem", borderRadius: 8, border: "1px solid var(--line)" }}
+                  onChange={(e) =>
+                    setModality(e.target.value as typeof modality)
+                  }
+                  style={{
+                    padding: "0.5rem",
+                    borderRadius: 8,
+                    border: "1px solid var(--line)",
+                  }}
                 >
-                  <option value="text">text → spoken reply</option>
-                  <option value="voice">voice</option>
+                  <option value="text">text input</option>
+                  <option value="voice" disabled>
+                    voice pending
+                  </option>
                   <option value="image">image</option>
                   <option value="link">link</option>
                 </select>
@@ -314,12 +429,17 @@ export function HarnessConsole() {
               borderRadius: 16,
             }}
           >
-            <h2 style={{ marginTop: 0, fontSize: "1.05rem" }}>Accepted state</h2>
+            <h2 style={{ marginTop: 0, fontSize: "1.05rem" }}>
+              Accepted state
+            </h2>
             <dl style={{ display: "grid", gap: 6, fontSize: 14, margin: 0 }}>
               <Row k="session" v={snapshot.sessionId} />
               <Row k="revision" v={String(snapshot.revision)} />
               <Row k="view" v={snapshot.view} />
-              <Row k="scenario" v={`${snapshot.scenarioId ?? "—"} / ${snapshot.scenarioStage}`} />
+              <Row
+                k="scenario"
+                v={`${snapshot.scenarioId ?? "—"} / ${snapshot.scenarioStage}`}
+              />
               <Row k="priority" v={snapshot.buyingPriority ?? "—"} />
               <Row k="approval" v={snapshot.approvalStatus} />
               <Row k="route" v={route ?? "—"} />
@@ -334,8 +454,12 @@ export function HarnessConsole() {
                     <strong>
                       {e.rank ?? "·"} {e.productId}
                     </strong>
-                    <div style={{ fontSize: 13, color: "var(--muted)" }}>{e.fitReason}</div>
-                    <div style={{ fontSize: 12 }}>Compromise: {e.compromise}</div>
+                    <div style={{ fontSize: 13, color: "var(--muted)" }}>
+                      {e.fitReason}
+                    </div>
+                    <div style={{ fontSize: 12 }}>
+                      Compromise: {e.compromise}
+                    </div>
                   </li>
                 ))}
               </ol>

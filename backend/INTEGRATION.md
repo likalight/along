@@ -1,4 +1,7 @@
-# Frontend + AI integration — current issue #2 contract
+# Standalone backend HTTP integration
+
+**For the combined Next.js + AI harness use [../INTEGRATION.md](../INTEGRATION.md).** It imports the core store directly and uses cookie-authenticated `/api` routes. This document describes the separate port-4318 transport; do not mix sessions or snapshot representations.
+
 
 This implements the updated three-category/multimodal baseline in GitHub #2 and backend #6–9. Lighting is deferred. Use **`src/integration-client.ts`** and **`/v1/integration`** for the agreed public field names; `src/client.ts` and `/v1` remain the internal/legacy tool interface. Both address the same session store. Do not mix their `view` formats: public `view` is a stage string, internal `view` is card presentation data.
 
@@ -9,7 +12,7 @@ Node 22.18+ or 24. `cd backend && npm ci`, create a local `.env` agent secret as
 ```ts
 // Browser: no agent secret
 const client = new IntegrationClient("http://127.0.0.1:4318");
-let session = await client.create("work-gym-bag");
+let session = await client.create("work-gym");
 for await (const event of client.events(abortController.signal)) {
   if (
     event.type === "session.updated" &&

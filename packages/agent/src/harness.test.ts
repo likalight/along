@@ -74,9 +74,9 @@ describe("A1 multimodal turn orchestration (#10)", () => {
     const voice = new FixtureVoiceAdapter();
     const orch = new VoiceOrchestrator(store, voice);
     const session = orch.createSession();
-    orch.turns.beginTurn({ turnId: "old", basedOnRevisionId: 0 });
+    orch.turnsFor(session.sessionId).beginTurn({ turnId: "old", basedOnRevisionId: 0 });
     await orch.bargeIn(session.sessionId, "old");
-    assert.equal(orch.turns.active, null);
+    assert.equal(orch.turnsFor(session.sessionId).active, null);
     assert.ok(voice.interrupted.some((x) => x.includes("barge_in")));
   });
 
@@ -152,8 +152,8 @@ describe("A2 guided priorities and shortlist (#11)", () => {
   });
 
   it("lowest-cost uses complete totals not unit price alone", () => {
-    const cheap = getOffer("mic-040-cheap")!;
-    const fast = getOffer("mic-040-fast")!;
+    const cheap = getOffer("MIC-040-A")!;
+    const fast = getOffer("MIC-040-B")!;
     assert.ok(completeTotalMinor(cheap)! < completeTotalMinor(fast)!);
   });
 
@@ -235,8 +235,8 @@ describe("A3 evidence and offers (#12)", () => {
       visibleRevision: rev,
       visibleProductIds: ["MIC-040"],
     });
-    assert.ok(out.snapshot.evidenceIds.some((id) => id.includes("product")));
-    assert.ok(out.snapshot.evidenceIds.some((id) => id.includes("seller")));
+    assert.ok(out.snapshot.evidenceIds.some((id) => id.startsWith("SRC-")));
+    assert.ok(out.snapshot.evidenceIds.some((id) => id.startsWith("SELLER-")));
     assert.equal(out.snapshot.view, "evidence");
   });
 
@@ -327,7 +327,7 @@ describe("A4 image and links (#13)", () => {
       turnId: "t-link2",
       baseRevision: 0,
       modality: "link",
-      text: "https://fixtures.local/ref/bag-001",
+      text: "https://www.osprey.com/daylitetm-large-tote-pack",
       visibleRevision: 0,
       visibleProductIds: [],
     });

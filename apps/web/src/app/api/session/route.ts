@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { sessionPayload, assertSessionAccess } from "@/server/session-access";
 import { getRuntime } from "@/server/runtime";
 
 export async function POST(req: Request) {
@@ -11,14 +12,26 @@ export async function POST(req: Request) {
     scenarioId: body.scenarioId ?? null,
     preparedAttachmentId: body.preparedAttachmentId,
   });
-  return NextResponse.json({
-    snapshot,
+  const response = NextResponse.json({
+    ...sessionPayload(snapshot.sessionId),
     voiceAdapter: {
       id: voice.id,
       duplex: voice.duplex,
-      pendingEvents: voice.pending.length,
+      pendingEvents: 0,
     },
   });
+  response.cookies.set(
+    `along-session-${snapshot.sessionId}`,
+    getRuntime().store.accessToken(snapshot.sessionId)!,
+    {
+      httpOnly: true,
+      sameSite: "strict",
+      secure: new URL(req.url).protocol === "https:",
+      path: "/",
+      maxAge: 7200,
+    },
+  );
+  return response;
 }
 
 export async function GET(req: Request) {
@@ -26,10 +39,18 @@ export async function GET(req: Request) {
   if (!sessionId) {
     return NextResponse.json({ error: "sessionId required" }, { status: 400 });
   }
+  try {
+    assertSessionAccess(req, sessionId);
+  } catch {
+    return NextResponse.json(
+      { error: "unauthorized_session" },
+      { status: 403 },
+    );
+  }
   const { orch } = getRuntime();
   const snapshot = orch.getSnapshot(sessionId);
   if (!snapshot) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
-  return NextResponse.json({ snapshot });
+  return NextResponse.json(sessionPayload(sessionId));
 }

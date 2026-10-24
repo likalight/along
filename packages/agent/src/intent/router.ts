@@ -50,7 +50,7 @@ export function routeInput(
   }
   if (EVIDENCE.test(text)) return "evidence_q";
   if (PRIORITY.test(text)) return "priority";
-  if (SOLUTION.test(text) && snapshot.scenarioId === "cafe_dictation") return "solution_type";
+  if (SOLUTION.test(text) && !/\d|usb|tomorrow/i.test(text) && snapshot.scenarioId === "cafe_dictation") return "solution_type";
   if (COMPARE.test(text)) return "compare";
   if (ORDINAL.test(text) && snapshot.displayOrder.length) return "ordinal_ref";
   if (CORRECT.test(text) && snapshot.imageInferences.length) return "image_correct";

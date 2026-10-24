@@ -10,3 +10,5 @@ export const VOICE_ADAPTER = {
   notes:
     "Proposed agentic voice adapter. AFK work uses deterministic substitutes; live credentials TBD.",
 } as const;
+
+export {agreedCatalog} from "./catalog.generated.js";

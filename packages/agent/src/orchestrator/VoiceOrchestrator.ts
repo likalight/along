@@ -24,7 +24,15 @@ export interface TurnOutcome {
  * Typed/image/link inputs still produce spoken replies via the voice adapter.
  */
 export class VoiceOrchestrator {
-  readonly turns = new TurnMachine();
+  private sessionTurns = new Map<string, TurnMachine>();
+  turnsFor(id: string) {
+    let t = this.sessionTurns.get(id);
+    if (!t) {
+      t = new TurnMachine();
+      this.sessionTurns.set(id, t);
+    }
+    return t;
+  }
   private threads = new Map<string, SessionThread>();
 
   constructor(
@@ -55,12 +63,13 @@ export class VoiceOrchestrator {
       throw new Error("epoch_mismatch");
     }
 
+    this.store.ingestInput(input);
+    const turns = this.turnsFor(input.sessionId);
     // New typed/voice turn cancels in-flight speech + work
-    const active = this.turns.active;
+    const active = turns.active;
     if (active) {
-      this.turns.cancel(active.turnId, "new_input");
+      turns.cancel(active.turnId, "new_input");
       await this.voice.interrupt(input.sessionId, "new_input");
-      this.store.interruptSummary(input.sessionId);
       const thread = this.thread(input.sessionId, snap);
       reduce(thread, {
         type: "delegation_cancelled",
@@ -69,7 +78,7 @@ export class VoiceOrchestrator {
     }
 
     const basedOn = this.store.get(input.sessionId)!;
-    const turn = this.turns.beginTurn({
+    const turn = turns.beginTurn({
       turnId: input.turnId,
       basedOnRevisionId: basedOn.revision,
       delegationId: `del-${input.turnId}`,
@@ -87,10 +96,15 @@ export class VoiceOrchestrator {
       await this.voice.injectUserText(input.sessionId, input.text ?? "");
     }
 
-    await this.voice.append(input.sessionId, "thinking", "Looking at that now…", {
-      turnId: turn.turnId,
-      delegationId: turn.delegationId,
-    });
+    await this.voice.append(
+      input.sessionId,
+      "thinking",
+      "Looking at that now…",
+      {
+        turnId: turn.turnId,
+        delegationId: turn.delegationId,
+      },
+    );
 
     const route = routeInput(input, basedOn);
     const normalized: InputEvent = {
@@ -128,8 +142,11 @@ export class VoiceOrchestrator {
       });
     }
 
-    this.turns.complete(turn.turnId);
-    reduce(thread, { type: "delegation_completed", data: { turnId: turn.turnId } });
+    turns.complete(turn.turnId);
+    reduce(thread, {
+      type: "delegation_completed",
+      data: { turnId: turn.turnId },
+    });
     thread.snapshot = this.store.get(input.sessionId)!;
 
     return {
@@ -140,9 +157,11 @@ export class VoiceOrchestrator {
     };
   }
 
-  async handleLifecycle(event: LifecycleEvent): Promise<SessionSnapshot | undefined> {
+  async handleLifecycle(
+    event: LifecycleEvent,
+  ): Promise<SessionSnapshot | undefined> {
     if (event.type === "audio.interrupted" || event.type === "turn.cancelled") {
-      this.turns.cancel(event.turnId, event.type);
+      this.turnsFor(event.sessionId).cancel(event.turnId, event.type);
       await this.voice.interrupt(event.sessionId, event.type);
       return this.store.interruptSummary(event.sessionId);
     }
@@ -161,7 +180,7 @@ export class VoiceOrchestrator {
   }
 
   async bargeIn(sessionId: string, turnId: string): Promise<void> {
-    this.turns.cancel(turnId, "barge_in");
+    this.turnsFor(sessionId).cancel(turnId, "barge_in");
     await this.voice.interrupt(sessionId, "barge_in");
     this.store.interruptSummary(sessionId);
   }

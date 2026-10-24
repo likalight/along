@@ -1,3 +1,4 @@
+import { parseBudget } from "../intent/requirements.js";
 import type { AgentProposal, SessionSnapshot } from "@coupang/contract";
 import { PRODUCTS } from "../fixtures/catalog.js";
 
@@ -21,7 +22,9 @@ export function buildBagDiscovery(snapshot: SessionSnapshot): {
   related: string[];
   narrowed: SessionSnapshot["shortlistEntries"];
 } {
-  const shape = String(snapshot.preferences["shape"] ?? snapshot.hardConstraints["shape"] ?? "");
+  const shape = String(
+    snapshot.preferences["shape"] ?? snapshot.hardConstraints["shape"] ?? "",
+  );
   const color = String(snapshot.preferences["color"] ?? "");
   let bags = PRODUCTS.filter(
     (p) => p.category === "bags" && !snapshot.exclusions.includes(p.id),
@@ -35,7 +38,9 @@ export function buildBagDiscovery(snapshot: SessionSnapshot): {
     );
   });
 
-  const closeMatches = (close.length ? close : bags).slice(0, 2).map((p) => p.id);
+  const closeMatches = (close.length ? close : bags)
+    .slice(0, 2)
+    .map((p) => p.id);
   const related = bags
     .filter((p) => !closeMatches.includes(p.id))
     .slice(0, 3)
@@ -79,8 +84,8 @@ export function parseBagPrefs(text: string): {
   if (/black/i.test(text)) out.color = "black";
   if (/khaki/i.test(text)) out.color = "khaki";
   if (/slate/i.test(text)) out.color = "slate";
-  const budget = text.match(/\$?\s?(\d{2,4})\b/);
-  if (budget) out.budgetMinor = Number(budget[1]) * 100;
+  const budget = parseBudget(text);
+  if (budget !== undefined) out.budgetMinor = budget;
   if (/tomorrow|need it tomorrow|next day/i.test(text)) out.needTomorrow = true;
   return out;
 }
