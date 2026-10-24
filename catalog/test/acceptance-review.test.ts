@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { activeAudioIds, buildAudio, decimalToMinor, importMicrophones, microphoneArchive } from "../src/microphones.ts";
+import { activeAudioIds, legacyAudioIds, legacyMicrophoneArchive, buildAudio, decimalToMinor, importMicrophones, microphoneArchive } from "../src/microphones.ts";
 import { nonTechEvidence, nonTechProducts } from "../src/nontech.ts";
 import { getCatalog, quoteOffer, validateCatalog } from "../src/index.ts";
 
@@ -17,7 +17,7 @@ test("microphone joins remain correct when each source table has a different row
   assert.equal(tableNumber, 3);
   const imported = importMicrophones(reordered);
   assert.equal(imported.records.length, 50);
-  for (const original of microphoneArchive.records) {
+  for (const original of legacyMicrophoneArchive.records) {
     const actual = imported.records.find(row => row.id === original.id)!;
     assert.deepEqual(actual, original);
     assert.equal(actual.sourceRows.commercial.id, actual.sourceRows.technical.id);
@@ -34,8 +34,9 @@ test("ambiguous, fractional-cent, negative and overflowing monetary input cannot
   assert.equal(decimalToMinor("90071992547409.91"), Number.MAX_SAFE_INTEGER);
 });
 
-test("the locked audio IDs include unavailable products and the archive retains discontinued references", () => {
-  assert.deepEqual([...activeAudioIds], ["MIC-001", "MIC-003", "MIC-009", "MIC-015", "MIC-020", "MIC-022", "MIC-025", "MIC-037", "MIC-038", "MIC-040", "MIC-044", "MIC-047"]);
+test("all100 audio IDs include negative-stock references and retain original rehearsal IDs", () => {
+  assert.equal(activeAudioIds.length, 100);
+  assert.deepEqual([...legacyAudioIds], ["MIC-001", "MIC-003", "MIC-009", "MIC-015", "MIC-020", "MIC-022", "MIC-025", "MIC-037", "MIC-038", "MIC-040", "MIC-044", "MIC-047"]);
   const { products, evidence } = buildAudio();
   assert.equal(products.find(p => p.id === "MIC-025")?.sourceAvailability, "unavailable");
   assert.equal(products.find(p => p.id === "MIC-038")?.sourceAvailability, "out_of_stock");
@@ -43,7 +44,7 @@ test("the locked audio IDs include unavailable products and the archive retains 
   assert.equal(microphoneArchive.records.find(p => p.id === "MIC-049")?.referencePrice.price_kind, "historical_page");
   for (const p of products) {
     assert.equal(p.referencePrice.payableTotalMinor, null);
-    assert.equal(p.authoredFit?.measuredPerformance, false);
+    if (p.authoredFit) assert.equal(p.authoredFit.measuredPerformance, false);
     assert.equal(p.buyerMetrics.purchaseCount, null);
     assert.equal(p.buyerMetrics.purchaseCountPeriod, null);
   }

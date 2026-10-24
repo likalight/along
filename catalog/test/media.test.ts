@@ -31,7 +31,7 @@ test("first source only, no review URL admission, and no ambiguous product mappi
   const products = [{ id: "P1", sourceUrls: ["https://shop.example/products/sheet", "https://reviews.example/one"] }] as Product[];
   assert.deepEqual(buildKnownLinks(products), [{ url: "https://shop.example/products/sheet", productId: "P1" }]);
   assert.deepEqual(resolveKnownLink("https://reviews.example/one", buildKnownLinks(products)), { status: "unsupported" });
-  assert.throws(() => buildKnownLinks([...products, { id: "P2", sourceUrls: products[0].sourceUrls } as Product]), /Ambiguous/);
+  assert.deepEqual(buildKnownLinks([...products, { id: "P2", sourceUrls: products[0].sourceUrls } as Product]), []);
   assert.deepEqual(resolveKnownLink("https://shop.example/products/sheet", [...links, { url: "https://shop.example/products/sheet", productId: "OTHER" }]), { status: "unsupported" });
 });
 test("prepared images exist, disclose proxy origin, and contain no remote resources", () => {

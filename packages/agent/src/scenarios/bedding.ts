@@ -39,7 +39,7 @@ export function buildBeddingShortlist(
   );
   if (material) {
     pool = pool.filter((p) =>
-      String(p.specs["material"] ?? "").includes(material.toLowerCase()),
+      `${p.specs["material"] ?? ""} ${p.specs["weave"] ?? ""}`.toLowerCase().includes(material.toLowerCase().replace("cotton-", "")),
     );
   }
   if (pool.length === 0) {

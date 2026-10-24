@@ -1,5 +1,13 @@
+import { productImage } from "../canvas/product-media";
+import { audioSolution } from "../canvas/product-presentation";
+import { AUDIO_SOLUTION_CHOICES } from "../canvas/solution-choices";
+import {
+  acceptedDeliveryLabel,
+  purchaseConfirmation,
+} from "../canvas/customer-copy";
+import { turnHeadings } from "./activity";
 import { agreedCatalog as catalog } from "@coupang/contract";
-import { getRuntime } from "./runtime";
+import { getRuntime, narrationSegments } from "./runtime";
 import type { Session, Summary, View } from "../session/contract";
 import type { CanvasData, Category } from "../canvas/contracts";
 export const category = (v: string | undefined): Category | null =>
@@ -13,6 +21,7 @@ export const category = (v: string | undefined): Category | null =>
 export const canvasData: CanvasData = {
   products: catalog.products.map((p: any) => ({
     ...p,
+    image: productImage(p.id, p.model, p.image),
     category: category(p.category),
     specs: Object.fromEntries(
       Object.entries(p.specs)
@@ -24,15 +33,8 @@ export const canvasData: CanvasData = {
     ),
     referencePriceMinor: p.referencePrice.amountMinor,
     availability: p.sourceAvailability,
-    classification: "snapshot",
-    solution:
-      p.category !== "audio-accessories"
-        ? undefined
-        : /headset|earpods/i.test(p.title)
-          ? "headset"
-          : /lavalier|clip|lav\b/i.test(p.title)
-            ? "clip"
-            : "desktop",
+    classification: p.provenance?.kind === "synthetic" ? "proxy" : "snapshot",
+    solution: audioSolution(p.category, p.title, p.specs),
   })),
   evidence: catalog.evidence.map((e: any) => ({
     ...e,
@@ -49,13 +51,14 @@ export const canvasData: CanvasData = {
       ...o,
       otherFeesMinor: o.otherFeesMinor + o.taxMinor,
       // Empty setupHardware → 0; unknown/unpriced audio adapters stay null.
-      requiredSetupMinor: setup.length === 0 || setupPriced
-        ? setup.reduce(
-            (sum: number, h: { priceMinor?: number | null }) =>
-              sum + (h.priceMinor ?? 0),
-            0,
-          )
-        : null,
+      requiredSetupMinor:
+        setup.length === 0 || setupPriced
+          ? setup.reduce(
+              (sum: number, h: { priceMinor?: number | null }) =>
+                sum + (h.priceMinor ?? 0),
+              0,
+            )
+          : null,
       deliveryWindow: {
         latestOffsetDays: Math.round(
           (Date.parse(o.deliveryWindow.latest.slice(0, 10)) -
@@ -77,10 +80,7 @@ function summaryStatus(
   hasReceipt: boolean,
 ): Summary["status"] {
   if (hasReceipt) return "confirmed";
-  if (
-    approvalStatus === "blocked" ||
-    raw?.playback === "interrupted"
-  )
+  if (approvalStatus === "blocked" || raw?.playback === "interrupted")
     return "invalidated";
   if (approvalStatus === "eligible") return "eligible";
   return "presenting";
@@ -105,16 +105,9 @@ export function project(id: string): Session {
         lineItemsMinor: raw.lineItemsMinor!,
         totalMinor: raw.totalMinor!,
         destination: raw.destination!,
-        deliveryWindow: (() => {
-          const w = raw.deliveryWindow as any;
-          return w.latestAt || w.latest
-            ? new Intl.DateTimeFormat("en-SG", {
-                dateStyle: "medium",
-                timeStyle: "short",
-                timeZone: "Asia/Singapore",
-              }).format(new Date(w.latestAt ?? w.latest)) + " SGT (simulated)"
-            : `Within ${w.latestOffsetDays} days (simulated)`;
-        })(),
+        deliveryWindow: acceptedDeliveryLabel(
+          raw.deliveryWindow as Record<string, unknown>,
+        ),
         conditions: raw.conditions!,
         uncertainties: raw.uncertainties!,
         presentationMode: raw.presentationMode!,
@@ -158,15 +151,27 @@ export function project(id: string): Session {
     receipt: "A choice made with confidence.",
     recovery: "Let’s pick up where you left off.",
   };
+  const displayHeading =
+    ["receipt", "recovery"].includes(view) ||
+    (view === "summary" && summary?.responseTurnId === c.turn?.id)
+      ? heading[view]
+      : (turnHeadings.get(id) ?? heading[view] ?? "Let’s explore.");
   const message =
     view === "recovery"
       ? "Narration or confirmation was interrupted. Your selection is still here. Review the summary again, or explicitly choose text mode for a fresh confirmation."
       : c.lastOutcome === "cancelled" && !c.receipt
         ? "Stopped. No purchase was made. Your choices are still here when you’re ready."
-        : view === "summary" && summary
+        : view === "summary" && summary && summary.responseTurnId === c.turn?.id
           ? summary.spokenText!
           : view === "receipt"
-            ? "SIMULATED purchase complete. No payment or real order was placed."
+            ? purchaseConfirmation(
+                category(
+                  catalog.products.find(
+                    (product: any) => product.id === summary?.productId,
+                  )?.category,
+                ),
+                summary?.deliveryWindow ?? "Delivery estimate unavailable",
+              )
             : (messages.get(id) ??
               "Tell me what you’re looking for, or start with a problem you’d like to solve.");
   const constraints: Record<string, string> = Object.fromEntries(
@@ -177,7 +182,23 @@ export function project(id: string): Session {
   );
   if (c.constraints.deliveryWithinDays !== undefined)
     constraints.deadlineDays = String(c.constraints.deliveryWithinDays);
-  const quotes = new Map(store.quotes(id).map((q) => [q.offer.id, q]));
+  // Quote only products represented in this accepted session. Catalogue-wide
+  // fulfilment checks are unnecessary when a shopper sees a handful of items.
+  const selectedProductId = catalog.offers.find(
+    (offer: any) => offer.id === s.selectedOfferId,
+  )?.productId;
+  const relevantProductIds = new Set([
+    ...s.displayOrder,
+    ...s.comparisonIds,
+    ...s.savedItems.map((item) => item.productId),
+    ...(s.focusedProductId ? [s.focusedProductId] : []),
+    ...(selectedProductId ? [selectedProductId] : []),
+  ]);
+  const quotes = new Map(
+    [...relevantProductIds]
+      .flatMap((productId) => store.quotes(id, productId))
+      .map((quote) => [quote.offer.id, quote]),
+  );
   const assistantNote = messages.get(id);
   const history: Session["history"] = [
     ...c.history.map((h) => ({
@@ -188,8 +209,18 @@ export function project(id: string): Session {
       ? [{ role: "assistant" as const, text: assistantNote }]
       : []),
   ];
+  const narration = narrationSegments.get(id);
+  const acceptedSegments =
+    narration?.turnId === c.turn?.id &&
+    narration?.revision === s.revision &&
+    !summary &&
+    !c.receipt &&
+    narration.segments.map((segment) => segment.text).join(" ") === message
+      ? narration.segments
+      : undefined;
   return {
     ...s,
+    narrationSegments: acceptedSegments,
     focusedProductId:
       s.focusedProductId ??
       catalog.offers.find((o: any) => o.id === s.selectedOfferId)?.productId ??
@@ -214,11 +245,12 @@ export function project(id: string): Session {
     view,
     category:
       category(c.constraints.category) ??
+      (view === "solution_types" ? "audio" : null) ??
       category(
         catalog.products.find((p: any) => s.displayOrder.includes(p.id))
           ?.category,
       ),
-    heading: heading[view] ?? "Let’s explore.",
+    heading: displayHeading,
     message,
     cards: [],
     summary,
@@ -231,8 +263,14 @@ export function project(id: string): Session {
           }
         : null,
     canvas: {
-      heading: heading[view] ?? "Let’s explore.",
+      heading: displayHeading,
       message,
+      solution:
+        s.preferences.audioDirectionPending === true
+          ? undefined
+          : AUDIO_SOLUTION_CHOICES.find(
+              (choice) => choice.solutionType === s.preferences.solutionType,
+            )?.id,
       annotations: Object.fromEntries(
         s.shortlistEntries.map((e, i) => [
           e.productId,

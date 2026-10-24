@@ -1,106 +1,49 @@
-# Catalog and attributable evidence
+# Along seeded catalogue
 
-Implementation of [issue #6](https://github.com/likalight/along/issues/6), using the [issue #2 contract](https://github.com/likalight/along/issues/2).
+The demo contains **148 products**: all **100 audio products** from the supplied expanded index, **24 everyday bags**, and **24 bedsheet sets**. Every product has two complete simulated seller offers and four clearly labelled fictional reviews: **296 offers and 592 demo reviews**. Product photographs use `/catalog/images/products/<ID>.webp` with the original image and listing URLs retained in the image metadata.
 
-The active catalog has **24 products: 12 audio configurations, six everyday bags, six bedsheet sets**. It supplies 48 complete, explicitly synthetic offers, 121 evidence records, three scenario fixtures, a bounded link map, and three original illustration fixtures. The full 50-row microphone research is retained separately.
+Run `npm ci && npm run verify` with Node 22.18 or newer. `verify` checks types, runs 51 tests, exercises the three rehearsal sequences and regenerates `data/catalog.json` and `data/microphones-archive.json`. Import `getCatalog`, `quoteOffer`, `eligibleOffers` and their types from `src/index.ts`. The generated JSON is reproducible; the source files are the editable authority.
 
-## Run
+## Data and provenance
 
-Requires Node 22.18+.
+- `sources/microphone-demo-data-100.md` retains the user-supplied 100-product index verbatim, with its SHA-256 recorded in the audio archive.
+- `sources/microphone-demo-data.md` retains the original 50-product technical/review archive verbatim. Those facts are joined by stable ID and retain their **24 October 2026** snapshots. The importer rejects a changed old price, rating, count, source URL, model or stock status instead of silently refreshing it.
+- New audio rows **MIC-051–MIC-100** retain the **25 October 2026** index snapshots. The standalone reference files linked by the index were not present in the supplied files, workspace or Downloads. Detailed technical specifications, original fit scores and individual review text therefore remain explicitly unknown. The linked local path is retained as provenance, not advertised as an accessible source file.
+- The four audio navigation groups have 25 records each. `specs.solutionType`, `family` and `representationGroup` make grouping explicit for consumers.
+- The original six bag and six bedding source snapshots remain intact. **BAG-007–BAG-024** add 18 real Osprey bag models; **BED-007–BED-024** add 18 real IKEA sheet-set configurations. Their manufacturer identities, reference prices and captured specifications are retained in `sources/real-bags-2026-10-25.json` and `sources/real-bedding-2026-10-25.json`. Uncaptured details remain unknown, including exact destination stock. IKEA family review aggregates retain their broader size/color scope.
 
-```sh
-cd catalog
-npm ci
-npm run verify
-```
+All products carry `provenance.kind` and a notice. Product/reference amounts are USD item or kit references, never a payable quote. Old source dates and stock are not replaced by the catalogue build date.
 
-Verification type-checks the package, runs the acceptance/regression suite, validates the catalog, exercises every scenario revision, and regenerates:
+## Reviews and evidence
 
-- `data/catalog.json`: active products, seller offers, evidence, scenarios, links, and image metadata.
-- `data/microphones-archive.json`: all 50 joined research records, the original three table rows per ID, variant notes, source URLs, and source hash.
+`buyerMetrics` stores only the supplied real-source aggregate fields. Missing values stay null; rating votes, written reviews and purchases remain separate. The original source scope and raw row survive import. MIC-099 explicitly retains **2 stars, one rating, zero written reviews**. Zero is preserved where supplied; it is never used to fill a missing value.
 
-`sources/microphone-demo-data.md` is the supplied research document, preserved without edits. Its facts are attributed to that research; they have not been independently rechecked in this implementation. The bag/bedding data uses the manufacturer's or retailer's linked pages inspected on 24 October 2026.
+`product.demoReviews` is a separate proxy object with a disclosure, four `entries`, and an aggregate computed from those four entries. Each entry has a stable product-bound ID, a `Demo shopper` name, rating, title, body, use case, date and `verifiedPurchase: false`. The demo review aggregate is not copied into `buyerMetrics` or evidence metrics. One proxy `DEMO-REVIEWS-<ID>` evidence record per product describes this separation. Do not present this field as real buyer evidence, real purchases or tested performance.
 
-CI runs the same verification and checks that generated JSON is up to date.
+Source feedback summaries remain paraphrases in evidence `claim`, never quoted `excerpt`. Original authored café/office scores remain in `authoredFit` with `measuredPerformance: false`; new missing scores are null. No actual dictation benchmark, cooling guarantee or delivery experience is asserted.
 
-## Backend / Next.js integration
+## Purchases and compatibility
 
-The base branch contains only a README. This PR adds a standalone TypeScript data package and portable JSON; it does not claim that an application or session/approval backend has been implemented. The separate, unmerged legacy backend branch uses different shapes, SGD and lighting fixtures. Do not mix those fixtures with this contract-v1 catalog.
+Every product has two fictional sellers, complete integer-cent item/shipping/setup/tax totals, delivery windows, an order cutoff, return terms and a destination. Required setup hardware is itemized and included in `otherFeesMinor`. Existing-user hardware does not discount a fixed bundle. Quote validation rejects incomplete totals, expired cutoffs, unsupported currency/destination/quantity, and incompatible hard constraints.
 
-On the server, import `getCatalog`, `quoteOffer`, `eligibleOffers`, and `resolveKnownLink` from `catalog/src/index.ts`. It uses Node filesystem APIs for the archived source and must not be imported into a client component. Alternatively load the generated JSON and validate it with `validateCatalog` before use.
+All audio products have an explicit proxy host path in `compatibilityFixture` and `demoConfiguration`. For newly indexed products whose detailed files were absent, those paths and bundled interface/cable/stand assumptions are authored solely for simulated checkout. Original source connector and power fields stay unknown. USB/XLR interfaces include microphone input and necessary cable; a headphone-only adapter is not substituted for a microphone interface. This is not evidence of real retail compatibility or included accessories.
 
-```ts
-import { getCatalog, eligibleOffers, quoteOffer, resolveKnownLink } from "./catalog/src/index.ts";
+Source out-of-stock, unavailable, discontinued, backordered, special-order and available-soon cases remain unpurchasable. Unknown positive stock is an explicit proxy assumption in the fictional service zone; no Singapore stock claim is made. A later [manufacturer recall notice](https://ca.ankerwork.com/pages/a3302-recall) for some PowerConf S3 units supplements MIC-095 without changing its original source snapshot; its offers are withheld because the demo cannot verify a unit serial number.
 
-const catalog = getCatalog(); // fresh copy for each session/reset
-const candidates = eligibleOffers(catalog, {
-  category: "everyday-bags", currency: "USD", budgetMinor: 15000,
-  laptopInches: 14, separateShoeCompartment: true,
-  deadline: "2026-10-25T18:00:00+08:00",
-});
-// BAG-001-B, 11900 cents, fictional next-day delivery.
-const quote = quoteOffer(catalog, "BAG-001-B", {
-  currency: "USD", budgetMinor: 15000,
-});
-const link = resolveKnownLink(
-  "https://www.osprey.com/daylitetm-large-tote-pack", catalog.knownLinks,
-);
-```
+Bags include backpacks, totes, slings, waist packs, duffels and wheeled bags with varied capacity and laptop support. Bedding includes Twin, Full/Double, Queen and King configurations with multiple materials and weaves. Match actual width, length and depth rather than size names. Raw source measurements and any conservative normalization are retained. Missing essential care/package fields remain unknown and block quote eligibility, including the original Brooklinen examples and BED-024.
 
-Use the exact types in `src/types.ts`. `referencePrice`, `sourceAvailability`, buyer metrics, authored fit and media status extend the minimal product contract so provenance does not get lost. Offers add explicit tax, total, cutoff and setup hardware fields. `otherFeesMinor` contains setup hardware once, not in addition to another hardware subtotal.
+## Scenario clock and regressions
 
-Mount or copy `catalog/public/catalog/images/` to the application's `public/catalog/images/`. The SVGs are original illustrations labelled DEMO ILLUSTRATION, not product photographs. Serve their corresponding alt/source/classification fields.
+The rehearsal clock remains frozen at **24 October 2026, 10:00 +08:00**, with a noon cutoff. Economy arrives after four days; express arrives the next day. Source snapshot date and simulated fulfillment clock are independent.
 
-For media display, `video.status === "missing"` means show “No curated product video available”; it does not mean a live video search was performed. No permission-verified playable anchor video is supplied. The issue explicitly allows missing media. If one is later curated, add product-associated media evidence with source URL, creator, published date (or explicit unknown), topic, classification and permission before changing status.
+The original café, work/gym and warm-room sequences preserve their exact offers and no-match outcomes. Bag/bedding scenarios explicitly scope `candidateProductIds` to their original six products; normal discovery and quoting have no such restriction and use the full catalogue. The café scenario retains its single product anchor and priced setup hardware.
 
-Resolve links only with `resolveKnownLink`; it performs no network request. Unknown/ambiguous links return unsupported. Photo fixtures are curated inspiration, not model recognition results: their mappings do not establish measurements or product identity.
+## Images, links and verification
 
-The helpers calculate eligibility, not authorization. Session revision handling, fresh explicit text/voice approval, audio completion, receipt idempotency and shopper UI remain the consuming backend's responsibility. Voice stays a complete path; text, photos and supported links are optional inputs under the latest issue #2 contract.
+Catalogue product photographs come from public manufacturer or retailer listings. Source-photo manifests in `sources/*images.json` retain the listing URL, original image URL, capture date and local image hash. A photograph is not evidence that every pictured accessory is included in the selected offer; captions retain configuration caveats. Original SVG inspiration fixtures remain available for the three rehearsal examples and as reliable fallbacks. Playable video remains explicitly missing where no permission-verified video was supplied.
 
-## Provenance and money
+From the repository root, `npm run seed:catalog` regenerates and synchronizes the catalogue to the backend, contract and app assets. `scripts/fetch-catalog-photos.mjs` downloads listing photos into browser-friendly WebP files and records attribution. `npm run verify:catalog-media` checks a decodable photo for every product, dimensions, canonical paths and online-source provenance. Run `npm run sync:catalog` after changing media. `output/catalogue-images/asset-manifest.json` records final asset hashes and any shared listing photographs. Earlier generated drafts remain archived but are superseded by sourced photos; no further generation is needed.
 
-- Currency is USD throughout. No automatic exchange or Singapore inventory assertion.
-- Source item prices are never payable totals. Their `price_kind` is retained even for starting prices, range floors, historical values, and estimates.
-- Offers are separately authored, complete proxy records for one product bundle at one fictional destination. Changing a source reference price cannot change an offer.
-- Decimal source prices are parsed as strings into integer cents using integer arithmetic, not floating-point rounding.
-- Tax is explicitly zero only in this fictional scenario. All totals include item, shipping, setup hardware/other fees and tax. Null or absent charges are invalid.
-- All fulfillment is simulated. No checkout endpoint, payment credential, real address or personal shopper information is present.
-- Unknown real stock remains unknown; proxy stock is separately labelled. The known negative audio cases MIC-025 and MIC-038 remain unavailable/out of stock. Discontinued rows remain in the 50-row archive.
+Known-link resolution accepts only exact, safe, unambiguous first-source identities. Shared family URLs used by multiple variants are omitted; they cannot silently select the wrong product. Tracking parameters can be ignored, but variant parameters remain significant. Synthetic products have no invented external source URL.
 
-## Reviews and compatibility
-
-Buyer metrics have independent nullable `rating`, `ratingCount`, `writtenReviewCount`, `purchaseCount`, and `purchaseCountPeriod` fields. A source's ambiguous aggregate count is preserved as `referenceCustomerReviewCount` and in the raw source row rather than asserted as two counts. Explicit review-count labels populate writtenReviewCount; the source's rendered individually rated reviews also establish ratingCount. No purchase counts are fabricated. Family-level review scope survives import.
-
-Feedback summaries are paraphrases in evidence `claim`, never `excerpt`. Authored café/office fit scores stay in `authoredFit` and proxy evidence; they are neither customer ratings nor measured transcription results. All six bag reviews remain unknown.
-
-Audio host paths are explicit simulation assumptions in `compatibilityFixture`, distinct from the source connector specification. Where a host-side cable, microphone interface or desktop stand is required, the bundle includes an identified, priced proxy component. A headphone-only adapter is not treated as a microphone interface. Missing host connection blocks eligibility; unsupported host paths are incompatible rather than silently guessed. Existing-user hardware does not discount the fixed bundle.
-
-Bag laptop fit is nominal manufacturer support, not a guarantee for every device of that diagonal. Unknown fit does not pass a required fit filter. For bedding, require exact width, length and depth. ULLVIDE uses the conservative 14.625-inch limit where source fields disagree. Brooklinen retail pack contents/care were not captured: those products stay in the catalog as incomplete-information examples, and quote eligibility blocks on those essential unknowns. Their proxy white/four-piece display assumptions do not fill real specification gaps.
-
-## Frozen scenario clock and scenarios
-
-Clock: **2026-10-24 10:00 +08:00**, Asia/Singapore. Cutoff: noon that day. “Tomorrow” is **2026-10-25**, with a 09:00–18:00 proxy delivery window. Economy arrives +4 days, express +1 day. Expired cutoff, unknown destination, incomplete totals and quantities other than one block eligibility. Advancing a rehearsal clock requires regenerating windows/cutoff together; `resolveDelivery` intentionally uses this frozen scenario date.
-
-1. **Noisy café:** clarify connection, wearability, portability and hard budget before comparing solution types. The directional MIC-044 anchor includes USD 20 setup hardware; economy total USD 134 versus next-day USD 148. Requiring tomorrow under USD 140 produces no match. Rankings are contextual hypotheses, not proven café performance.
-2. **Work/gym bag:** optional illustration or known link, then clarify shape versus color, space, compartments, weight and budget. BAG-001 has supported shoe separation and nominal laptop fit. USD 104 economy versus USD 119 next day. Retaining tomorrow and reducing budget to USD 100 produces no match.
-3. **Warm-room bedding:** require US Queen 60 × 80 inches and 12-inch mattress depth under USD 70. Show BED-002-A and BED-003-A/B. A percale preference selects BED-003, next day selects B at USD 63.99; requiring pure cotton while retaining the constraints yields no match. No cooling or health guarantee.
-
-Scenario changes are cumulative, and tests assert exact eligible offer IDs. Do not force three eligible matches when fewer satisfy hard constraints. Discovery candidates from an image are not all eligible purchases.
-
-## Acceptance evidence
-
-All nine issue #6 criteria are covered by the following implementation and checks:
-
-| Criterion | Implementation and verification |
-| --- | --- |
-| 24 active products, full 50-row archive, competing offers | Exact issue #2 MIC IDs; 6 BAG + 6 BED; 2 offers for every active product. Count tests and validator enforce the boundary. |
-| ID joins, source fields, exact money | Three independently shuffled source tables still join by ID; raw rows, scope, availability, links and notes retained. Decimal edge tests cover fractional cents, malformed and unsafe amounts. |
-| Reference prices distinct from totals; USD | Separate reference/offer objects; price-mutation test confirms independence; currency conflict rejects SGD; generated archive is non-executable. |
-| Authored fit distinct; negative cases | Proxy fit evidence with measuredPerformance=false; null reviews unchanged; MIC-025/MIC-038 blocked; discontinued MIC-018 retained in archive. |
-| Complete bag/bedding specification fields, unknown compatibility | Dimensions with units, capacity/weight/compartments/material/laptop fit; exact bedding dimensions/depth/composition/pieces/care. Unknown fields explicitly null and block matching when required. |
-| Complete proxy commerce and deadlines | Fictional destination, fees/tax, hardware, return policies, cutoff, absolute windows and fixed timezone. Exact totals and all three revision scenarios verified. |
-| Independent nullable counts; scope; paraphrases | Separate metrics, preserved raw count and grouped scope; no excerpt field for paraphrases; no café performance evidence invented. |
-| Playable permitted media or missing; links/images | Explicit missing-video records and rendering instructions; exact local URL allowlist; three owned SVG fixtures with correction examples. Link and asset tests pass. |
-| IDs, associations, totals and negative cases | Mutation tests reject duplicate/orphan/cross-subject IDs, unrelated URLs, missing/invalid money, dates, hardware and stock changes; no-match, missing evidence and incompatible hardware are exercised. |
-
-Verification record: `npm run verify` passes TypeScript checks, **41 tests**, validation of 24 products / 48 offers / 121 evidence records, and all three scenario sequences. This is catalog validation, not a claim that the full app or a live voice rehearsal has passed.
+Tests cover all 148 product IDs, four balanced audio groups, original snapshot preservation, unknown/new review counts, demo review separation, two offers per product, every audio host path, all source-negative stock states, varied new bag/bedding constraints, shared-link ambiguity, malformed imports/totals, and the three legacy scenario sequences. Photo assets and application integration are validated by their own consumers; catalogue checks alone do not establish live UI or deployment behavior.

@@ -11,7 +11,7 @@ export function bagClarifyShapeColour(
     evidenceIds: [],
     payload: {
       question:
-        "For this bag inspiration, what matters more right now — the shape, the colour, or another practical detail like capacity?",
+        "What matters most in your bag — how much it holds, its shape, or its colour?",
       stage: "understand",
     },
   };
@@ -30,11 +30,17 @@ export function buildBagDiscovery(snapshot: SessionSnapshot): {
     (p) => p.category === "bags" && !snapshot.exclusions.includes(p.id),
   );
 
+  if (snapshot.preferences["bagPriority"] === "capacity") {
+    // Prefer known roomier bags; never invent a capacity for missing specs.
+    bags = [...bags].sort((a, b) =>
+      Number(b.specs["capacityLitres"] ?? 0) - Number(a.specs["capacityLitres"] ?? 0));
+  }
+
   const close = bags.filter((p) => {
-    const s = String(p.specs["shape"] ?? "");
-    const c = String(p.specs["color"] ?? "");
+    const shapes = [p.specs["shape"], p.specs["style"], ...(Array.isArray(p.specs["carryModes"]) ? p.specs["carryModes"] : [])].filter(Boolean).map(value => String(value).toLowerCase());
+    const c = String(p.specs["color"] ?? "").toLowerCase();
     return (
-      (!shape || s === shape) && (!color || c === color || c.includes(color))
+      (!shape || shapes.some(value => value.includes(shape.toLowerCase()))) && (!color || c === color || c.includes(color))
     );
   });
 
@@ -55,9 +61,13 @@ export function buildBagDiscovery(snapshot: SessionSnapshot): {
   const narrowed = narrowedPool.map((p, i) => ({
     productId: p.id,
     rank: ranks[i],
-    fitReason: `Tentative resemblance to your ${shape || "preferred"} / ${color || "stated"} cues — not designer attribution.`,
+    fitReason: snapshot.preferences["bagPriority"] === "capacity"
+      ? typeof p.specs["capacityLitres"] === "number"
+        ? `${p.specs["capacityLitres"]} litres of space, with room to consider for your work and gym gear.`
+        : "Worth a look, though we still need to check how much it holds."
+      : `Worth a look for your ${shape || color || "everyday bag"} preference.`,
     compromise:
-      "Practical fit (laptop/waterproofing) is not inferred from appearance alone.",
+      "We still need to check the laptop fit and whether it keeps your shoes separate.",
   }));
 
   return { closeMatches, related, narrowed };
@@ -68,13 +78,18 @@ export function parseBagPrefs(text: string): {
   color?: string;
   budgetMinor?: number;
   needTomorrow?: boolean;
+  bagPriority?: "capacity" | "shape" | "color";
 } {
   const out: {
     shape?: string;
     color?: string;
     budgetMinor?: number;
     needTomorrow?: boolean;
+    bagPriority?: "capacity" | "shape" | "color";
   } = {};
+  if (/\b(capacity|roomy|spacious|storage|space|holds?|fit everything)\b|room for|how much.*(?:carry|fit)|laptop.*gym|gym.*laptop/i.test(text)) out.bagPriority = "capacity";
+  else if (/\bshape\b/i.test(text)) out.bagPriority = "shape";
+  else if (/\bcolou?r\b/i.test(text)) out.bagPriority = "color";
   if (/backpack/i.test(text)) out.shape = "backpack";
   if (/tote/i.test(text)) out.shape = "tote";
   if (/sling/i.test(text)) out.shape = "sling";

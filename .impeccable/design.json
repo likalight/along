@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-24T18:38:05.160881+00:00",
+  "title": "Design System: Along",
+  "extensions": {
+    "motion": [
+      {
+        "name": "carousel-ready",
+        "value": "opacity 0.45s ease",
+        "purpose": "Existing carousel readiness transition; disabled for reduced motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "shell-mobile",
+        "value": "760px"
+      },
+      {
+        "name": "comparison-mobile",
+        "value": "700px"
+      },
+      {
+        "name": "carousel-mobile",
+        "value": "600px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "description": "Start voice",
+      "html": "<button class=\"ds-primary\">Start voice</button>",
+      "css": ".ds-primary{background:var(--blue,#d1d4ac);color:#292b20;min-height:44px;padding:0 18px;border:0;border-radius:10px;font:14px \"DM Sans\",sans-serif;cursor:pointer}.ds-primary:hover{background:#e1e3c6}.ds-primary:focus-visible{outline:3px solid #d9c99e;outline-offset:4px}",
+      "refersTo": "button-primary"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "description": "Secondary conversation action.",
+      "html": "<button class=\"ds-ghost\">Type instead</button>",
+      "css": ".ds-ghost{background:none;border:0;min-height:44px;color:var(--muted,#c6b9a7);font:14px \"DM Sans\",sans-serif;cursor:pointer}.ds-ghost:focus-visible{outline:3px solid #d9c99e;outline-offset:4px}",
+      "refersTo": "button-ghost"
+    },
+    {
+      "name": "Composer Input",
+      "kind": "input",
+      "description": "Typed request field.",
+      "html": "<input class=\"ds-field\" aria-label=\"Shopping request\" placeholder=\"Tell me what you need\">",
+      "css": ".ds-field{padding:10px 12px;background:#302a22;border:1px solid #7a6851;border-radius:16px;color:var(--ink,#f1eadf);font:16px/1.5 \"DM Sans\",sans-serif}.ds-field:focus-visible{outline:3px solid #d9c99e;outline-offset:4px}.ds-field::placeholder{color:#c6b9a7;opacity:1}",
+      "refersTo": "input"
+    },
+    {
+      "name": "Evidence Card",
+      "kind": "card",
+      "description": "Contained product evidence.",
+      "html": "<article class=\"ds-card\"><p>Product evidence</p></article>",
+      "css": ".ds-card{background:#302a22;border:1px solid #514637;border-radius:14px;padding:16px 20px;color:#f1eadf;font:14px/1.55 \"DM Sans\",sans-serif}.ds-card p{margin:0}",
+      "refersTo": "card"
+    },
+    {
+      "name": "Context Chip",
+      "kind": "chip",
+      "description": "Compact conversation context.",
+      "html": "<span class=\"ds-chip\">Your preferences</span>",
+      "css": ".ds-chip{display:inline-block;font:12px \"DM Sans\",sans-serif;border:0;border-radius:14px;background:transparent;padding:0;color:#c6b9a7}"
+    },
+    {
+      "name": "Product Navigation",
+      "kind": "nav",
+      "description": "Named selection with a visible position count.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Product choices\"><button aria-label=\"Previous product\">\u2190</button><span>1 of 3</span><button aria-label=\"Next product\">\u2192</button></nav>",
+      "css": ".ds-nav{display:flex;align-items:center;gap:16px;font:14px \"DM Sans\",sans-serif;color:#f1eadf}.ds-nav button{min-width:44px;min-height:44px;border:1px solid #675943;border-radius:50%;background:transparent;color:inherit;cursor:pointer}.ds-nav button:hover{background:#40372b}.ds-nav button:focus-visible{outline:2px solid #d9c99e;outline-offset:4px}"
+    }
+  ],
+  "narrative": {
+    "overview": "Along uses the approved warm brown, cream and olive direction. Newsreader headings introduce the recommendation; DM Sans keeps the conversation, product facts and controls readable. This captures the current CSS and supplied visual direction, without assigning an invented creative metaphor.\n\nThe supplied shopping screenshot informs visual grammar: a clear product-and-price row, compact supporting facts and distinct fit and compromise panels. Its products, ratings and claims are not evidence for Along's catalog. Surface-specific composition is recorded in `.impeccable/surfaces/shopper.md`.",
+    "keyCharacteristics": [
+      "Warm brown surfaces with cream text and olive actions.",
+      "Editorial serif headings paired with readable sans-serif details.",
+      "Plain-language facts with visible provenance and price basis."
+    ],
+    "rules": [],
+    "dos": [
+      "Do preserve readable price basis, uncertainty and imagery provenance.",
+      "Do retain visible focus states and non-animated product navigation.",
+      "Do use final CSS declarations rather than superseded blue-and-white styling.",
+      "Do distinguish genuine source metrics from explicitly fictional demo reviews."
+    ],
+    "donts": [
+      "Don't present generic artwork as verified product photography.",
+      "Don't hide the reference-price basis behind a bare price.",
+      "Don't expose raw JSON or internal catalog metadata in shopper details.",
+      "Don't copy products, ratings or claims from the visual reference."
+    ]
+  }
+}

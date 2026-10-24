@@ -4,7 +4,6 @@ import { motion, useReducedMotion } from "motion/react";
 import {
   ArrowUpRight,
   Bookmark,
-  Check,
   CircleHelp,
   Play,
   RotateCcw,
@@ -21,6 +20,15 @@ import {
   type Snapshot,
 } from "@/lib/canvas/contracts";
 import styles from "./canvas.module.css";
+import { AUDIO_SOLUTION_CHOICES } from "@/lib/canvas/solution-choices";
+import { customerCopy, customerDestinationLabel, customerNotes, customerSellerLabel } from "@/lib/canvas/customer-copy";
+import { consumerDetails } from "@/lib/canvas/consumer-details";
+import { ProductCarousel } from "./ProductCarousel";
+import { productImageFallback } from "@/lib/canvas/product-media";
+import {
+  productSummary,
+  reviewEvidence,
+} from "@/lib/canvas/product-presentation";
 
 export type PlaybackRequest = Pick<
   MediaEvent,
@@ -39,6 +47,8 @@ export type ProductCanvasProps = {
   /** Shell sets while resolving spatial/ordinal language; suppress all positional transitions. */
   interpretingSpatialReference?: boolean;
   busy?: boolean;
+  /** Temporary product reference from the audio segment currently playing. */
+  narrationProductId?: string | null;
   mediaRequest?: {
     requestId: string;
     evidenceId: string;
@@ -47,58 +57,7 @@ export type ProductCanvasProps = {
   } | null;
   turnId?: string;
 };
-const ranks = {
-  1: "Top recommendation",
-  2: "Strong alternative",
-  3: "Third choice",
-};
-const steps = [
-  "Understand",
-  "Explore",
-  "Narrow",
-  "Compare",
-  "Evidence",
-  "Offers",
-];
-const stepOf = (view: Snapshot["view"]) =>
-  view === "understanding"
-    ? 0
-    : view === "solution_types"
-      ? 1
-      : view === "buying_priorities" || view === "shortlist"
-        ? 2
-        : view === "comparison"
-          ? 3
-          : view === "evidence"
-            ? 4
-            : 5;
-const solutions = [
-  {
-    id: "headset",
-    title: "A close-talking headset",
-    tag: "Your voice, up close",
-    text: "A boom keeps the mic near your mouth, helping your speech stand out.",
-    trade: "You have to wear it; a headset can be conspicuous.",
-    command: "Choose headset",
-  },
-  {
-    id: "clip",
-    title: "A discreet clip-on",
-    tag: "Small. Portable. Ears free.",
-    text: "Bring the microphone with you, clipped close to your voice.",
-    trade: "Clothing rustle, input compatibility and nearby voices need care.",
-    command: "Choose clip-on",
-  },
-  {
-    id: "desktop",
-    title: "A directional desk mic",
-    tag: "A place for your voice",
-    text: "Close, directional pickup while keeping your ears completely free.",
-    trade:
-      "Needs desk space and careful placement; distance admits more noise.",
-    command: "Choose desktop",
-  },
-];
+const solutions = AUDIO_SOLUTION_CHOICES;
 const priorities = [
   {
     id: "value",
@@ -113,7 +72,7 @@ const priorities = [
     title: "Best supported quality",
     tag: "Put performance first",
     text: "Prioritise supported capabilities for your problem, within your hard budget.",
-    trade: "Demo ranking is a hypothesis, not a measured dictation benchmark.",
+    trade: "May cost more; the best fit still depends on your setup.",
     command: "Choose quality",
   },
   {
@@ -134,6 +93,7 @@ export function ProductCanvas({
   onPlaybackRequest,
   interpretingSpatialReference = false,
   busy = false,
+  narrationProductId,
   mediaRequest,
   turnId = `canvas-${s.revision}`,
 }: ProductCanvasProps) {
@@ -142,6 +102,17 @@ export function ProductCanvas({
   const [videoError, setVideoError] = useState(false);
   const [videoRequest, setVideoRequest] = useState(0);
   const [takeaway, setTakeaway] = useState("");
+  const [failedImages, setFailedImages] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const markImageFallback = (source: string) =>
+    setFailedImages((previous) =>
+      previous.has(source) ? previous : new Set([...previous, source]),
+    );
+  const imageCredit = (product: Product) =>
+    failedImages.has(product.image.url)
+      ? "Generic category illustration · product image unavailable"
+      : customerCopy(product.image.source);
   const activePlayback = useRef<{
     sessionId: string;
     epoch: number;
@@ -160,6 +131,19 @@ export function ProductCanvas({
     return p ? [p] : [];
   });
   const focused = data.products.find((p) => p.id === s.focusedProductId);
+  const presentedProduct =
+    products.find((p) => p.id === (narrationProductId ?? s.focusedProductId)) ??
+    products[0];
+  const presentedAnnotation = presentedProduct
+    ? s.canvas.annotations[presentedProduct.id]
+    : undefined;
+  const recommendationTitle =
+    s.view === "saved_choice"
+      ? "A choice you saved"
+      : presentedAnnotation?.rank === 1 ||
+          presentedAnnotation?.role === "Top recommendation"
+        ? "Our pick for your brief"
+        : "Another option to consider";
   // Discovery entrance must not depend on busy/thinking — cards often mount
   // while status is still "thinking", which previously suppressed the fly-in.
   // Keep settles for compare/evidence/offers/spatial/video/reduced-motion.
@@ -171,6 +155,7 @@ export function ProductCanvas({
   ].includes(s.view);
   const stable =
     interpretingSpatialReference ||
+    busy ||
     !discoveryView ||
     Boolean(videoId) ||
     Boolean(reduced);
@@ -317,20 +302,28 @@ export function ProductCanvas({
 
   function card(p: Product, index: number, compact = false) {
     const annotation = s.canvas.annotations[p.id];
-    const rank = annotation?.rank;
+    const carouselCard = s.view === "shortlist" || s.view === "saved_choice";
+    const pricedOffers = data.offers
+      .filter(
+        (offer) =>
+          offer.productId === p.id &&
+          offer.variantId === p.variantId &&
+          offer.eligible !== false &&
+          offer.availability === "in_stock" &&
+          deliveredTotal(offer) !== null,
+      )
+      .sort((a, b) => deliveredTotal(a)! - deliveredTotal(b)!);
+    const lowestOffer = pricedOffers[0];
     const isFocused = p.id === s.focusedProductId;
-    const metrics = data.evidence.find(
-      (e) =>
-        e.subjectType === "product" &&
-        e.subjectId === p.id &&
-        e.sourceType === "Customer review snapshot",
-    );
+    const sourceReviews = reviewEvidence(p, data.evidence);
+    const metrics = sourceReviews;
     return (
       <motion.article
         key={p.id}
+        layoutId={`product-${s.sessionId}-${p.id}`}
         data-product-id={p.id}
         data-number={s.displayOrder.indexOf(p.id) + 1}
-        className={`${styles.card} ${isFocused ? styles.focused : ""} ${compact ? styles.compact : ""}`}
+        className={`${styles.card} ${carouselCard ? styles.carouselDetails : ""} ${isFocused ? styles.focused : ""} ${compact ? styles.compact : ""}`}
         initial={
           stable
             ? false
@@ -347,59 +340,67 @@ export function ProductCanvas({
           <span className={styles.number}>
             Option {s.displayOrder.indexOf(p.id) + 1}
           </span>
-          {rank && (
-            <span className={`${styles.rank} ${styles[`rank${rank}`]}`}>
-              <span aria-hidden="true">
-                {rank === 1 ? "●" : rank === 2 ? "◉" : "○"}
-              </span>{" "}
-              {ranks[rank]}
-            </span>
-          )}
-          {isFocused && <span className={styles.focusLabel}>In focus</span>}
         </div>
-        <div className={styles.productImage}>
-          <img src={p.image.url} alt={p.image.alt} loading="lazy" />
-          <span>
-            {p.image.classification === "proxy"
-              ? "Illustration · proxy"
-              : `${p.image.classification} image`}
-          </span>
-        </div>
-        <div className={styles.cardBody}>
-          <span className={styles.eyebrow}>
-            {annotation?.role ??
-              (s.savedItems.some((item) => item.id === p.id)
-                ? "Saved choice"
-                : "Shortlisted choice")}
-          </span>
-          <p className={styles.brand}>{p.brand}</p>
-          <h3>{p.model}</h3>
-          <p className={styles.variant}>{p.variantId}</p>
-          <p className={styles.fit}>
-            {annotation?.fitReason ??
-              p.specs["Why it may help"] ??
-              Object.values(p.specs).join(" · ")}
-          </p>
-          <p className={styles.compromise}>
-            <span>The trade-off</span>{" "}
-            {annotation?.compromise ?? p.limitations[0]}
-          </p>
-          <div className={styles.price}>
-            <strong>{money(p.referencePriceMinor)}</strong>
-            <span>item reference · {p.classification}</span>
+        {!carouselCard && (
+          <div className={styles.productImage}>
+            <img
+              src={p.image.url}
+              alt={p.image.alt}
+              loading="lazy"
+              onError={(event) => {
+                const image = event.currentTarget;
+                if (image.dataset.fallback) return;
+                image.dataset.fallback = "true";
+                image.src = productImageFallback(p.id);
+                image.alt = `${p.model}: generic category illustration`;
+                markImageFallback(p.image.url);
+              }}
+            />
+            <span>{imageCredit(p)}</span>
           </div>
-          <p className={styles.metricHint}>
-            {metrics?.rating != null
-              ? `${metrics.rating}/5 customer stars · ${metrics.ratingCount ?? "unavailable"} ratings`
-              : "Customer stars not available"}
+        )}
+        <div className={styles.cardBody}>
+          <div className={styles.listingHeader}>
+            <div>
+              <p className={styles.brand}>{p.brand}</p>
+              <h3>{p.model}</h3>
+            </div>
+            <div className={styles.price}>
+              <strong>{money(p.referencePriceMinor)}</strong>
+              <span>Reference price</span>
+            </div>
+          </div>
+          <p className={styles.fit}>
+            <span>
+              {annotation?.fitReason ? "Why this fits" : "At a glance"}
+            </span>{" "}
+            {customerCopy(annotation?.fitReason ?? productSummary(p))}
           </p>
+          {(annotation?.compromise || p.limitations[0]) && (
+            <p className={styles.compromise}>
+              <span>The trade-off</span>{" "}
+              {customerCopy(annotation?.compromise ?? p.limitations[0])}
+            </p>
+          )}
+          {lowestOffer && (
+            <p className={styles.offerPrice}>
+              {money(deliveredTotal(lowestOffer), lowestOffer.currency)} delivered
+            </p>
+          )}
+          {metrics?.rating != null && (
+            <p className={styles.metricHint}>
+              {metrics.rating}/5 ·{" "}
+              {metrics.ratingCount?.toLocaleString() ?? "unavailable"}{" "}
+              source ratings
+            </p>
+          )}
           <div className={styles.cardActions}>
             <button
               disabled={busy}
-              onClick={() => intent(`Focus ${p.id}`)}
-              aria-label={`Focus ${p.model}`}
+              onClick={() => intent(`Show offers for ${p.id}`)}
+              aria-label={`View offers for ${p.model}`}
             >
-              Explore <ArrowUpRight size={15} />
+              View offers <ArrowUpRight size={15} />
             </button>
             <button
               disabled={busy}
@@ -421,12 +422,7 @@ export function ProductCanvas({
     );
   }
   function details(p: Product) {
-    const reviews = data.evidence.find(
-      (e) =>
-        e.subjectType === "product" &&
-        e.subjectId === p.id &&
-        e.sourceType === "Customer review snapshot",
-    );
+    const reviews = reviewEvidence(p, data.evidence);
     return (
       <section
         className={styles.focusSheet}
@@ -434,13 +430,9 @@ export function ProductCanvas({
       >
         <div className={styles.sectionHeading}>
           <div>
-            <span className={styles.eyebrow}>
-              In focus · option {s.displayOrder.indexOf(p.id) + 1}
-            </span>
             <h3>
               {p.brand} {p.model}
             </h3>
-            <p>{p.variantId}</p>
           </div>
           <button
             onClick={() => intent(`Show offers for ${p.id}`)}
@@ -450,61 +442,63 @@ export function ProductCanvas({
           </button>
         </div>
         <dl className={styles.specs}>
-          {Object.entries(p.specs).map(([key, value]) => (
-            <div key={key}>
-              <dt>{key}</dt>
+          {consumerDetails(p.specs).map(({ label, value }) => (
+            <div key={label}>
+              <dt>{label}</dt>
               <dd>{value}</dd>
             </div>
           ))}
         </dl>
-        <dl className={styles.metrics}>
-          <div>
-            <dt>Customer stars</dt>
-            <dd>
-              {reviews?.rating == null
-                ? "Not available"
-                : `${reviews.rating} / 5`}
-            </dd>
-          </div>
-          <div>
-            <dt>Rating count</dt>
-            <dd>{reviews?.ratingCount ?? "Not available"}</dd>
-          </div>
-          <div>
-            <dt>Written reviews</dt>
-            <dd>{reviews?.writtenReviewCount ?? "Not available"}</dd>
-          </div>
-          <div>
-            <dt>Purchases / period</dt>
-            <dd>
-              {reviews?.purchaseCount != null && reviews.purchaseCountPeriod
-                ? `${reviews.purchaseCount} / ${reviews.purchaseCountPeriod}`
-                : "Not available"}
-            </dd>
-          </div>
-        </dl>
+        <h4 className={styles.reviewHeading}>Source review snapshot</h4>
+        {reviews &&
+        (reviews.rating != null ||
+          reviews.ratingCount != null ||
+          reviews.writtenReviewCount != null) ? (
+          <>
+            <dl className={styles.metrics}>
+              {reviews.rating != null && (
+                <div>
+                  <dt>Source rating</dt>
+                  <dd>{reviews.rating} / 5</dd>
+                </div>
+              )}
+              {reviews.ratingCount != null && (
+                <div>
+                  <dt>Ratings</dt>
+                  <dd>{reviews.ratingCount.toLocaleString()}</dd>
+                </div>
+              )}
+              {reviews.writtenReviewCount != null && (
+                <div>
+                  <dt>Written reviews</dt>
+                  <dd>{reviews.writtenReviewCount.toLocaleString()}</dd>
+                </div>
+              )}
+            </dl>
+            <p className={styles.scope}>
+              {reviews.reviewScope}{" "}
+              {reviews.checkedOn ? `Checked ${reviews.checkedOn}.` : ""}
+            </p>
+            {reviews.claim && <p>{reviews.claim}</p>}
+          </>
+        ) : (
+          <p className={styles.unavailable}>
+            No real customer review snapshot was captured for this product.
+          </p>
+        )}
         <p className={styles.scope}>
-          {reviews
-            ? `${reviews.classification} · ${reviews.reviewScope ?? "Review scope unavailable"}. Checked ${reviews.checkedOn}.`
-            : "Review source and scope are unavailable."}
-          {p.category === "audio"
-            ? " These customer metrics do not measure café dictation accuracy."
-            : " Customer metrics are not a guarantee of product performance."}
-        </p>
-        <p>{reviews?.claim ?? "Review synthesis not available."}</p>
-        <p className={styles.unavailable}>
-          Delivered total and delivery date depend on a seller offer. Reference
-          price excludes shipping, fees and any extra hardware.
+          Reference prices exclude shipping and extras. Choose an offer to see
+          the delivered total.
         </p>
         <div className={styles.inlineActions}>
           <button
             disabled={busy}
             onClick={() => intent(`Show reviews for ${p.id}`)}
           >
-            Explore evidence <ArrowUpRight size={15} />
+            Reviews and sources <ArrowUpRight size={15} />
           </button>
           <button disabled={busy} onClick={() => intent(`Save ${p.id}`)}>
-            <Bookmark size={15} /> Save with reason
+            <Bookmark size={15} /> Save
           </button>
         </div>
       </section>
@@ -518,99 +512,36 @@ export function ProductCanvas({
       aria-busy={busy}
       data-stable={stable}
     >
-      <nav className={styles.progress} aria-label="Shopping stages">
-        {steps.map((name, index) => (
-          <span
-            key={name}
-            className={index === stepOf(s.view) ? styles.currentStep : ""}
-            aria-current={index === stepOf(s.view) ? "step" : undefined}
-          >
-            {String(index + 1).padStart(2, "0")} {name}
-          </span>
-        ))}
-      </nav>
-      <header className={styles.heading}>
-        <span className={styles.eyebrow}>
-          {s.category === "audio"
-            ? "For the way you work"
-            : s.category === "bags"
-              ? "Inspired by you"
-              : "Comfort, considered"}
-        </span>
-        <h1>{s.canvas.heading}</h1>
-        <p aria-live="polite">{s.canvas.message}</p>
-      </header>
-      <div
-        className={styles.context}
-        aria-label="Your current needs and constraints"
-      >
-        {s.canvas.reference && (
+      {s.canvas.reference && (
+        <div className={styles.context}>
           <img
             src={s.canvas.reference.url}
             alt={s.canvas.reference.alt}
             className={styles.reference}
           />
-        )}
-        <div className={styles.chips}>
-          {s.needs.map((need) => (
-            <span key={need}>{need}</span>
-          ))}
-          {Object.entries(s.hardConstraints)
-            .filter(
-              ([key]) =>
-                !["currency", "deliveryWithinDays", "category"].includes(key),
-            )
-            .map(([key, value]) => (
-              <span key={key} className={styles.constraint}>
-                {key === "budgetMinor"
-                  ? `Under ${money(Number(value))}`
-                  : key === "deadlineDays"
-                    ? `Arrive within ${value} ${value === "1" ? "day" : "days"}`
-                    : key === "compatibility" ||
-                        key === "requiredSpecifications"
-                      ? Object.entries(JSON.parse(String(value)))
-                          .map(
-                            ([k, v]) => `${k.replace(/([A-Z])/g, " $1")}: ${v}`,
-                          )
-                          .join(" · ")
-                      : value}
-              </span>
-            ))}
-          {s.preferences.map((pref) => (
-            <span key={pref}>{pref}</span>
-          ))}
+          <span>Your reference image</span>
         </div>
-      </div>
-      {s.view === "understanding" && (
-        <section className={styles.understanding}>
-          <div className={styles.understandSymbol}>
-            <Check size={26} />
-          </div>
-          <h2>Good recommendations begin with listening.</h2>
-          <p>Keep what’s right. Change what isn’t.</p>
-          <div className={styles.examples}>
-            <span>“My budget is under $100”</span>
-            <span>
-              {s.category === "audio"
-                ? "“Actually, USB-A”"
-                : s.category === "bags"
-                  ? "“I prefer the softer shape”"
-                  : "“Mattress depth 40 cm”"}
-            </span>
-          </div>
-          <button
-            className={styles.primary}
-            onClick={() => intent("Explore options")}
-            disabled={busy}
-          >
-            Explore the possibilities <ArrowUpRight size={17} />
-          </button>
-          <p className={styles.hint}>You can say or type every choice.</p>
+      )}
+      {s.view === "solution_types" && (
+        <section className={styles.directionChoices} aria-label="Microphone setups">
+          {solutions.map((choice) => (
+            <button
+              key={choice.id}
+              className={styles.directionChoice}
+              disabled={busy}
+              onClick={() => intent(choice.command)}
+            >
+              <span><strong>{choice.title}</strong><span>{choice.text}</span></span>
+              <ArrowUpRight size={17} aria-hidden="true" />
+            </button>
+          ))}
+          <p>You can also ask me to talk it through.</p>
         </section>
       )}
-      {(s.view === "solution_types" || s.view === "buying_priorities") && (
-        <div className={styles.choices}>
-          {(s.view === "solution_types" ? solutions : priorities).map(
+      {s.view === "buying_priorities" && (
+        <section aria-label="Choose a buying priority">
+          <div className={styles.choices}>
+          {priorities.map(
             (choice, index) => (
               <motion.article
                 key={choice.id}
@@ -622,18 +553,8 @@ export function ProductCanvas({
                   delay: stable ? 0 : index * 0.1,
                 }}
               >
-                {s.view === "solution_types" ? (
-                  <img
-                    src={`/canvas/${choice.id}.svg`}
-                    alt={`${choice.title}, schematic illustration`}
-                  />
-                ) : (
-                  <span className={styles.prioritySymbol} aria-hidden="true">
-                    {["↔", "✧", "↓"][index]}
-                  </span>
-                )}
-                <span className={styles.eyebrow}>{choice.tag}</span>
-                <h2>{choice.title}</h2>
+                <span className={styles.directionLabel}>{index + 1} · {choice.tag}</span>
+                <h3>{choice.title}</h3>
                 <p>{choice.text}</p>
                 <p className={styles.compromise}>
                   <span>The trade-off</span> {choice.trade}
@@ -644,7 +565,8 @@ export function ProductCanvas({
               </motion.article>
             ),
           )}
-        </div>
+          </div>
+        </section>
       )}
       {[
         "shortlist",
@@ -658,14 +580,16 @@ export function ProductCanvas({
         <>
           {products.length > 0 ? (
             <>
+              {(s.view === "shortlist" || s.view === "saved_choice") && (
+                <h2 className={styles.recommendationHeading}>
+                  {recommendationTitle}
+                </h2>
+              )}
               <div className={styles.stageToolbar}>
                 <span>
                   {s.view === "comparison"
-                    ? "Stable comparison"
-                    : s.view === "evidence"
-                      ? "Stable evidence view"
-                      : `${products.length} considered options`}{" "}
-                  · positions held while you speak
+                    ? "Compare products"
+                    : `${products.length} options`}
                 </span>
                 <div>
                   {products.length >= 2 && (
@@ -684,16 +608,26 @@ export function ProductCanvas({
                   </button>
                 </div>
               </div>
-              {s.view !== "evidence" && (
-                <div
-                  className={`${styles.products} ${products.length >= 2 ? styles.discovery : ""} ${s.view === "offers" ? styles.offersStrip : ""}`}
-                  data-stable={stable}
-                >
-                  {products.map((p, i) =>
-                    card(p, i, s.view === "offers" || products.length > 3),
-                  )}
-                </div>
-              )}
+              {s.view !== "evidence" &&
+                (s.view === "shortlist" || s.view === "saved_choice" ? (
+                  <ProductCarousel
+                    products={products}
+                    focusedId={narrationProductId ?? s.focusedProductId}
+                    locked={busy || interpretingSpatialReference}
+                    onFocus={(id) => intent(`Focus ${id}`)}
+                  >
+                    {products.map((p, i) => card(p, i))}
+                  </ProductCarousel>
+                ) : (
+                  <div
+                    className={`${styles.products} ${s.view === "comparison" ? styles.comparisonSpread : ""} ${s.view === "offers" ? styles.offersStrip : ""}`}
+                    data-stable={stable}
+                  >
+                    {products.map((p, i) =>
+                      card(p, i, s.view === "offers" || products.length > 3),
+                    )}
+                  </div>
+                ))}
             </>
           ) : (
             <div className={styles.empty}>
@@ -705,7 +639,12 @@ export function ProductCanvas({
               </p>
             </div>
           )}
-          {s.view === "shortlist" && focused && details(focused)}
+          {s.view === "shortlist" && focused && (
+            <details className={styles.moreDetails}>
+              <summary>Product details</summary>
+              {details(focused)}
+            </details>
+          )}
           {s.view === "comparison" && products.length > 0 && (
             <div
               className={styles.tableScroll}
@@ -714,10 +653,7 @@ export function ProductCanvas({
               tabIndex={0}
             >
               <table className={styles.comparison}>
-                <caption>
-                  Trade-offs for your current shortlist. Rank reflects this
-                  session only.
-                </caption>
+                <caption>Prices and trade-offs for these products.</caption>
                 <thead>
                   <tr>
                     <th scope="col">What matters</th>
@@ -726,7 +662,6 @@ export function ProductCanvas({
                         Option {s.displayOrder.indexOf(p.id) + 1}
                         <br />
                         {p.brand} {p.model}
-                        <small>{p.variantId}</small>
                       </th>
                     ))}
                   </tr>
@@ -737,31 +672,26 @@ export function ProductCanvas({
                     "Main compromise",
                     "Reference price",
                     "Delivered total",
-                    "Customer stars",
-                    "Written reviews",
+                    "Source stars",
                   ].map((label) => (
                     <tr key={label}>
                       <th scope="row">{label}</th>
                       {products.map((p) => {
-                        const r = data.evidence.find(
-                          (e) => e.id === `${p.id}-reviews`,
-                        );
+                        const r = reviewEvidence(p, data.evidence);
                         return (
                           <td key={p.id}>
                             {label === "Why it fits"
-                              ? s.canvas.annotations[p.id]?.fitReason
+                              ? (s.canvas.annotations[p.id]?.fitReason ??
+                                customerCopy(productSummary(p)))
                               : label === "Main compromise"
-                                ? p.limitations[0]
+                                ? customerCopy(p.limitations[0] ?? "")
                                 : label === "Reference price"
                                   ? money(p.referencePriceMinor)
                                   : label === "Delivered total"
                                     ? "Select seller; not yet known"
-                                    : label === "Customer stars"
-                                      ? r?.rating == null
-                                        ? "Not available"
-                                        : `${r.rating}/5 · ${r.ratingCount ?? "unknown"} ratings`
-                                      : (r?.writtenReviewCount ??
-                                        "Not available")}
+                                    : r?.rating == null
+                                          ? "Not available"
+                                          : `${r.rating}/5 · ${r.writtenReviewCount ?? "unknown"} source reviews`}
                           </td>
                         );
                       })}
@@ -781,9 +711,6 @@ export function ProductCanvas({
                 className={styles.evidencePanel}
                 aria-label="Evidence and curated video"
               >
-                <span className={styles.eyebrow}>
-                  Evidence, with its limits
-                </span>
                 <h2>What supports this choice?</h2>
                 {!data.evidence.some(
                   (ev) =>
@@ -801,20 +728,19 @@ export function ProductCanvas({
                     (ev) =>
                       s.evidenceIds.includes(ev.id) &&
                       ev.subjectType === "product" &&
-                      ev.subjectId === focused.id,
+                      ev.subjectId === focused.id &&
+                      !(ev.classification === "proxy" && /review/i.test(ev.sourceType)),
                   )
                   .map((ev) => (
                     <article className={styles.evidenceItem} key={ev.id}>
                       <div className={styles.evidenceMeta}>
-                        <span>{ev.classification}</span>
                         <span>{ev.sourceType}</span>
                       </div>
-                      <p>{ev.claim}</p>
-                      {ev.excerpt && <blockquote>{ev.excerpt}</blockquote>}
+                      {customerCopy(ev.claim) && <p>{customerCopy(ev.claim)}</p>}
+                      {ev.excerpt && customerCopy(ev.excerpt) && <blockquote>{customerCopy(ev.excerpt)}</blockquote>}
                       <p className={styles.scope}>
-                        {ev.media?.creator ??
-                          "Research seed / attributed source"}{" "}
-                        · checked {ev.checkedOn}
+                        {ev.media?.creator ? `${ev.media.creator} · ` : ""}
+                        Checked {ev.checkedOn}
                         {ev.media && ` · Topic: ${ev.media.title}`}
                       </p>
                       {ev.sourceUrl && (
@@ -832,7 +758,7 @@ export function ProductCanvas({
                               : "Check media availability"}
                           </button>
                           <p className={styles.scope}>
-                            Original proxy explainer, not a product review or
+                            Illustrative explainer, not a product review or
                             performance test.
                           </p>
                         </>
@@ -943,19 +869,22 @@ export function ProductCanvas({
                   className={styles.offerProductImage}
                   src={focused.image.url}
                   alt={focused.image.alt}
+                  onError={(event) => {
+                    const image = event.currentTarget;
+                    if (image.dataset.fallback) return;
+                    image.dataset.fallback = "true";
+                    image.src = productImageFallback(focused.id);
+                    image.alt = `${focused.model}: generic category illustration`;
+                    markImageFallback(focused.image.url);
+                  }}
                 />
                 <div>
-                  <span className={styles.eyebrow}>
-                    Same product · exact variant
-                  </span>
                   <h2>
                     {focused.brand} {focused.model}
                   </h2>
-                  <p>{focused.variantId} · fictional demo destination</p>
+                  <p>Offers for this product</p>
+                  <p className={styles.scope}>{imageCredit(focused)}</p>
                 </div>
-                <span className={styles.proxy}>
-                  All fulfillment is synthetic
-                </span>
               </div>
               {data.offers
                 .filter(
@@ -979,7 +908,7 @@ export function ProductCanvas({
                       className={`${styles.offer} ${o.id === s.selectedOfferId ? styles.selectedOffer : ""}`}
                     >
                       <div>
-                        <span className={styles.eyebrow}>{o.sellerId}</span>
+                        <p>{customerSellerLabel(o.sellerId)}</p>
                         <h3>
                           {money(total, o.currency)}{" "}
                           <small>
@@ -996,16 +925,15 @@ export function ProductCanvas({
                           {money(o.requiredSetupMinor, o.currency)} required
                           setup
                         </p>
-                        <p>Destination: {o.destination}</p>
+                        <p>Destination: {customerDestinationLabel(o.destination)}</p>
                         <p>
                           {o.availability === "in_stock"
-                            ? "Synthetic stock fixture"
+                            ? "In stock"
                             : "Availability unverified"}
                         </p>
                         <p>
-                          Demo estimate:{" "}
-                          {deliveryDate(o.deliveryWindow.latestOffsetDays)} ·
-                          based on 24 Oct 2026, Singapore
+                          Delivery estimate:{" "}
+                          {deliveryDate(o.deliveryWindow.latestOffsetDays)}
                         </p>
                         <span
                           className={
@@ -1024,8 +952,8 @@ export function ProductCanvas({
                         </span>
                       </div>
                       <div>
-                        <p>{o.returnTerms}</p>
-                        {o.conditions.map((c) => (
+                        {customerCopy(o.returnTerms) && <p>{customerCopy(o.returnTerms)}</p>}
+                        {customerNotes(o.conditions).map((c) => (
                           <p className={styles.scope} key={c}>
                             {c}
                           </p>
@@ -1035,14 +963,17 @@ export function ProductCanvas({
                             (e) =>
                               o.evidenceIds.includes(e.id) &&
                               e.subjectType === "seller" &&
-                              e.subjectId === o.sellerId,
+                              e.subjectId === o.sellerId &&
+                              e.classification !== "proxy" &&
+                              !/fixture|authored/i.test(e.sourceType) &&
+                              Boolean(customerCopy(e.claim)),
                           )
                           .map((e) => (
                             <p className={styles.sellerEvidence} key={e.id}>
                               <strong>
-                                Seller evidence · {e.classification}
+                                Seller details
                               </strong>{" "}
-                              {e.claim}
+                              {customerCopy(e.claim)}
                               <span className={styles.scope}>
                                 {" "}
                                 {e.sourceType} · checked {e.checkedOn}
@@ -1058,7 +989,7 @@ export function ProductCanvas({
                               )}
                             </p>
                           ))}
-                        {o.conflicts?.map((reason) => (
+                        {customerNotes(o.conflicts ?? []).map((reason) => (
                           <p key={reason} role="note">
                             {reason}
                           </p>
@@ -1073,7 +1004,7 @@ export function ProductCanvas({
                           onClick={() => intent(`Select offer ${o.id}`)}
                         >
                           {o.id === s.selectedOfferId
-                            ? "Selected for comparison"
+                            ? "Selected offer"
                             : "Review this offer"}{" "}
                           <ArrowUpRight size={14} />
                         </button>
@@ -1106,13 +1037,10 @@ export function ProductCanvas({
           </button>
         </p>
       )}
-      {s.view !== "understanding" && (
+      {products.length > 0 && !["understanding", "shortlist", "saved_choice"].includes(s.view) && (
         <footer className={styles.canvasFooter}>
-          <span>
-            Rank is personal to this shortlist. Focus does not change rank.
-          </span>
           <button disabled={busy} onClick={() => intent("Back to shortlist")}>
-            Back to exploration <ArrowUpRight size={14} />
+            Back to products <ArrowUpRight size={14} />
           </button>
         </footer>
       )}

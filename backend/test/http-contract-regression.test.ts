@@ -45,8 +45,8 @@ test("HTTP default catalog preserves the complete shared USD fixtures and serves
   const h = await harness(t);
   const catalog = await h.shopper.catalog();
   const shared = getCatalog();
-  assert.equal(catalog.products.length, 24);
-  assert.equal(catalog.offers.length, 48);
+  assert.equal(catalog.products.length, shared.products.length);
+  assert.equal(catalog.offers.length, shared.offers.length);
   assert.equal(catalog.currency, "USD");
   assert.deepEqual(catalog.products, shared.products);
   assert.deepEqual(catalog.offers, shared.offers);
@@ -57,8 +57,10 @@ test("HTTP default catalog preserves the complete shared USD fixtures and serves
   for (const path of new Set(shared.products.map(p => p.image.url))) {
     const response = await fetch(h.base + path);
     assert.equal(response.status, 200);
-    assert.match(response.headers.get("content-type")!, /image\/svg\+xml/);
-    assert.match(await response.text(), /DEMO ILLUSTRATION/);
+    assert.match(response.headers.get("content-type")!, /image\/webp/);
+    const image = Buffer.from(await response.arrayBuffer());
+    assert.equal(image.subarray(0, 4).toString(), "RIFF");
+    assert.equal(image.subarray(8, 12).toString(), "WEBP");
   }
   assert.equal((await fetch(h.base + "/catalog/images/private.svg")).status, 404);
 });

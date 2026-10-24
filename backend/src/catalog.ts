@@ -434,7 +434,6 @@ export function validateCatalog(data: CatalogData = catalog) {
   unique(products);
   unique(offers);
   unique(evidence);
-  if (products.length > 50) throw new Error("Catalog exceeds demo cap");
   for (const p of products)
     for (const id of p.evidenceIds)
       if (

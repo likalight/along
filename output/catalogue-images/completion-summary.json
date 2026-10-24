@@ -1,0 +1,28 @@
+{
+  "products": 148,
+  "categories": {
+    "audio-accessories": 100,
+    "everyday-bags": 24,
+    "bedsheet-sets": 24
+  },
+  "offers": 296,
+  "demoReviews": 592,
+  "sourcedPhotographs": 148,
+  "photoBytes": 6090446,
+  "evidence": 973,
+  "checks": {
+    "catalogueTests": 51,
+    "backendTests": 53,
+    "agentTests": 52,
+    "shopperTests": 146,
+    "typechecks": "passed",
+    "legacyScenarios": 3
+  },
+  "onlinePhotoManifest": "output/catalogue-images/asset-manifest.json",
+  "notes": [
+    "Offers and demo reviews are fictional and labelled.",
+    "Original source facts and unknowns remain distinct.",
+    "Source listing photographs may depict different colors or kit accessories.",
+    "MIC-095 has a separately sourced manufacturer recall notice and a simulated purchase hold pending serial verification."
+  ]
+}

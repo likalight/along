@@ -34,6 +34,27 @@ export type Product = {
   referencePriceMinor: number | null;
   availability: "in_stock" | "unknown" | "unavailable";
   classification: Classification;
+  provenance?: {
+    kind: "source_snapshot" | "synthetic";
+    notice: string;
+  };
+  demoReviews?: {
+    classification: "proxy";
+    disclosure: string;
+    rating: number;
+    ratingCount: number;
+    writtenReviewCount: number;
+    entries: {
+      id: string;
+      author: string;
+      rating: number;
+      title: string;
+      body: string;
+      usedFor: string;
+      postedOn: string;
+      verifiedPurchase: false;
+    }[];
+  };
 };
 export type Evidence = {
   id: string;

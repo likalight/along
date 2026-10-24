@@ -1,0 +1,17 @@
+{
+  "checkedOn": "2026-10-25",
+  "scope": "MIC-001 through MIC-050",
+  "downloaded": 50,
+  "visuallyReviewed": 50,
+  "manifest": "catalog/sources/audio-001-050-images.json",
+  "canonicalFiles": "catalog/public/catalog/images/products/MIC-NNN.webp",
+  "totalWebpBytes": 1881708,
+  "hashAndImageValidation": "Passed for all 50: SHA-256 matches manifest, WebP decodes, both dimensions >=160",
+  "unresolved": [],
+  "notes": [
+    "Product photographs acquired from linked public manufacturer or retailer sources; no further image generation used.",
+    "All 50 reviewed via contact sheet; the incorrect generic Logitech logos, Jabra gear placeholder and mono headset, wrong DJI bundle, and mobile-only Hollyland image were replaced.",
+    "MIC-037, MIC-038, MIC-042, MIC-043 and MIC-045 retain some retailer or manufacturer branding, title text, or award marks alongside the correct products.",
+    "MIC-049 is a headset-only photograph of the SpeechOne product; it does not display every accessory in the configured kit. Other photographs may omit bundled accessories or show mounting accessories. Preserve the pictured-configuration-may-vary disclosure."
+  ]
+}

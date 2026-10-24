@@ -1,0 +1,12 @@
+
+> @along/shopper@0.1.0 test
+> vitest run
+
+
+ RUN  v4.1.12 /Users/priyadharshan/Documents/ChatGPT/AI Grand Prix/along/apps/shopper
+
+
+ Test Files  18 passed (18)
+      Tests  146 passed (146)
+   Start at  03:03:20
+   Duration  13.79s (transform 4.77s, setup 0ms, import 7.52s, tests 18.31s, environment 1ms)

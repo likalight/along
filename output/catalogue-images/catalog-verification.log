@@ -1,0 +1,333 @@
+
+> @along/catalog@2.0.0 verify
+> npm run check && npm test && npm run build
+
+
+> @along/catalog@2.0.0 check
+> tsc --noEmit
+
+
+> @along/catalog@2.0.0 test
+> node --experimental-strip-types --test test/*.test.ts
+
+TAP version 13
+# Subtest: microphone joins remain correct when each source table has a different row order
+ok 1 - microphone joins remain correct when each source table has a different row order
+  ---
+  duration_ms: 2.645917
+  type: 'test'
+  ...
+# Subtest: ambiguous, fractional-cent, negative and overflowing monetary input cannot enter the catalog
+ok 2 - ambiguous, fractional-cent, negative and overflowing monetary input cannot enter the catalog
+  ---
+  duration_ms: 0.365167
+  type: 'test'
+  ...
+# Subtest: all100 audio IDs include negative-stock references and retain original rehearsal IDs
+ok 3 - all100 audio IDs include negative-stock references and retain original rehearsal IDs
+  ---
+  duration_ms: 0.871833
+  type: 'test'
+  ...
+# Subtest: unknown reviews stay unknown and paraphrases are never emitted as verbatim excerpts
+ok 4 - unknown reviews stay unknown and paraphrases are never emitted as verbatim excerpts
+  ---
+  duration_ms: 0.405208
+  type: 'test'
+  ...
+# Subtest: non-tech specifications keep dimensional units, physical fit limitations and unverified fields
+ok 5 - non-tech specifications keep dimensional units, physical fit limitations and unverified fields
+  ---
+  duration_ms: 0.2715
+  type: 'test'
+  ...
+# Subtest: catalog validation rejects a known-link mapping unrelated to its product source
+ok 6 - catalog validation rejects a known-link mapping unrelated to its product source
+  ---
+  duration_ms: 19.117375
+  type: 'test'
+  ...
+# Subtest: malformed fulfillment dates cannot create an eligible quote
+ok 7 - malformed fulfillment dates cannot create an eligible quote
+  ---
+  duration_ms: 31.3125
+  type: 'test'
+  ...
+# Subtest: non-finite compatibility values are not treated as supported fit
+ok 8 - non-finite compatibility values are not treated as supported fit
+  ---
+  duration_ms: 12.269459
+  type: 'test'
+  ...
+# Subtest: 100-product index is retained verbatim with reproducible hash and full active coverage
+ok 9 - 100-product index is retained verbatim with reproducible hash and full active coverage
+  ---
+  duration_ms: 18.514792
+  type: 'test'
+  ...
+# Subtest: every scenario's cumulative revisions yield exactly its expected offers, including no-match
+ok 10 - every scenario's cumulative revisions yield exactly its expected offers, including no-match
+  ---
+  duration_ms: 24.632583
+  type: 'test'
+  ...
+# Subtest: same-variant cheap/late versus dearer/on-time and all setup costs are explicit
+ok 11 - same-variant cheap/late versus dearer/on-time and all setup costs are explicit
+  ---
+  duration_ms: 12.383125
+  type: 'test'
+  ...
+# Subtest: reference price changes cannot turn research amounts into executable offers
+ok 12 - reference price changes cannot turn research amounts into executable offers
+  ---
+  duration_ms: 9.675166
+  type: 'test'
+  ...
+# Subtest: unavailable products, unknown evidence, incompatible hardware and exact mattress limits stay visible
+ok 13 - unavailable products, unknown evidence, incompatible hardware and exact mattress limits stay visible
+  ---
+  duration_ms: 9.399458
+  type: 'test'
+  ...
+# Subtest: quote fails closed on malformed totals, unsupported destination, cutoff, quantity, stale hardware
+ok 14 - quote fails closed on malformed totals, unsupported destination, cutoff, quantity, stale hardware
+  ---
+  duration_ms: 8.726042
+  type: 'test'
+  ...
+# Subtest: validator rejects duplicate product
+ok 15 - validator rejects duplicate product
+  ---
+  duration_ms: 8.238167
+  type: 'test'
+  ...
+# Subtest: validator rejects invalid offer product
+ok 16 - validator rejects invalid offer product
+  ---
+  duration_ms: 9.692333
+  type: 'test'
+  ...
+# Subtest: validator rejects variant mismatch
+ok 17 - validator rejects variant mismatch
+  ---
+  duration_ms: 8.899792
+  type: 'test'
+  ...
+# Subtest: validator rejects seller mismatch
+ok 18 - validator rejects seller mismatch
+  ---
+  duration_ms: 10.24525
+  type: 'test'
+  ...
+# Subtest: validator rejects unknown evidence
+ok 19 - validator rejects unknown evidence
+  ---
+  duration_ms: 8.654167
+  type: 'test'
+  ...
+# Subtest: validator rejects cross-product evidence
+ok 20 - validator rejects cross-product evidence
+  ---
+  duration_ms: 8.149375
+  type: 'test'
+  ...
+# Subtest: validator rejects orphan evidence
+ok 21 - validator rejects orphan evidence
+  ---
+  duration_ms: 7.959833
+  type: 'test'
+  ...
+# Subtest: validator rejects unassociated source
+ok 22 - validator rejects unassociated source
+  ---
+  duration_ms: 7.422792
+  type: 'test'
+  ...
+# Subtest: validator rejects null mandatory money
+ok 23 - validator rejects null mandatory money
+  ---
+  duration_ms: 8.926084
+  type: 'test'
+  ...
+# Subtest: validator rejects undefined mandatory money
+ok 24 - validator rejects undefined mandatory money
+  ---
+  duration_ms: 9.341166
+  type: 'test'
+  ...
+# Subtest: validator rejects fractional cents
+ok 25 - validator rejects fractional cents
+  ---
+  duration_ms: 8.52875
+  type: 'test'
+  ...
+# Subtest: validator rejects negative cents
+ok 26 - validator rejects negative cents
+  ---
+  duration_ms: 8.855333
+  type: 'test'
+  ...
+# Subtest: validator rejects wrong total
+ok 27 - validator rejects wrong total
+  ---
+  duration_ms: 9.140542
+  type: 'test'
+  ...
+# Subtest: validator rejects unsafe money
+ok 28 - validator rejects unsafe money
+  ---
+  duration_ms: 8.775667
+  type: 'test'
+  ...
+# Subtest: validator rejects hardware omitted
+ok 29 - validator rejects hardware omitted
+  ---
+  duration_ms: 8.437959
+  type: 'test'
+  ...
+# Subtest: validator rejects stock negative erased
+ok 30 - validator rejects stock negative erased
+  ---
+  duration_ms: 8.200208
+  type: 'test'
+  ...
+# Subtest: validator rejects reversed delivery
+ok 31 - validator rejects reversed delivery
+  ---
+  duration_ms: 8.52775
+  type: 'test'
+  ...
+# Subtest: validator rejects different destination
+ok 32 - validator rejects different destination
+  ---
+  duration_ms: 8.895
+  type: 'test'
+  ...
+# Subtest: validator rejects missing return policy
+ok 33 - validator rejects missing return policy
+  ---
+  duration_ms: 8.871167
+  type: 'test'
+  ...
+# Subtest: validator rejects invented purchase period
+ok 34 - validator rejects invented purchase period
+  ---
+  duration_ms: 7.50125
+  type: 'test'
+  ...
+# Subtest: validator rejects missing source date
+ok 35 - validator rejects missing source date
+  ---
+  duration_ms: 7.695625
+  type: 'test'
+  ...
+# Subtest: validator rejects missing image product
+ok 36 - validator rejects missing image product
+  ---
+  duration_ms: 8.807333
+  type: 'test'
+  ...
+# Subtest: fresh reset cannot inherit mutated fixture state
+ok 37 - fresh reset cannot inherit mutated fixture state
+  ---
+  duration_ms: 18.2945
+  type: 'test'
+  ...
+# Subtest: 100-index joins original 50 details by ID without silently refreshing their facts
+ok 38 - 100-index joins original 50 details by ID without silently refreshing their facts
+  ---
+  duration_ms: 2.783959
+  type: 'test'
+  ...
+# Subtest: index importer rejects omissions, duplicate IDs, changed old facts and malformed review ratings
+ok 39 - index importer rejects omissions, duplicate IDs, changed old facts and malformed review ratings
+  ---
+  duration_ms: 1.95725
+  type: 'test'
+  ...
+# Subtest: missing new source details and nuanced review counts remain explicit
+ok 40 - missing new source details and nuanced review counts remain explicit
+  ---
+  duration_ms: 16.851875
+  type: 'test'
+  ...
+# Subtest: every product has distinct disclosed demo reviews without contaminating source aggregates
+ok 41 - every product has distinct disclosed demo reviews without contaminating source aggregates
+  ---
+  duration_ms: 13.685
+  type: 'test'
+  ...
+# Subtest: new non-tech categories use real manufacturer products and usable sourced constraints
+ok 42 - new non-tech categories use real manufacturer products and usable sourced constraints
+  ---
+  duration_ms: 10.360083
+  type: 'test'
+  ...
+# Subtest: catalogue JSON preserves unknown source fields without dropping undefined values
+ok 43 - catalogue JSON preserves unknown source fields without dropping undefined values
+  ---
+  duration_ms: 17.869125
+  type: 'test'
+  ...
+# Subtest: expanded audio simulated bundles are quoteable, with all setup costs and negative stock preserved
+ok 44 - expanded audio simulated bundles are quoteable, with all setup costs and negative stock preserved
+  ---
+  duration_ms: 10.79375
+  type: 'test'
+  ...
+# Subtest: later recall notice preserves the source snapshot and withholds unverified offers
+ok 45 - later recall notice preserves the source snapshot and withholds unverified offers
+  ---
+  duration_ms: 8.237833
+  type: 'test'
+  ...
+# Subtest: shared family source links do not resolve to an arbitrary product variant
+ok 46 - shared family source links do not resolve to an arbitrary product variant
+  ---
+  duration_ms: 9.506333
+  type: 'test'
+  ...
+# Subtest: validator rejects mixed synthetic/source provenance, altered demo averages and loss of review disclosure
+ok 47 - validator rejects mixed synthetic/source provenance, altered demo averages and loss of review disclosure
+  ---
+  duration_ms: 38.958333
+  type: 'test'
+  ...
+# Subtest: known links match identity, ignore fragment/tracking, preserve variant
+ok 48 - known links match identity, ignore fragment/tracking, preserve variant
+  ---
+  duration_ms: 2.426708
+  type: 'test'
+  ...
+# Subtest: unknown and hostile references never resolve or execute
+ok 49 - unknown and hostile references never resolve or execute
+  ---
+  duration_ms: 0.282875
+  type: 'test'
+  ...
+# Subtest: first source only, no review URL admission, and no ambiguous product mappings
+ok 50 - first source only, no review URL admission, and no ambiguous product mappings
+  ---
+  duration_ms: 0.168667
+  type: 'test'
+  ...
+# Subtest: prepared images exist, disclose proxy origin, and contain no remote resources
+ok 51 - prepared images exist, disclose proxy origin, and contain no remote resources
+  ---
+  duration_ms: 1.162167
+  type: 'test'
+  ...
+1..51
+# tests 51
+# suites 0
+# pass 51
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 420.472667
+
+> @along/catalog@2.0.0 build
+> node --experimental-strip-types scripts/build.ts
+
+Validated 148 products, 296 proxy offers, 973 evidence records, 3 scenarios; archived 100 source rows.

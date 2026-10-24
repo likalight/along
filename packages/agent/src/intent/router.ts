@@ -1,4 +1,5 @@
 import type { InputEvent, SessionSnapshot } from "@coupang/contract";
+import { getProduct } from "../fixtures/catalog.js";
 
 export type Route =
   | "strong_intent"
@@ -25,7 +26,7 @@ const PRIORITY =
 const SOLUTION = /\b(headset|clip[- ]?on|desktop|directional|solution type)\b/i;
 const COMPARE = /\b(compare|versus|vs\.?)\b/i;
 const APPROVE = /\b(approve|confirm( the)? (purchase|order)|yes[,.]? (approve|confirm)|place (the )?order)\b/i;
-const ORDINAL = /\b(first|second|third|left|right|top|blue|navy|olive|the \d+(st|nd|rd|th))\b/i;
+const ORDINAL = /\b(first|second|third|left|right|middle|center|centre|top|blue|navy|olive|the \d+(st|nd|rd|th))\b/i;
 const CORRECT = /\b(actually|not the|wrong|i meant|correction|shape|colour|color)\b/i;
 const REVISE = /\b(budget|instead|change|prefer|tomorrow|delivery|need it by)\b/i;
 
@@ -94,7 +95,11 @@ export function resolveReference(
   if (!order.length) return { ambiguous: "Nothing is on screen to refer to yet." };
 
   const lower = text.toLowerCase();
-  if (/\b(first|1st|top)\b/.test(lower)) return { productId: order[0] };
+  // Product order identifies numbered choices, not spatial placement. Carousel
+  // focus, comparison mode and responsive layouts can all move cards on screen.
+  if (/\b(left|right|middle|center|centre|top)\b/.test(lower))
+    return { ambiguous: "Which product do you mean? Say its name or number so I choose the right one." };
+  if (/\b(first|1st)\b/.test(lower)) return { productId: order[0] };
   if (/\b(second|2nd)\b/.test(lower)) {
     return order[1]
       ? { productId: order[1] }
@@ -105,24 +110,25 @@ export function resolveReference(
       ? { productId: order[2] }
       : { ambiguous: "There isn't a third option visible." };
   }
-  if (/\bleft\b/.test(lower)) return { productId: order[0] };
-  if (/\bright\b/.test(lower)) return { productId: order[order.length - 1] };
 
-  const colorHit = order.find((id) => {
-    // color often encoded in variantId / title via store — soft match on id list position labels only
-    return lower.includes(id.toLowerCase());
+  const named = order.filter((id) => {
+    const product = getProduct(id);
+    return lower.includes(id.toLowerCase()) || (product && lower.includes(product.model.toLowerCase()));
   });
-  if (colorHit) return { productId: colorHit };
+  if (named.length === 1) return { productId: named[0] };
+  if (named.length > 1) return { ambiguous: "More than one named option is visible — which one?" };
 
-  const navy = order.filter((id) => /navy|blue/i.test(id) || lower.includes("navy"));
-  if (/\bnavy\b|\bblue\b/.test(lower)) {
-    const matches = order.filter((id) => id.startsWith("BAG") && (id === "BAG-001" || id === "BAG-006"));
+  const color = lower.match(/\b(navy|blue|olive|black|white|grey|gray|green|orange|red|sand|ivory|burgundy|terracotta)\b/)?.[1];
+  if (color) {
+    const matches = order.filter(id => {
+      const specs = getProduct(id)?.specs;
+      const variant = specs?.demoVariant as { color?: string } | undefined;
+      const actual = String(specs?.color ?? variant?.color ?? "").toLowerCase();
+      return actual.includes(color) || (color === "blue" && actual.includes("navy")) ||
+        (["grey", "gray"].includes(color) && /gr[ae]y/.test(actual));
+    });
     if (matches.length === 1) return { productId: matches[0] };
-    if (matches.length > 1) {
-      return { ambiguous: "More than one navy option is visible — which one?" };
-    }
+    if (matches.length > 1) return { ambiguous: `More than one ${color} option is visible — which one?` };
   }
-
-  void navy;
   return { ambiguous: "I'm not sure which item you mean — could you say the number or name?" };
 }

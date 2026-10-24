@@ -1,3 +1,4 @@
+import { productImage } from "./product-media";
 import type { CanvasData, Evidence, Offer, Product } from "./contracts";
 
 const image = (kind: string, label: string) => ({
@@ -434,4 +435,6 @@ for (const offer of offers)
     claim:
       "Seller history and verification are unavailable. Return conditions are demonstration data, separate from product reviews.",
   });
+for (const product of products)
+  product.image = productImage(product.id, product.model);
 export const fixtureData: CanvasData = { products, evidence, offers };

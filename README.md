@@ -26,7 +26,7 @@ Shopping rarely follows a straight line. A review changes your mind, your budget
 
 **Along keeps that conversation together.** Explore a curated catalog, compare complete seller offers, revise your requirements, and explicitly confirm a simulated purchase. You can also save an option or decide not to buy.
 
-Built for the Coupang challenge. The shopper interface, session backend, and text journey run today. Browser speech is available where supported; provider audio streaming remains unfinished. See [project status](#project-status) for the current boundaries.
+Built for the Coupang challenge. The shopper interface, authoritative session backend, open-ended text shopping and GPT-Live voice conversation run today. A server-side OpenAI API key is required for conversational shopping. See [project status](#project-status) for the current boundaries.
 
 ## Quickstart
 
@@ -45,13 +45,13 @@ Requires **Docker Engine and Docker Compose v2**. Node.js is not required on the
 docker compose up --build
 ```
 
-Open [localhost:3000](http://127.0.0.1:3000) and choose **I'd rather type**. No API key or database is required for the text demo.
+Open [localhost:3000](http://127.0.0.1:3000) and choose **Type instead** or **Start talking**. Configure `OPENAI_API_KEY` in the root `.env` before starting Compose to use conversational shopping and voice. No database is required; without a key, the interface loads but the live agent cannot answer shopping requests.
 
 Stop with Ctrl+C, then `docker compose down`. Compose publishes port 3000 on the host; the container listens on all interfaces. For port changes and another device on the same network, see the [Docker demo guide](./docs/docker-demo.md).
 
 ### Native Node.js
 
-Requires **Node.js 22.18+** and npm.
+Requires **Node.js 22.18+** and npm. Set `OPENAI_API_KEY` in the ignored `apps/shopper/.env.local` for conversational shopping and voice. See [local voice setup](./apps/shopper/docs/live-voice.md) and [the combined handoff](./INTEGRATION.md). A hosted demo remains pending.
 
 ```sh
 npm ci
@@ -71,9 +71,9 @@ Start in text mode and enter these messages in order:
 4. `show evidence`
 5. `show offers`
 6. `choose faster offer`
-7. Read the complete summary, then type `confirm simulated purchase`.
+7. Read the complete summary, then say or type `Yes, go ahead and place the order`, or answer the current order-approval question with `yes please`.
 
-Try `looks good` before the final confirmation: it must not create a receipt. Then enter `review summary`, reread the summary, and give fresh explicit confirmation. Changing the budget or delivery deadline also requires a new summary and fresh approval.
+No special confirmation word is required. A short assent only authorizes the current reviewed order when it answers the order-approval question; saying `looks good` while browsing products or answering an unrelated question must not create a receipt. Changing the budget or delivery deadline requires a new summary and fresh approval.
 
 | Scenario | Opening request | What matters |
 | --- | --- | --- |
@@ -81,15 +81,15 @@ Try `looks good` before the final confirmation: it must not create a receipt. Th
 | A bag for work and gym | “I like this shape. I need room for work and gym clothes.” | Laptop fit, capacity, shoe storage, total price, and delivery. |
 | Bedsheets for a warm room | “Help me choose sheets for my bed.” | Actual mattress width, length and depth, composition, care, and included pieces. |
 
-Conversation routing is bounded and deterministic. Prepared illustrations and supported product links provide context; arbitrary website crawling and general image recognition are not implemented.
+The open-ended agent chooses validated shopping tools within bounded execution limits. Simple UI commands and checkout approval retain direct server handlers. Prepared illustrations and supported product links provide context; arbitrary website crawling and general image recognition are not implemented. See the [shopping harness](./apps/shopper/docs/open-ended-harness.md) for routing and guardrails.
 
 ## What Along does
 
 - **Preserves context.** Budget, delivery and compatibility requirements survive follow-up questions and changes of direction.
-- **Keeps comparisons stable.** Numbered product cards, focus, saved items and comparisons use accepted product IDs.
+- **Keeps comparisons stable.** The React Bits circular carousel, focus, saved items and comparisons use accepted product IDs; live speech can focus the product being discussed.
 - **Shows the complete offer.** Item cost, shipping, required setup hardware, tax, delivery and returns appear before approval.
 - **Makes evidence inspectable.** Source facts, customer metrics, synthetic seller terms and unknown fields remain distinguishable.
-- **Supports different inputs.** Text, browser speech, validated image uploads, prepared illustrations and allowlisted links feed the same session.
+- **Supports different inputs.** Text, GPT-Live speech, validated image uploads, prepared illustrations and allowlisted links feed the same session.
 - **Provides accessible fallbacks.** Keyboard controls, transcripts, reduced motion and a CSS orb keep the interface usable without WebGL.
 
 ## How it works
@@ -114,20 +114,21 @@ The Next.js shopper renders accepted session snapshots. The agent adapter propos
 A purchase summary identifies the product, variant, seller, quantity, destination, complete total, delivery, conditions and uncertainties.
 
 - Material changes invalidate the previous summary and approval.
-- Saving, selecting, “looks good,” attachments and assistant audio are not authorization.
-- Text confirmation must be a fresh, deliberate instruction after the current summary is displayed.
-- The backend voice contract additionally requires completed, uninterrupted playback and trusted shopper speech evidence. Provider voice approval is not yet an integrated, verified path; use explicit text confirmation for the demo.
+- Saving, product selection, attachments and assistant audio are not authorization.
+- Natural purchase requests require the current displayed summary. Short assent such as “yes please” additionally requires a pending order-approval question bound to that summary.
+- The strict voice contract still requires completed, uninterrupted playback and trusted shopper speech evidence. GPT-Live transcript fragments do not satisfy those requirements: this no-payment prototype uses a separate server-only completion path bound to the displayed summary, revision, response turn and eligible proxy offer. It cannot authorize payment or a real merchant order. See [purchase boundaries](./apps/shopper/docs/live-voice.md#purchase-boundary).
 - Retried approvals return the same simulated receipt.
 
 **No payment is taken and no real merchant order is placed.**
 
 ## Configuration
 
-Defaults are sufficient for the text demo.
+An OpenAI API key with access to the configured models is required for live text and voice shopping. Scripted routing remains available to automated offline tests; provider failures do not silently fall back to it.
 
 | Variable | Used by | Purpose |
 | --- | --- | --- |
-| `OPENAI_API_KEY` | Next.js server / Compose | Optional: enables an attempt to mint an ephemeral Realtime client secret. It does not complete the provider audio transport. |
+| `OPENAI_API_KEY` | Next.js server / Compose | Enables the Responses API shopping harness and GPT-Live voice connection. Keep it server-side. |
+| `ALONG_AGENT_MODEL`, `ALONG_AGENT_REASONING_EFFORT`, `ALONG_AGENT_SERVICE_TIER` | Next.js server | Optional model-routing overrides for operator testing; see [model routing](./apps/shopper/docs/live-voice.md#model-routing). |
 | `ALONG_PORT` | Docker Compose | Published host port; defaults to `3000`. The container still listens on port 3000. |
 | `PLAYWRIGHT_PORT` | Browser tests | Isolated test-server port; defaults to `3000`. |
 | `CHROME_PATH` | Browser tests | Optional Chrome executable path instead of Playwright's installed Chromium. |
@@ -136,9 +137,9 @@ For Compose, copy [`.env.example`](./.env.example) to `.env` to override default
 
 ### Voice status
 
-The app can mint a real provider client secret when configured. However, `LiveSpeechAdapter` currently uses browser recognition and speech synthesis; WebRTC audio negotiation is still pending. A successful mint or a “live” UI label does not establish a working provider audio stream.
+The shopper uses `gpt-live-1` over WebRTC with microphone input, provider audio playback and an authenticated server sideband that delegates shopping work to the same harness as text mode. The microphone stays active during replies; local playback yields to interruptions while new constraints supersede obsolete work. The carousel follows recognized product names in live assistant captions.
 
-Without a key, the mint endpoint returns `not_connected` and browser speech/text fallback remains available. Browser speech is half duplex: recognition pauses during narration. Support and microphone permissions depend on the browser. For a reproducible purchase rehearsal, use text mode.
+Research and recommendations involving several criteria request GPT-6.1 Sol with low reasoning and Fast processing; routine work uses GPT-6 Luna. Fast mode is a requested provider tier, not a latency guarantee. Connection failures and recoverable shopping limits are surfaced. Human microphone tests are still needed to assess interruption timing, acoustic false triggers and conversational smoothness; automated tests do not establish those qualities. See [voice setup, rehearsal and limits](./apps/shopper/docs/live-voice.md).
 
 ## Development and checks
 
@@ -180,24 +181,24 @@ When catalog source data changes, regenerate it with the catalog verification co
 
 ## Catalog and provenance
 
-The catalog on main contains **24 active products and 48 synthetic seller offers**:
+The catalog contains **148 active products and 296 synthetic seller offers**:
 
 | Category | Active products |
 | --- | ---: |
-| Audio configurations | 12 |
-| Everyday bags | 6 |
-| Bedsheet sets | 6 |
-| **Total** | **24** |
+| Audio configurations | 100 |
+| Everyday bags | 24 |
+| Bedsheet sets | 24 |
+| **Total** | **148** |
 
-The full 50-record microphone research remains a separate archive. The active catalog includes 121 evidence records, three scenario sequences, supported source links and labelled illustrations.
+The full 100-record microphone research is also retained as an archive. The active catalog includes 973 evidence records, three scenario sequences, supported source links, product photographs and labelled illustration fallbacks.
 
 | Data | Treatment |
 | --- | --- |
 | Product specifications and reference prices | Attributed snapshots or explicitly labelled estimates; source and price kind travel with the value. |
 | Seller prices, stock, delivery and returns | Complete, explicitly synthetic offers for the fictional demo destination. |
-| Customer ratings and review counts | Separate nullable fields; missing information stays unknown. |
+| Customer ratings and review counts | Source metrics remain separate nullable fields; missing information stays unknown. Authored demo review entries are separate synthetic data. |
 | Café/office fit scores | Authored hypotheses, separate from customer ratings and measured performance. |
-| Images and video | Illustrations are labelled proxy media; uncurated product videos remain missing. |
+| Images and video | Product photographs retain manufacturer or retailer source metadata; illustration fallbacks remain proxy media. Uncurated product videos remain missing. |
 
 All money is **USD in integer cents**. Reference item prices are separate from payable totals. Unknown laptop fit cannot satisfy a fit requirement, and unknown essential bedding details block checkout eligibility.
 
@@ -215,7 +216,7 @@ The scenario clock is frozen at **24 October 2026, 10:00, Asia/Singapore**. Deli
 | [`catalog/`](./catalog/) | Catalog source, research attribution, validators and scenario fixtures. |
 | [`catalog/data/catalog.json`](./catalog/data/catalog.json) | Canonical active catalog consumed by the app. |
 | [`catalog/data/microphones-archive.json`](./catalog/data/microphones-archive.json) | Full archived microphone research. |
-| [`scripts/sync-catalog.mjs`](./scripts/sync-catalog.mjs) | Regenerates runtime adapters and copies illustration assets. |
+| [`scripts/sync-catalog.mjs`](./scripts/sync-catalog.mjs) | Regenerates runtime adapters and copies catalog media assets. |
 | [`docs/docker-demo.md`](./docs/docker-demo.md) | Container setup and device-access instructions. |
 
 ## Project status
@@ -224,14 +225,15 @@ Along is a hackathon prototype. This README describes the code on main; historic
 
 | Implemented | Boundary |
 | --- | --- |
-| Shopper shell and adaptive product canvas | Integrated text journey, stable comparisons and simulated receipts. |
+| Shopper shell and circular product carousel | Integrated text and voice journeys, stable comparisons and simulated receipts. |
 | Authoritative session backend | In-memory, session-scoped access with a two-hour TTL; restarting the process loses sessions. |
 | Catalog and provenance checks | Curated fixture data; no live retailer ingestion or inventory guarantees. |
 | Image and link references | Validated uploads, prepared illustrations and supported source URLs; no general vision or unrestricted fetching. |
-| Browser speech and provider-secret minting | Browser-dependent speech; provider audio transport and trusted voice approval remain unfinished. |
+| GPT-Live conversation and delegated shopping | WebRTC audio and server sideband are integrated; interruption quality needs human acoustic testing. Live demo completion remains separate from strict verified voice approval. |
+| Natural checkout approval | Clear purchase requests and context-bound assent complete the current reviewed order; rejection preserves the review. |
 | Docker Compose demo | One application process; no database or shared multi-instance session storage. |
 
-Upcoming work includes the provider audio bridge and its live rehearsal, image understanding, durable sessions, and broader catalog ingestion. Real checkout, payment processing and mailbox integrations are outside this demo. Track work in [GitHub Issues](https://github.com/likalight/along/issues).
+Upcoming work includes further live voice rehearsal and latency tuning, image understanding, durable sessions, and broader catalog ingestion. Real checkout, payment processing and mailbox integrations are outside this demo. Track work in [GitHub Issues](https://github.com/likalight/along/issues).
 
 ## Contributing
 

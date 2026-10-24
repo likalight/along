@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 import { createApp } from "../src/server.ts";
 import { teamProfile } from "../src/team-catalog.ts";
 import { destination } from "../../catalog/src/offers.ts";
+import { getCatalog } from "../../catalog/src/index.ts";
 import { quoteOffer } from "../src/catalog.ts";
 async function harness(t: any) {
   const agentToken = randomUUID(),
@@ -182,7 +183,7 @@ test("contract #2: typed display + fresh exact confirmation creates one receipt;
   if (first.value?.type === "session.updated")
     assert.equal(first.value.snapshot.sessionId, h.id);
   await stream.return(undefined);
-  assert.equal((await publicClient.catalog()).products.length, 24);
+  assert.equal((await publicClient.catalog()).products.length, getCatalog().products.length);
   const i = input(s, "Show bags");
   const a = await h.post("inputs", i),
     b = await h.post("inputs", i);

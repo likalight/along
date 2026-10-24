@@ -223,6 +223,8 @@ export type Receipt = {
   summaryRevision: number;
   createdAt: string;
   quote: Quote;
+  /** Separate no-payment Live rehearsal, never verified financial authorization. */
+  completionSource?: "live_demo";
 };
 export type Session = {
   displayOrder: string[];

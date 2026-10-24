@@ -4,27 +4,44 @@ import type {
   SessionTransport,
   VoiceStatus,
   Attachment,
+  VoiceEvidence,
+  TurnActivity,
 } from "./contract";
 import type { SpeechAdapter, Playback } from "@/lib/voice/adapter";
 import { TransportError } from "./http-transport";
+import { LiveProductFocus } from "./live-product-focus";
 export type ClientState = {
   snapshot: Session | null;
+  narrationProductId: string | null;
   status: VoiceStatus;
   capturing: boolean;
   mode: "text" | "voice" | null;
   error: string | null;
   partial: string;
   connected: boolean;
+  activity: TurnActivity | null;
+  requestText: string;
+  waitingSince: number | null;
+  delayed: boolean;
+  liveCaption: string;
+  livePending: boolean;
 };
 export class SessionController {
   private state: ClientState = {
     snapshot: null,
+    narrationProductId: null,
     status: "ready",
     capturing: false,
     mode: null,
     error: null,
     partial: "",
     connected: false,
+    activity: null,
+    requestText: "",
+    waitingSince: null,
+    delayed: false,
+    liveCaption: "",
+    livePending: false,
   };
   private listeners = new Set<() => void>();
   private generation = 0;
@@ -34,16 +51,69 @@ export class SessionController {
   private cancellation: Promise<unknown> = Promise.resolve();
   private mediaEvents: Promise<unknown> = Promise.resolve();
   private playback: Playback | null = null;
+  private liveFocus = new LiveProductFocus();
+  private activityTimer: ReturnType<typeof setTimeout> | null = null;
+  private delayTimer: ReturnType<typeof setTimeout> | null = null;
+  private activityAbort: AbortController | null = null;
+  private voice: "marin" | "cedar" | "coral" = "marin";
   speechKind: "live" | "browser" = "browser";
   constructor(
     private transport: SessionTransport,
     private speech: SpeechAdapter,
   ) {}
-  /** Swap speech implementation after mint (live vs labeled browser fallback). */
-  setSpeechAdapter(adapter: SpeechAdapter, kind: "live" | "browser" = "browser") {
+  /** Select configured OpenAI voice or the labeled browser fallback. */
+  setSpeechAdapter(
+    adapter: SpeechAdapter,
+    kind: "live" | "browser" = "browser",
+  ) {
     this.speech.dispose();
     this.speech = adapter;
+    this.speech.setVoice?.(this.voice);
     this.speechKind = kind;
+  }
+  setVoice(voice: "marin" | "cedar" | "coral") {
+    this.voice = voice;
+    this.speech.setVoice?.(voice);
+  }
+  private stopActivity() {
+    if (this.activityTimer) clearTimeout(this.activityTimer);
+    if (this.delayTimer) clearTimeout(this.delayTimer);
+    this.activityTimer = null;
+    this.delayTimer = null;
+    this.activityAbort?.abort();
+    this.activityAbort = null;
+  }
+  private pollActivity(identity: Identity, generation: number) {
+    if (!this.transport.activity) return;
+    const active = () =>
+      !this.disposed &&
+      generation === this.generation &&
+      this.pending !== null &&
+      this.identity?.turnId === identity.turnId;
+    const poll = async () => {
+      if (!active()) return;
+      const abort = new AbortController();
+      this.activityAbort = abort;
+      try {
+        const { activity } = await this.transport.activity!(
+          identity,
+          abort.signal,
+        );
+        if (
+          active() &&
+          !abort.signal.aborted &&
+          activity?.turnId === identity.turnId
+        )
+          this.update({ activity });
+      } catch {
+        // Progress is optional: a failed poll must not cancel the actual request.
+      } finally {
+        if (this.activityAbort === abort) this.activityAbort = null;
+        if (active() && !abort.signal.aborted)
+          this.activityTimer = setTimeout(poll, 1000);
+      }
+    };
+    this.activityTimer = setTimeout(poll, 500);
   }
   getSnapshot = () => this.state;
   subscribe = (listener: () => void) => {
@@ -54,7 +124,15 @@ export class SessionController {
   };
   private update(patch: Partial<ClientState>) {
     if (this.disposed) return;
-    this.state = { ...this.state, ...patch };
+    this.state = {
+      ...this.state,
+      ...patch,
+      ...(patch.status &&
+      patch.status !== "speaking" &&
+      !(this.speech.fullDuplex && patch.status === "listening")
+        ? { narrationProductId: null }
+        : {}),
+    };
     this.listeners.forEach((l) => l());
   }
   private acceptSnapshot(snapshot: Session) {
@@ -67,7 +145,17 @@ export class SessionController {
           snapshot.revision < current.revision))
     )
       return false;
-    this.update({ snapshot });
+    const changed =
+      !current ||
+      snapshot.epoch !== current.epoch ||
+      snapshot.revision !== current.revision;
+    if (changed && this.speech.fullDuplex) this.liveFocus.clear();
+    this.update({
+      snapshot,
+      ...(changed && this.speech.fullDuplex
+        ? { narrationProductId: null }
+        : {}),
+    });
     return true;
   }
   async connect() {
@@ -108,6 +196,8 @@ export class SessionController {
   }
   private fail(e: unknown) {
     this.generation++;
+    this.liveFocus.clear(true);
+    this.stopActivity();
     this.pending?.abort();
     this.pending = null;
     this.playback = null;
@@ -115,6 +205,9 @@ export class SessionController {
     this.speech.stop();
     this.update({
       status: "error",
+      activity: null,
+      waitingSince: null,
+      delayed: false,
       capturing: false,
       error:
         e instanceof Error
@@ -122,10 +215,38 @@ export class SessionController {
           : "Connection unavailable. Retry to get the latest session.",
     });
   }
+  /** Esc yields the spoken floor without cancelling delegated shopping work. */
   interrupt = () => {
+    if (this.speech.fullDuplex && this.state.mode === "voice") {
+      this.liveFocus.clear(true);
+      this.speech.cancel();
+      this.update({
+        status: this.state.capturing ? "listening" : "paused",
+        narrationProductId: null,
+      });
+      return;
+    }
+    this.cancelTurn();
+  };
+  pauseListening = () => {
+    this.liveFocus.clear(true);
+    this.speech.stop();
+    this.update({ capturing: false, status: "paused" });
+  };
+  /** Release microphone and provider resources when the mounted UI goes away. */
+  closeVoice = () => {
+    this.liveFocus.clear(true);
+    this.speech.dispose();
+    this.update({ capturing: false, status: "paused" });
+  };
+  private cancelTurn = () => {
+    this.liveFocus.clear(true);
     const wasInFlight =
-      this.state.status === "thinking" || this.state.status === "speaking";
+      this.state.status === "thinking" ||
+      this.state.status === "speaking" ||
+      !!this.playback;
     this.generation++;
+    this.stopActivity();
     const generation = this.generation;
     this.pending?.abort();
     this.pending = null;
@@ -157,11 +278,19 @@ export class SessionController {
     void this.cancellation.catch((e) => {
       if (generation === this.generation) this.fail(e);
     });
-    this.update({ capturing: false, status: "paused", partial: "" });
+    this.update({
+      capturing: false,
+      status: "paused",
+      partial: "",
+      activity: null,
+      waitingSince: null,
+      delayed: false,
+    });
   };
   draftChanged = () => {
     // Ordinary draft edits must not cancel an already presented summary.
     // Only interrupt in-flight thinking/speaking — never a quiescent presented summary.
+    if (this.speech.fullDuplex && this.state.mode === "voice") return;
     const view = this.state.snapshot?.view;
     if (view === "summary" || view === "receipt" || view === "recovery") return;
     if (
@@ -174,9 +303,18 @@ export class SessionController {
   };
   async chooseMode(mode: "text" | "voice") {
     if (!this.state.snapshot) return;
-    this.interrupt();
+    if (
+      mode === "voice" &&
+      this.speech.fullDuplex &&
+      this.state.mode === "voice"
+    ) {
+      await this.listen();
+      return;
+    }
+    this.cancelTurn();
     const generation = this.generation;
     try {
+      await this.speech.prepareTurn?.();
       await this.cancellation;
       await this.mediaEvents;
       const latest = await this.transport.connect(
@@ -201,6 +339,10 @@ export class SessionController {
     if (!this.state.snapshot) return;
     if (this.state.mode !== "voice") {
       await this.chooseMode("voice");
+      return;
+    }
+    if (this.speech.fullDuplex) {
+      await this.listenLive();
       return;
     }
     if (
@@ -238,8 +380,9 @@ export class SessionController {
           )
             this.interrupt();
         },
-        transcript: (text) => {
-          if (generation === this.generation) void this.send(text, "voice");
+        transcript: (text, evidence) => {
+          if (generation === this.generation)
+            void this.send(text, "voice", undefined, evidence);
         },
         error: (message) => {
           if (generation === this.generation) this.fail(new Error(message));
@@ -253,16 +396,126 @@ export class SessionController {
       if (generation === this.generation) this.fail(e);
     }
   }
+  private async listenLive() {
+    if (this.state.status === "reconnecting") return;
+    this.liveFocus.clear();
+    let starting = true;
+    const generation = this.generation;
+    const current = () =>
+      !this.disposed &&
+      generation === this.generation &&
+      this.state.mode === "voice";
+    this.update({ status: "reconnecting", error: null });
+    try {
+      await this.speech.start({
+        capture: (capturing) => {
+          if (current())
+            this.update({
+              capturing,
+              status: capturing
+                ? "listening"
+                : starting
+                  ? "reconnecting"
+                  : "paused",
+            });
+        },
+        transcript: () => {}, // Live transcripts are not authorized shopping input.
+        bargeIn: () => {
+          if (current()) this.interrupt();
+        },
+        error: (message) => {
+          if (current()) this.fail(new Error(message));
+        },
+        ended: () => {
+          if (current()) this.update({ capturing: false, status: "paused" });
+        },
+        playbackResumed: () => {
+          if (!current()) return;
+          this.liveFocus.beginOutput();
+          this.update({ narrationProductId: null });
+        },
+        caption: (speaker, text) => {
+          if (!current()) return;
+          if (speaker === "user") {
+            this.liveFocus.clear();
+            this.update({ requestText: text, narrationProductId: null });
+          } else {
+            const productId = this.liveFocus.accept(text, this.state.snapshot);
+            this.update({
+              liveCaption: text,
+              narrationProductId:
+                this.state.status === "speaking"
+                  ? productId
+                  : this.state.narrationProductId,
+            });
+          }
+        },
+        speaking: (active) => {
+          if (current())
+            this.update({
+              narrationProductId: active
+                ? this.liveFocus.productId
+                : this.state.narrationProductId,
+              status: active
+                ? "speaking"
+                : starting
+                  ? "reconnecting"
+                  : this.state.capturing
+                    ? "listening"
+                    : "paused",
+            });
+        },
+        backend: (result) => {
+          if (!current()) return;
+          if (result.snapshot && !this.acceptSnapshot(result.snapshot)) return;
+          this.update({
+            livePending: result.pending,
+            activity: result.activity ?? null,
+            waitingSince: result.pending
+              ? (this.state.waitingSince ?? Date.now())
+              : null,
+            error: result.error ?? null,
+          });
+        },
+      });
+      starting = false;
+      if (current() && this.getSnapshot().status === "reconnecting")
+        this.update({ status: this.state.capturing ? "listening" : "paused" });
+    } catch (error) {
+      starting = false;
+      if (current()) this.fail(error);
+    }
+  }
   async send(
     text: string,
     modality: "text" | "voice" = "text",
     attachment?: Attachment,
+    voiceEvidence?: VoiceEvidence,
   ) {
     if (!this.state.snapshot || (!text.trim() && !attachment)) return;
-    this.interrupt();
+    this.cancelTurn();
     const generation = this.generation;
-    this.update({ status: "thinking", error: null });
+    this.update({
+      liveCaption: "",
+      livePending: false,
+      status: "thinking",
+      error: null,
+      requestText: text.trim() || attachment?.name || "Your request",
+      waitingSince: Date.now(),
+      delayed: false,
+      activity: {
+        turnId: "",
+        phase: "working",
+        label: "I’m on it.",
+        heading: "Working on your request",
+      },
+    });
+    this.delayTimer = setTimeout(() => {
+      if (generation === this.generation && this.state.status === "thinking")
+        this.update({ delayed: true });
+    }, 10000);
     try {
+      await this.speech.prepareTurn?.();
       await this.cancellation;
       await this.mediaEvents;
       if (generation !== this.generation) return;
@@ -281,7 +534,11 @@ export class SessionController {
         if (!this.acceptSnapshot(snapshot)) return;
         this.update({ mode: modality });
         if (snapshot.summary) {
+          this.stopActivity();
           this.update({
+            activity: null,
+            waitingSince: null,
+            delayed: false,
             status: "ready",
             error:
               "The full summary is now displayed for text confirmation. Review it and enter a fresh confirmation.",
@@ -322,7 +579,12 @@ export class SessionController {
       const trimmed = text.trim();
       if (trimmed) input.text = trimmed;
       if (attachment?.id) input.attachmentId = attachment.id;
-      const accepted = await this.transport.send(input, abort.signal);
+      this.pollActivity(this.identity, generation);
+      const accepted = await this.transport.send(
+        input,
+        abort.signal,
+        input.modality === "voice" ? voiceEvidence : undefined,
+      );
       if (generation !== this.generation) return;
       if (
         accepted.turnId !== this.identity?.turnId ||
@@ -338,6 +600,7 @@ export class SessionController {
           "The response did not match the current accepted turn. Reconnect to refresh the session.",
         );
       this.pending = null;
+      this.stopActivity();
       this.identity = { ...this.identity!, revision: accepted.revision };
       // Apply snapshot + ready in one update so ProductCanvas mounts with
       // discovery entrance (not under a lingering "thinking"/busy frame).
@@ -350,8 +613,19 @@ export class SessionController {
             accepted.snapshot.revision < current.revision))
       )
         return;
-      this.update({ snapshot: accepted.snapshot, status: "ready", error: null });
-      if (modality === "voice") this.narrate(accepted.snapshot);
+      this.update({
+        snapshot: accepted.snapshot,
+        activity: null,
+        waitingSince: null,
+        delayed: false,
+        status: "ready",
+        error: null,
+      });
+      if (this.speech.fullDuplex) {
+        await this.speech.sync?.();
+        if (generation === this.generation && modality === "voice")
+          await this.listenLive();
+      } else if (modality === "voice") this.narrate(accepted.snapshot);
       // Text turns that land on a summary must finish presentation ack before
       // the next confirm — otherwise interrupt→text→confirm races APPROVAL_NOT_READY.
       if (
@@ -371,61 +645,119 @@ export class SessionController {
   }
   private narrate(s: Session) {
     const generation = this.generation;
+    const currentIdentity = this.currentIdentity();
+    const isSummary =
+      s.summary?.responseTurnId === currentIdentity.turnId &&
+      s.message === s.summary?.spokenText;
     const identity: Playback = {
-      ...this.currentIdentity(),
+      ...currentIdentity,
       playbackId: crypto.randomUUID(),
-      summaryId: s.summaryId ?? undefined,
-      summaryRevision: s.summary?.revision,
+      summaryId: isSummary ? (s.summaryId ?? undefined) : undefined,
+      summaryRevision: isSummary ? s.summary?.revision : undefined,
     };
     this.playback = identity;
+    // Loading generated speech is still in-flight work and must be cancellable.
+    this.update({
+      status: "thinking",
+      capturing: false,
+      delayed: false,
+      activity: {
+        turnId: currentIdentity.turnId,
+        phase: "speaking",
+        label: "Getting your voice reply ready…",
+        heading: s.heading,
+      },
+    });
+    let terminalEvent = false;
     try {
-      this.speech.speak(s.message, identity, (type, i) => {
-        if (generation !== this.generation || !this.matches(i)) return;
-        if (type === "input.barge_in") {
-          this.interrupt();
-          return;
-        }
-        if (type === "audio.started")
-          this.update({ status: "speaking", capturing: false });
-        this.mediaEvents = this.mediaEvents
-          .catch(() => {})
-          .then(() => {
-            if (generation !== this.generation || !this.matches(i)) return null;
-            return this.transport.lifecycle({
-              ...i,
-              revision: this.state.snapshot!.revision,
-              type,
+      this.speech.speak(
+        s.message,
+        identity,
+        (type, i) => {
+          if (
+            terminalEvent ||
+            generation !== this.generation ||
+            !this.matches(i)
+          )
+            return;
+          if (type === "input.barge_in") {
+            this.interrupt();
+            return;
+          }
+          if (type === "audio.completed" || type === "audio.interrupted")
+            terminalEvent = true;
+          if (type === "audio.started")
+            this.update({
+              status: "speaking",
+              capturing: false,
+              activity: null,
             });
-          })
-          .then((snapshot) => {
-            if (snapshot && generation === this.generation && this.matches(i))
-              this.acceptSnapshot(snapshot);
-          });
-        void this.mediaEvents.catch((e) => {
-          if (generation === this.generation) this.fail(e);
-        });
-        if (type === "audio.completed") {
-          void this.mediaEvents
+          this.mediaEvents = this.mediaEvents
+            .catch(() => {})
             .then(() => {
-              if (generation === this.generation && this.matches(i)) {
-                this.playback = null;
-                this.update({ status: "ready" });
-                void this.listen();
-              }
+              if (generation !== this.generation || !this.matches(i))
+                return null;
+              return this.transport.lifecycle({
+                ...i,
+                revision: this.state.snapshot!.revision,
+                type,
+              });
             })
-            .catch(() => {});
-        }
-        if (type === "audio.interrupted") {
-          this.playback = null;
-          this.update({
-            status: "paused",
-            error:
-              "Narration was interrupted. Your selection is preserved — review the summary again or explicitly choose text mode.",
-            capturing: false,
-            mode: this.state.mode,
+            .then((snapshot) => {
+              if (snapshot && generation === this.generation && this.matches(i))
+                this.acceptSnapshot(snapshot);
+            });
+          void this.mediaEvents.catch((e) => {
+            if (generation === this.generation) this.fail(e);
           });
-        }
-      });
+          if (type === "audio.completed") {
+            void this.mediaEvents
+              .then(() => {
+                if (generation === this.generation && this.matches(i)) {
+                  this.playback = null;
+                  this.update({ status: "ready" });
+                  void this.listen();
+                }
+              })
+              .catch(() => {});
+          }
+          if (type === "audio.interrupted") {
+            // Keep the identity until the serialized interruption reaches the
+            // server; clearing it here makes the queued matches() check fail.
+            this.update({
+              status: "paused",
+              error:
+                "Narration was interrupted. Your selection is preserved — review the summary again or explicitly choose text mode.",
+              capturing: false,
+              mode: this.state.mode,
+            });
+            void this.mediaEvents
+              .then(() => {
+                if (generation === this.generation && this.matches(i))
+                  this.playback = null;
+              })
+              .catch(() => {});
+          }
+        },
+        (message) => {
+          if (generation === this.generation && this.matches(identity))
+            this.fail(new Error(message));
+        },
+        !isSummary && s.narrationSegments
+          ? {
+              segments: s.narrationSegments,
+              onProduct: (productId) => {
+                if (generation === this.generation && this.matches(identity))
+                  this.update({
+                    narrationProductId:
+                      productId && s.displayOrder.includes(productId)
+                        ? productId
+                        : null,
+                  });
+              },
+            }
+          : undefined,
+      );
     } catch (e) {
       this.fail(e);
     }
@@ -494,7 +826,7 @@ export class SessionController {
     await this.mediaEvents;
   }
   async reconnect() {
-    this.interrupt();
+    this.cancelTurn();
     const generation = this.generation;
     this.update({ status: "reconnecting", error: null, connected: false });
     try {
@@ -514,6 +846,7 @@ export class SessionController {
   dispose() {
     this.disposed = true;
     this.generation++;
+    this.stopActivity();
     this.pending?.abort();
     this.speech.dispose();
     this.listeners.clear();

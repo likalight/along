@@ -1,34 +1,24 @@
 import type { SpeechAdapter } from "./adapter";
 import { BrowserSpeechAdapter } from "./browser-adapter";
-import { LiveSpeechAdapter } from "./live-adapter";
+import { GptLiveAdapter } from "./gpt-live-adapter";
 
 export type SpeechAdapterKind = "live" | "browser";
 
-/**
- * Prefer GPT-Live when mint returns a real client secret; otherwise the labeled
- * browser Speech fallback. Never claims duplex without a successful mint.
- */
+/** Check server configuration only. Microphone/provider sessions start on a user action. */
 export async function createSpeechAdapter(
   sessionId?: string,
 ): Promise<{ adapter: SpeechAdapter; kind: SpeechAdapterKind; note?: string }> {
-  if (!sessionId) {
+  if (!sessionId)
     return { adapter: new BrowserSpeechAdapter(), kind: "browser" };
-  }
   try {
-    const res = await fetch("/api/voice/mint", {
+    const response = await fetch("/api/voice/mint", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sessionId }),
     });
-    const data = await res.json();
-    if (res.ok && data.mode === "live" && data.clientSecret) {
-      return {
-        adapter: new LiveSpeechAdapter({
-          clientSecret: data.clientSecret,
-          model: data.model,
-        }),
-        kind: "live",
-      };
+    const data = await response.json();
+    if (response.ok && data.mode === "available") {
+      return { adapter: new GptLiveAdapter({ sessionId }), kind: "live" };
     }
     return {
       adapter: new BrowserSpeechAdapter(),
@@ -36,13 +26,13 @@ export async function createSpeechAdapter(
       note:
         typeof data.note === "string"
           ? data.note
-          : "Live voice is not connected; using browser speech fallback.",
+          : "OpenAI voice is not configured; browser speech remains available.",
     };
   } catch {
     return {
       adapter: new BrowserSpeechAdapter(),
       kind: "browser",
-      note: "Live voice mint unreachable; using browser speech fallback.",
+      note: "Could not check OpenAI voice configuration. Browser speech and text remain available.",
     };
   }
 }
