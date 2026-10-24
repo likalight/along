@@ -23,7 +23,38 @@ export async function POST(request: Request) {
       );
     if (Number(request.headers.get("content-length") ?? 0) > 32_768)
       return NextResponse.json({ error: "Turn too large." }, { status: 413 });
-    const body = await request.json();
+    if (
+      request.headers.get("content-type")?.split(";")[0] !== "application/json"
+    )
+      return NextResponse.json(
+        { error: "Use application/json." },
+        { status: 415 },
+      );
+    const reader = request.body?.getReader();
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    if (reader) {
+      try {
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          total += value.byteLength;
+          if (total > 32_768) {
+            await reader.cancel();
+            return NextResponse.json(
+              { error: "Turn too large." },
+              { status: 413 },
+            );
+          }
+          chunks.push(value);
+        }
+      } finally {
+        reader.releaseLock();
+      }
+    }
+    const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    if (!body || typeof body !== "object" || Array.isArray(body))
+      throw new Error("Expected a session request object.");
     if (body.action === "connect")
       return NextResponse.json(connect(body.sessionId));
     const i = body.input as Identity;
@@ -47,6 +78,7 @@ export async function POST(request: Request) {
           "audio.completed",
           "audio.interrupted",
           "turn.cancelled",
+          "summary.displayed",
         ].includes(body.input.type) ||
         typeof body.input.playbackId !== "string" ||
         !Number.isInteger(i.revision)

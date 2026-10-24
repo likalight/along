@@ -24,7 +24,7 @@ The bundled browser adapter intentionally stops recognition and releases tracks 
 
 ## Confirmation
 
-The server fixture creates and owns summaries and receipts. Voice summaries start in `presenting`; matching full playback completion makes the same summary eligible. Cancellation while presenting invalidates it. The adapter cannot promote an interrupted summary by firing a stale completion. New non-approval inputs invalidate old summaries.
+The server fixture creates and owns summaries and receipts. Every summary starts in `presenting`. The mounted summary view sends an identity-bound `summary.displayed` acknowledgment; text eligibility requires this acknowledgment, while voice eligibility additionally requires matching, full, uninterrupted playback completion. Cancellation while presenting invalidates it. The adapter cannot promote an interrupted summary by firing a stale completion. New non-approval inputs invalidate old summaries.
 
 An explicit mode switch invalidates pending voice presentation, clears active playback, increments revision and returns the complete current summary again in the new mode. The UI displays every required summary field. If a direct text send unexpectedly changes mode while a summary exists, the controller displays the new summary and requires another fresh submission rather than using that same message as approval.
 

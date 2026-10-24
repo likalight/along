@@ -17,13 +17,15 @@ class Conflict extends Error {
     message = "Session changed. Please review the current state and try again.",
   ) {
     super(message);
+    this.snapshot = structuredClone(snapshot);
   }
 }
 export { Conflict };
 type RecordState = {
   snapshot: Session;
   cancelled: Set<string>;
-  events: Map<string, Accepted>;
+  events: Map<string, { fingerprint: string; event: Accepted }>;
+  usedTurns: Set<string>;
   playback: Lifecycle | null;
   activeTurn: string | null;
   mode: "text" | "voice";
@@ -52,6 +54,7 @@ export function connect(id?: string): Session {
     snapshot,
     cancelled: new Set(),
     events: new Map(),
+    usedTurns: new Set(),
     playback: null,
     activeTurn: null,
     mode: "text",
@@ -63,11 +66,22 @@ export function connect(id?: string): Session {
 function record(id: string) {
   const r = sessions.get(id);
   if (!r) throw new Error("Session expired. Start a new session.");
+  if (Date.now() - r.touched > 3_600_000) {
+    sessions.delete(id);
+    throw new Error("Session expired. Start a new session.");
+  }
   return r;
 }
 function check(i: Identity) {
   const r = record(i.sessionId);
-  if (r.snapshot.epoch !== i.epoch) throw new Conflict(r.snapshot);
+  if (
+    r.snapshot.epoch !== i.epoch ||
+    !Number.isSafeInteger(i.revision) ||
+    i.revision < 0 ||
+    typeof i.turnId !== "string" ||
+    !/^[A-Za-z0-9_-]{1,100}$/.test(i.turnId)
+  )
+    throw new Conflict(r.snapshot);
   r.touched = Date.now();
   return r;
 }
@@ -80,33 +94,44 @@ function invalidate(r: RecordState) {
 }
 export function cancel(i: Identity) {
   const r = check(i);
+  if (i.revision > r.snapshot.revision) throw new Conflict(r.snapshot);
+  if (r.cancelled.size >= 2048 && !r.cancelled.has(i.turnId))
+    throw new Error("Start a new rehearsal session after 2048 turns.");
   r.cancelled.add(i.turnId);
   if (r.activeTurn === i.turnId) {
-    if (r.snapshot.approvalStatus === "presenting") invalidate(r);
-    else r.playback = null;
+    if (r.snapshot.approvalStatus === "presenting") {
+      invalidate(r);
+      r.snapshot.revision++;
+    } else r.playback = null;
     r.activeTurn = null;
   }
   return structuredClone(r.snapshot);
 }
 export function setMode(i: Identity, mode: "text" | "voice") {
   const r = check(i);
+  if (i.revision !== r.snapshot.revision) throw new Conflict(r.snapshot);
+  if (mode !== "text" && mode !== "voice")
+    throw new Error("Choose voice or text mode.");
+  if (mode === r.mode) return structuredClone(r.snapshot);
+  if (r.snapshot.receipt) return structuredClone(r.snapshot);
   r.cancelled.add(i.turnId);
   invalidate(r);
   r.activeTurn = null;
   r.mode = mode;
+  r.snapshot.revision++;
   if (
     r.snapshot.summary &&
     r.snapshot.view === "summary" &&
     !r.snapshot.receipt
   ) {
-    r.snapshot.revision++;
     r.snapshot.summary = {
       ...r.snapshot.summary,
       revision: r.snapshot.revision,
       presentationMode: mode,
-      status: mode === "text" ? "eligible" : "presenting",
+      status: "presenting",
+      displayed: false,
     };
-    r.snapshot.approvalStatus = mode === "text" ? "eligible" : "presenting";
+    r.snapshot.approvalStatus = "presenting";
     r.snapshot.message = summaryText(r.snapshot.summary);
   }
   return structuredClone(r.snapshot);
@@ -114,24 +139,80 @@ export function setMode(i: Identity, mode: "text" | "voice") {
 export function lifecycle(e: Lifecycle) {
   const r = check(e),
     s = r.snapshot;
+  if (s.receipt) return structuredClone(s);
+  if (e.revision !== s.revision) return structuredClone(s);
+  if (e.type === "summary.displayed") {
+    if (
+      !s.summary ||
+      e.summaryId !== s.summary.id ||
+      e.summaryRevision !== s.summary.revision ||
+      s.summary.status === "invalidated" ||
+      s.receipt
+    )
+      return structuredClone(s);
+    if (s.summary.displayed) return structuredClone(s);
+    s.summary.displayed = true;
+    if (
+      s.summary.presentationMode === "text" ||
+      r.playback?.type === "audio.completed"
+    ) {
+      s.summary.status = "eligible";
+      s.approvalStatus = "eligible";
+    }
+    s.revision++;
+    return structuredClone(s);
+  }
   if (
     r.cancelled.has(e.turnId) ||
     r.activeTurn !== e.turnId ||
     e.revision !== s.revision
   )
     return structuredClone(s);
-  if (e.type === "audio.started") r.playback = e;
-  if (e.type === "audio.interrupted" || e.type === "turn.cancelled")
+  if (
+    s.summary &&
+    (e.summaryId !== s.summary.id ||
+      e.summaryRevision !== s.summary.revision ||
+      s.summary.presentationMode !== "voice" ||
+      s.summary.status === "invalidated")
+  )
+    return structuredClone(s);
+  if (e.type === "audio.started") {
+    if (r.playback) return structuredClone(s);
+    r.playback = structuredClone(e);
+    s.revision++;
+  }
+  if (e.type === "audio.interrupted" || e.type === "turn.cancelled") {
+    if (
+      e.type === "audio.interrupted" &&
+      r.playback?.playbackId !== e.playbackId
+    )
+      return structuredClone(s);
     invalidate(r);
+    r.cancelled.add(e.turnId);
+    r.activeTurn = null;
+    s.revision++;
+  }
   if (
     e.type === "audio.completed" &&
     r.playback?.playbackId === e.playbackId &&
+    r.playback.type === "audio.started" &&
     e.summaryId === s.summaryId &&
     s.summary?.presentationMode === "voice"
   ) {
-    s.summary.status = "eligible";
-    s.approvalStatus = "eligible";
+    if (s.summary.displayed) {
+      s.summary.status = "eligible";
+      s.approvalStatus = "eligible";
+    }
+    r.playback = structuredClone(e);
+    s.revision++;
+  } else if (
+    e.type === "audio.completed" &&
+    !s.summary &&
+    r.playback?.playbackId === e.playbackId &&
+    r.playback.type === "audio.started"
+  ) {
     r.playback = null;
+    s.revision++;
   }
   return structuredClone(s);
 }
@@ -142,16 +223,38 @@ export function addAsset(id: string, asset: Omit<Attachment, "id">) {
       "Remove or reuse a reference; this rehearsal allows 12 uploads per session.",
     );
   const a = { ...asset, id: randomUUID() };
-  r.assets.set(a.id, a);
-  return a;
+  r.assets.set(a.id, structuredClone(a));
+  return structuredClone(a);
+}
+export function removeAsset(id: string, attachmentId: string) {
+  const r = record(id);
+  if (r.snapshot.attachmentIds.includes(attachmentId)) return false;
+  return r.assets.delete(attachmentId);
 }
 export function accept(input: Input): Accepted {
-  const r = check({ ...input, revision: input.baseRevision }),
+  const current = check({ ...input, revision: input.baseRevision });
+  const fingerprint = JSON.stringify(input),
+    prior = current.events.get(input.eventId);
+  if (prior) {
+    if (prior.fingerprint !== fingerprint)
+      throw new Conflict(
+        current.snapshot,
+        "Event identity was reused with different content.",
+      );
+    return structuredClone(prior.event);
+  }
+  const r = {
+      ...current,
+      snapshot: structuredClone(current.snapshot),
+      assets: new Map(current.assets),
+    },
     s = r.snapshot;
-  if (r.cancelled.has(input.turnId))
-    throw new Conflict(s, "That turn was interrupted.");
-  const prior = r.events.get(input.eventId);
-  if (prior) return structuredClone(prior);
+  if (r.cancelled.has(input.turnId) || r.usedTurns.has(input.turnId))
+    throw new Conflict(s, "That turn was interrupted or already used.");
+  if (r.events.size >= 2048)
+    throw new Error("Start a new rehearsal session after 2048 turns.");
+  if (!/^[A-Za-z0-9_-]{1,100}$/.test(input.eventId))
+    throw new Error("Use a bounded unique event ID.");
   if (
     (input.modality === "voice" || input.modality === "text") &&
     input.modality !== r.mode
@@ -160,12 +263,27 @@ export function accept(input: Input): Accepted {
       s,
       "Choose your input mode explicitly before continuing.",
     );
-  if (input.baseRevision !== s.revision || input.visibleRevision !== s.revision)
+  if (
+    input.baseRevision !== s.revision ||
+    input.visibleRevision !== s.revision ||
+    JSON.stringify(input.visibleProductIds) !== JSON.stringify(s.displayOrder)
+  )
     throw new Conflict(s);
   if (input.attachmentId && !r.assets.has(input.attachmentId))
     throw new Error("Unknown attachment. Upload the reference again.");
+  if (
+    (input.modality === "image" || input.modality === "link") &&
+    (!input.attachmentId ||
+      r.assets.get(input.attachmentId)?.kind !== input.modality)
+  )
+    throw new Error("Reference type must match a session attachment.");
   const text = (input.text ?? "").trim(),
     t = text.toLowerCase();
+  if (s.receipt && t !== "confirm simulated purchase")
+    throw new Conflict(
+      s,
+      "This simulated order is complete. Start a new rehearsal to change it.",
+    );
   // Approval is deliberately narrow and cannot originate in image/link content.
   if (
     t === "confirm simulated purchase" &&
@@ -177,7 +295,8 @@ export function accept(input: Input): Accepted {
       s.approvalStatus !== "eligible" ||
       s.summary.status !== "eligible" ||
       s.summary.presentationMode !== input.modality ||
-      r.mode !== input.modality
+      r.mode !== input.modality ||
+      !s.summary.displayed
     )
       throw new Conflict(
         s,
@@ -196,9 +315,19 @@ export function accept(input: Input): Accepted {
     s.cards = [];
   } else {
     invalidate(r);
-    if (t.startsWith("remove reference ")) {
+    if (/^(stop|cancel|decline|do not buy|don't buy)[.!]?$/i.test(t)) {
+      s.summary = null;
+      s.summaryId = null;
+      s.approvalStatus = "not_prepared";
+      s.view = "recovery";
+      s.heading = "Paused. Nothing was purchased.";
+      s.message =
+        "Your pending choice is cancelled. Describe what you would like to change, or ask to show options.";
+      s.cards = [];
+    } else if (t.startsWith("remove reference ")) {
       const id = text.slice("remove reference ".length);
       s.attachmentIds = s.attachmentIds.filter((a) => a !== id);
+      r.assets.delete(id);
       s.message =
         "Reference removed from this session. Tell me what you would like to keep or change.";
     } else if (input.attachmentId) {
@@ -229,6 +358,7 @@ export function accept(input: Input): Accepted {
       const fast = s.selectedOfferId === "fast";
       const rev = s.revision + 1;
       s.summary = {
+        displayed: false,
         id: randomUUID(),
         revision: rev,
         productId: s.focusedProductId,
@@ -261,10 +391,10 @@ export function accept(input: Input): Accepted {
           "No live seller, compatibility, stock or delivery verification",
         ],
         presentationMode: r.mode,
-        status: r.mode === "text" ? "eligible" : "presenting",
+        status: "presenting",
       };
       s.summaryId = s.summary.id;
-      s.approvalStatus = r.mode === "text" ? "eligible" : "presenting";
+      s.approvalStatus = "presenting";
       s.message = summaryText(s.summary);
     } else if (/offer|seller|price|tomorrow/.test(t) && s.category) {
       s.view = "offers";
@@ -287,7 +417,19 @@ export function accept(input: Input): Accepted {
         "Stable positions: option 1 and option 2. These synthetic products demonstrate the session shell; verified specifications and product evidence arrive through the catalog integration. Say “show option 1” or “show evidence”.";
     } else if (/option\s*[123]|first|second|third/.test(t) && s.category) {
       const index = /2|second/.test(t) ? 1 : /3|third/.test(t) ? 2 : 0;
-      s.cards = [products(s.category)[index]];
+      const mentions = [
+        ...t.matchAll(/option\s*[123]|\bfirst\b|\bsecond\b|\bthird\b/g),
+      ];
+      const product = s.cards.find(
+        (card) =>
+          card.id === input.visibleProductIds[index] && card.kind === "product",
+      );
+      if (mentions.length !== 1 || !product)
+        throw new Conflict(
+          current.snapshot,
+          "Please name one option from the current displayed choices.",
+        );
+      s.cards = [product];
       s.focusedProductId = s.cards[0].id;
       s.view = "shortlist";
       s.heading = "A little more about this one.";
@@ -363,6 +505,8 @@ export function accept(input: Input): Accepted {
     { role: "assistant" as const, text: s.message },
   ].slice(-40);
   r.activeTurn = input.turnId;
+  r.usedTurns.add(input.turnId);
+  sessions.set(input.sessionId, r);
   return event(input, r);
 }
 function event(input: Input, r: RecordState): Accepted {
@@ -375,6 +519,6 @@ function event(input: Input, r: RecordState): Accepted {
     type: "session.updated",
     snapshot: structuredClone(r.snapshot),
   };
-  r.events.set(input.eventId, e);
+  r.events.set(input.eventId, { fingerprint: JSON.stringify(input), event: e });
   return e;
 }

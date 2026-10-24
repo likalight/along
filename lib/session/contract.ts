@@ -52,6 +52,7 @@ export type StageCard = {
   price?: string;
 };
 export type Summary = {
+  displayed: boolean;
   id: string;
   revision: number;
   productId: string;
@@ -104,7 +105,9 @@ export type Accepted = Identity & {
 export type Lifecycle = Identity & {
   playbackId: string;
   summaryId?: string;
+  summaryRevision?: number;
   type:
+    | "summary.displayed"
     | "audio.started"
     | "audio.completed"
     | "audio.interrupted"

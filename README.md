@@ -7,7 +7,8 @@
 A voice-first shopping concierge that carries your context from the first idea to the final decision.
 
 [![Stage: Hackathon prototype](https://img.shields.io/badge/stage-hackathon_prototype-2563eb)](https://github.com/likalight/along/issues/1)
-[![Catalog acceptance](https://github.com/likalight/along/actions/workflows/catalog.yml/badge.svg?branch=codex%2Fissue-6-catalog&event=pull_request)](https://github.com/likalight/along/actions/workflows/catalog.yml)
+[![Catalog acceptance](https://github.com/likalight/along/actions/workflows/catalog.yml/badge.svg)](https://github.com/likalight/along/actions/workflows/catalog.yml)
+[![Backend acceptance](https://github.com/likalight/along/actions/workflows/backend.yml/badge.svg)](https://github.com/likalight/along/actions/workflows/backend.yml)
 [![Purchases: Simulated](https://img.shields.io/badge/purchases-simulated-64748b)](#human-approval-by-design)
 
 [Getting started](#getting-started) · [How it works](#how-it-works) · [Demo scenarios](#demo-scenarios) · [Contributing](#contributing)
@@ -64,18 +65,18 @@ The active fixture contains **24 products**: 12 audio configurations, six bags, 
 
 ## Getting started
 
-The catalog is ready to inspect and test in [PR #16](https://github.com/likalight/along/pull/16). The session shell runs locally with deterministic fixtures. Live backend/provider integration and a hosted end-to-end demo remain pending.
+The shared catalog, session backend, and fixture-based shopper shell are ready to inspect and test. Wiring the shell to the backend and live voice provider remains separate integration work; there is no complete hosted demo yet.
 
 ### Run the session shell
 
-The fixture-based Next.js session shell for [issue #3](https://github.com/likalight/along/issues/3) runs from the repository root. It includes voice/text input, photo/link references, interruption handling, and simulated confirmation. Live provider and backend integration remain separate work.
+From the repository root:
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Open http://127.0.0.1:3000. See the [session shell guide](docs/session-shell.md) for rehearsal commands, validation, and integration limits.
+Open [the local shell](http://127.0.0.1:3000). It supports voice/text journeys, photo/link references, interruption, and simulated confirmation against an explicitly labelled server fixture. See the [session shell guide](./docs/session-shell.md) for commands and integration limits.
 
 ### Run the catalog checks
 
@@ -85,8 +86,6 @@ Requires **Git** and **Node.js 22.18+** with npm. No API key is needed.
 git clone https://github.com/likalight/along.git
 cd along
 
-# Until PR #16 is merged, use its implementation branch.
-git switch codex/issue-6-catalog
 cd catalog
 
 npm ci
@@ -102,11 +101,22 @@ The generated files are:
 | `catalog/data/catalog.json` | 24 products, 48 proxy offers, 121 evidence records, scenarios, supported links, and image metadata. |
 | `catalog/data/microphones-archive.json` | All 50 joined microphone research records, original source fields, and provenance. |
 
-For schemas and server integration, read the [catalog guide](https://github.com/likalight/along/blob/codex/issue-6-catalog/catalog/README.md).
+For schemas and server integration, read the [catalog guide](./catalog/README.md).
+
+### Run the backend rehearsal
+
+```sh
+# From the repository root
+cd backend
+npm ci
+npm run verify
+```
+
+This checks the backend and rehearses all three purchase scenarios over HTTP, including explicit voice/text approval and duplicate receipt prevention. Display and playback callbacks are emulated. See the [backend guide](./backend/README.md) to start the service and the [acceptance review](./backend/ACCEPTANCE.md) for criterion-level evidence.
 
 ### Try a catalog query
 
-On the catalog branch, a server-side TypeScript consumer can use:
+A server-side TypeScript consumer can use:
 
 ```ts
 import { getCatalog, eligibleOffers } from "./catalog/src/index.ts";
@@ -162,9 +172,9 @@ Along is an early hackathon project, not a production marketplace.
 | Workstream | Status |
 | --- | --- |
 | Product direction and integration contract | Agreed in [issue #2](https://github.com/likalight/along/issues/2). |
-| Catalog, provenance, scenarios, and validation | Implemented and tested in [PR #16](https://github.com/likalight/along/pull/16), pending merge. |
-| Session backend and simulated approval | Under review in [PR #15](https://github.com/likalight/along/pull/15); integration with the latest contract remains to be checked. |
-| Shopper session shell | Implemented with deterministic fixtures; see the [session shell guide](docs/session-shell.md). Live integration is pending. |
+| Catalog, provenance, scenarios, and validation | Implemented in [PR #16](https://github.com/likalight/along/pull/16) and integrated through [PR #15](https://github.com/likalight/along/pull/15). |
+| Session backend and simulated approval | Implemented with voice/text approval, multimodal state, and CI in [PR #15](https://github.com/likalight/along/pull/15). See the [acceptance matrix](./backend/ACCEPTANCE.md). |
+| Shopper session shell | Implemented with deterministic fixtures in [PR #19](https://github.com/likalight/along/pull/19); see the [shell guide](./docs/session-shell.md). Live integration remains pending. |
 | End-to-end demo rehearsal | Pending; the target is a seven-minute presentation. |
 
 The agreed frontend direction is **Next.js App Router + TypeScript**, **Motion for React**, and an **ElevenLabs UI Orb**. The orb is a visual component; it does not establish the selected speech/model provider or a paid service commitment.
@@ -176,7 +186,7 @@ The current catalog package uses TypeScript and Node's built-in test runner, wit
 1. Read the [PRD](https://github.com/likalight/along/issues/1) and [current integration contract](https://github.com/likalight/along/issues/2).
 2. Pick an issue or describe a focused proposal in the [issue tracker](https://github.com/likalight/along/issues).
 3. Keep changes scoped to a workstream and open a pull request with validation results.
-4. For catalog changes, run `npm run verify` from `catalog/` and commit the regenerated JSON.
+4. Run `npm run verify` from `catalog/` and `backend/` for changes affecting their integration. Commit regenerated catalog JSON when the source changes.
 
 Preserve stable IDs and source attribution. Keep unknown values explicit, label synthetic data, and include the necessary negative cases alongside the successful journey. Never turn review text, external media, or model proposals into authority to approve a purchase.
 

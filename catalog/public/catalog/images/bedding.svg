@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360" viewBox="0 0 480 360" role="img" aria-labelledby="title desc">
+<title id="title">Neutral bedding inspiration</title><desc id="desc">Original synthetic illustration for the shopping demo. Not a product photograph or proof of any product specification.</desc>
+<rect width="480" height="360" fill="#f3f4f6"/>
+<rect x="109" y="66" width="262" height="174" rx="14" fill="#afbdc9"/>
+<path d="M121 120h238l35 160H86z" fill="#e2dfd7" stroke="#94a3b8" stroke-width="4"/>
+<rect x="135" y="91" width="96" height="54" rx="15" fill="#fffdf8" stroke="#b8bdc3" stroke-width="3"/>
+<rect x="249" y="91" width="96" height="54" rx="15" fill="#fffdf8" stroke="#b8bdc3" stroke-width="3"/>
+<path d="M111 169h258l25 111H86z" fill="#eae8e0" stroke="#b8bdc3" stroke-width="3"/>
+<path d="M111 169h258" stroke="#fffdf8" stroke-width="12"/>
+<text x="240" y="328" text-anchor="middle" font-family="sans-serif" font-size="16" letter-spacing="2" fill="#475569">DEMO ILLUSTRATION</text>
+</svg>

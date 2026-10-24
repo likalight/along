@@ -1,10 +1,10 @@
 # Along — conversational shopping session
 
-Next.js App Router + TypeScript implementation of [issue #3](https://github.com/likalight/coupangchallenge/issues/3), using the [contract v1 baseline](https://github.com/likalight/coupangchallenge/issues/2). A light canvas, persistent blue ElevenLabs UI Orb, one adaptive content stage, optional composer, and photo/link reference tray.
+Next.js App Router + TypeScript implementation of [issue #3](https://github.com/likalight/along/issues/3), using the [contract v1 baseline](https://github.com/likalight/along/issues/2). A light canvas, persistent blue ElevenLabs UI Orb, one adaptive content stage, optional composer, and photo/link reference tray.
 
 ## Run locally
 
-Requires Node 22.13+ and npm. `npm ci`, then `npm run dev`. Open http://127.0.0.1:3000. Nothing is deployed by these commands. No credentials are required.
+Requires Node 22.18+ and npm. `npm ci`, then `npm run dev`. Open http://127.0.0.1:3000. Nothing is deployed by these commands. No credentials are required.
 
 - `npm run typecheck` — TypeScript checks.
 - `npm test` — session, cancellation and approval invariants.

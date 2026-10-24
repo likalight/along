@@ -39,10 +39,14 @@ export function VoiceOrb({
     const element = wrapper.current;
     const lost = () => setWebgl(false);
     element?.addEventListener("webglcontextlost", lost, true);
-    const canvas = document.createElement("canvas");
-    const gl = canvas.getContext("webgl2");
-    setWebgl(!!gl);
-    gl?.getExtension("WEBGL_lose_context")?.loseContext();
+    try {
+      const canvas = document.createElement("canvas");
+      const gl = canvas.getContext("webgl2");
+      setWebgl(!!gl);
+      gl?.getExtension("WEBGL_lose_context")?.loseContext();
+    } catch {
+      setWebgl(false);
+    }
     return () => element?.removeEventListener("webglcontextlost", lost, true);
   }, []);
   const active = capturing || status === "thinking" || status === "speaking";
