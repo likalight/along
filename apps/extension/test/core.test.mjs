@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULTS, backendOrigin, sourceAllowed, normalizeObservation, shouldObserve, cropRectangle, validCandidates, publicConnection, expiresAtMs, fingerprint, createSerialQueue } from '../src/core.js';
+import { DEFAULTS, backendOrigin, sourceAllowed, normalizeObservation, shouldObserve, cropRectangle, validCandidates, publicConnection, expiresAtMs, fingerprint, mediaReference, observationFingerprint, createSerialQueue } from '../src/core.js';
 import '../src/detection.js';
 const D = globalThis.AlongDetection;
 const enabled = { ...DEFAULTS, consentVersion: 1, enabledOrigins: ['https://www.amazon.com', 'https://www.instagram.com', 'https://www.tiktok.com'] };
@@ -68,6 +68,28 @@ test('capture guard geometry excludes overlapping private controls and changed p
   assert.equal(D.sameObservation(before, { ...before }), true);
   assert.equal(D.sameObservation(before, { ...before, text: 'Model B' }), false);
   assert.equal(D.sameObservation(before, { ...before, pageUrl: `${before.pageUrl}other` }), false);
+});
+
+test('only one prominent media candidate is selected; thumbnails and competing posts stay quiet', () => {
+  const viewport = { width: 1200, height: 800 };
+  const media = (id, x, y, width, height) => ({ id, rect: { left: x, top: y, right: x + width, bottom: y + height, width, height } });
+  const main = media('main', 100, 100, 500, 500), avatar = media('avatar', 50, 30, 40, 40);
+  assert.equal(D.dominantMedia([avatar, main], viewport), main);
+  assert.equal(D.dominantMedia([main, media('second', 650, 100, 400, 500)], viewport), null);
+  assert.equal(D.dominantMedia([avatar], viewport), null);
+  assert.equal(D.dominantMedia([media('offscreen', 100, 700, 500, 500)], viewport), null);
+  assert.equal(D.dominantMedia([media('narrow', 100, 100, 120, 700)], viewport), null);
+});
+
+test('photo identity deduplicates unchanged media but recognizes a changed carousel image', () => {
+  const observation = { pageUrl: 'https://www.instagram.com/p/example/', title: 'My work bag', kind: 'post' };
+  const photo = { kind: 'photo', identity: '1:abc', extra: 'discarded' };
+  assert.deepEqual(mediaReference(photo), { kind: 'photo', identity: '1:abc' });
+  for (const invalid of [null, { ...photo, kind: 'screen' }, { ...photo, identity: 'a'.repeat(101) }, { ...photo, identity: 'https://example.test' }]) assert.equal(mediaReference(invalid), null);
+  assert.equal(observationFingerprint(observation, photo, 100000, true), observationFingerprint(observation, photo, 200000, true));
+  assert.notEqual(observationFingerprint(observation, photo, 100000, true), observationFingerprint(observation, { ...photo, identity: '1:def' }, 100000, true));
+  const video = { ...photo, kind: 'video' };
+  assert.notEqual(observationFingerprint(observation, video, 100000, true), observationFingerprint(observation, video, 200000, true));
 });
 test('overlapping settings updates preserve both changes and failed reconciliation does not block later work', async () => {
   const settingsQueue = createSerialQueue(), scriptsQueue = createSerialQueue();

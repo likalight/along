@@ -16,6 +16,7 @@ import {
   RESULT_TTL_MS,
 } from "@/lib/discovery/store";
 import { coupangSignature } from "@/lib/discovery/providers";
+import * as webListings from "@/lib/discovery/web-listings";
 import { MAX_DISCOVERY_BODY } from "@/lib/discovery/security";
 
 const EXT = "a".repeat(32),
@@ -103,9 +104,12 @@ beforeEach(() => {
     "COUPANG_SECRET_KEY",
     "COUPANG_SEARCH_PATH",
     "ALONG_DISCOVERY_VISION",
+    "ALONG_DISCOVERY_VISION_MODEL",
+    "ALONG_DISCOVERY_WEB_SEARCH",
     "OPENAI_API_KEY",
   ])
     vi.stubEnv(name, "");
+  vi.stubEnv("ALONG_DISCOVERY_VISION_MODEL", "gpt-4.1-mini");
   vi.stubEnv(
     "COUPANG_SEARCH_PATH",
     "/v2/providers/affiliate_open_api/apis/openapi/v1/products/search",
@@ -119,6 +123,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
 });
@@ -934,4 +939,321 @@ describe("approved provider adapter", () => {
     expect(result).toMatchObject({ mode: "unavailable", candidates: [] });
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
+});
+
+describe("recognition with ordinary Coupang search links", () => {
+  const recognized = (overrides: Record<string, unknown> = {}) => ({
+    productPresent: true,
+    title: "Navy tote bag with long handles",
+    query: "네이비 긴 손잡이 토트백",
+    confidence: 0.94,
+    ...overrides,
+  });
+  const recognitionResponse = (result: unknown) =>
+    Response.json({
+      status: "completed",
+      output: [
+        { content: [{ type: "output_text", text: JSON.stringify(result) }] },
+      ],
+    });
+  beforeEach(() => {
+    vi.stubEnv("ALONG_DISCOVERY_PROVIDER", "search");
+    vi.stubEnv("OPENAI_API_KEY", "test-recognition-key");
+    vi.stubEnv("COUPANG_PARTNERS_APPROVED", "false");
+  });
+
+  it("recognizes page text without Coupang credentials and creates no price or listing claim", async () => {
+    const p = await paired();
+    const fetcher = vi
+      .fn()
+      .mockImplementation(async () => recognitionResponse(recognized()));
+    vi.stubGlobal("fetch", fetcher);
+    const status = await (
+      await discoveryPost(extensionRequest(p.token, { action: "status" }))
+    ).json();
+    expect(status).toMatchObject({ mode: "live", visionAvailable: false });
+    const result = await (
+      await discoveryPost(
+        extensionRequest(p.token, { action: "discover", observation }),
+      )
+    ).json();
+    expect(result).toMatchObject({
+      mode: "live",
+      candidates: [
+        {
+          title: "Navy tote bag with long handles",
+          price: null,
+          linkKind: "search",
+          match: "similar",
+        },
+      ],
+    });
+    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates[0].imageUrl).toBeUndefined();
+    expect(result.candidates[0].catalogProductId).toBeUndefined();
+    expect(result.notice).toContain(
+      "listings and prices have not been retrieved",
+    );
+    const url = new URL(result.candidates[0].url);
+    expect(url.origin + url.pathname).toBe("https://www.coupang.com/np/search");
+    expect(url.searchParams.get("q")).toBe(recognized().query);
+    expect([...url.searchParams.keys()]).toEqual(["q"]);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(fetcher.mock.calls[0][0]).toBe(
+      "https://api.openai.com/v1/responses",
+    );
+    const payload = JSON.parse(fetcher.mock.calls[0][1].body);
+    expect(payload.store).toBe(false);
+    expect(payload.text.format.strict).toBe(true);
+    expect(payload.input[0].content).toHaveLength(1);
+    expect(payload.input[0].content[0].type).toBe("input_text");
+    expect(payload.instructions).toContain("primarily in Korean");
+    expect(payload.instructions).toContain("untrusted data");
+
+    const repeated = await (
+      await discoveryPost(
+        extensionRequest(p.token, { action: "discover", observation }),
+      )
+    ).json();
+    expect(repeated.candidates[0].id).toBe(result.candidates[0].id);
+    expect(
+      fetcher.mock.calls.every(
+        ([endpoint]) => endpoint === "https://api.openai.com/v1/responses",
+      ),
+    ).toBe(true);
+    const handoff = await discoveryPost(
+      extensionRequest(p.token, {
+        action: "handoff",
+        observationId: repeated.observationId,
+        candidateId: repeated.candidates[0].id,
+      }),
+    );
+    expect(handoff.status).toBe(200);
+    expect(getPendingHandoff(p.id)?.candidate).toMatchObject({
+      id: result.candidates[0].id,
+      linkKind: "search",
+      price: null,
+    });
+  });
+
+  it("uses an opted-in image for recognition without calling Coupang", async () => {
+    vi.stubEnv("ALONG_DISCOVERY_VISION", "true");
+    const p = await paired();
+    const fetcher = vi
+      .fn()
+      .mockResolvedValue(recognitionResponse(recognized()));
+    vi.stubGlobal("fetch", fetcher);
+    const status = await (
+      await discoveryPost(extensionRequest(p.token, { action: "status" }))
+    ).json();
+    expect(status).toMatchObject({ mode: "live", visionAvailable: true });
+    const result = await (
+      await discoveryPost(
+        extensionRequest(p.token, {
+          action: "discover",
+          observation: { ...observation, kind: "video", imageDataUrl: png },
+        }),
+      )
+    ).json();
+    expect(result.mode).toBe("live");
+    expect(result.candidates[0].reasons[0]).toContain("visible product crop");
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    const [endpoint, options] = fetcher.mock.calls[0];
+    expect(endpoint).toBe("https://api.openai.com/v1/responses");
+    expect(options.redirect).toBe("error");
+    expect(JSON.parse(options.body).input[0].content[1]).toMatchObject({
+      type: "input_image",
+      image_url: png,
+    });
+  });
+
+  it("does not upload supplied pixels when visual processing is disabled", async () => {
+    const p = await paired();
+    const fetcher = vi
+      .fn()
+      .mockResolvedValue(recognitionResponse(recognized()));
+    vi.stubGlobal("fetch", fetcher);
+    const result = await (
+      await discoveryPost(
+        extensionRequest(p.token, {
+          action: "discover",
+          observation: { ...observation, imageDataUrl: png },
+        }),
+      )
+    ).json();
+    expect(result.candidates[0].reasons[0]).toContain(
+      "page's product description",
+    );
+    expect(fetcher.mock.calls[0][1].body).not.toContain(png);
+    expect(
+      JSON.parse(fetcher.mock.calls[0][1].body).input[0].content,
+    ).toHaveLength(1);
+  });
+
+  it("stays unavailable without a recognition key and does not fall back to fixtures", async () => {
+    vi.stubEnv("OPENAI_API_KEY", "");
+    const p = await paired();
+    const status = await (
+      await discoveryPost(extensionRequest(p.token, { action: "status" }))
+    ).json();
+    expect(status).toMatchObject({
+      mode: "unavailable",
+      visionAvailable: false,
+    });
+    const result = await (
+      await discoveryPost(
+        extensionRequest(p.token, { action: "discover", observation }),
+      )
+    ).json();
+    expect(result).toMatchObject({ mode: "unavailable", candidates: [] });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    recognized({
+      productPresent: false,
+      title: "",
+      query: "",
+      confidence: 0.99,
+    }),
+    recognized({ confidence: 0.65 }),
+  ])("stays quiet when there is no clear product: %j", async (identified) => {
+    const p = await paired();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(recognitionResponse(identified)),
+    );
+    const result = await (
+      await discoveryPost(
+        extensionRequest(p.token, {
+          action: "discover",
+          observation: {
+            ...observation,
+            title: "A beautiful day",
+            text: "Clouds and music",
+            kind: "post",
+          },
+        }),
+      )
+    ).json();
+    expect(result).toMatchObject({ mode: "live", candidates: [] });
+    expect(result.notice).toContain("stay quiet");
+  });
+
+  it.each([
+    recognized({ confidence: "0.95" }),
+    recognized({ confidence: 2 }),
+    recognized({ query: "https://evil.example/?q=bag" }),
+    recognized({ query: "x".repeat(81) }),
+    recognized({ title: "x".repeat(161) }),
+    recognized({ price: 99 }),
+    null,
+  ])(
+    "rejects malformed recognition without manufacturing a product: %j",
+    async (identified) => {
+      const p = await paired();
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(recognitionResponse(identified)),
+      );
+      const result = await (
+        await discoveryPost(
+          extensionRequest(p.token, { action: "discover", observation }),
+        )
+      ).json();
+      expect(result).toMatchObject({ mode: "unavailable", candidates: [] });
+      expect(fetch).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("rejects a provider refusal and does not expose diagnostics", async () => {
+    const p = await paired();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        Response.json({
+          status: "completed",
+          output: [
+            {
+              content: [
+                { type: "refusal", refusal: "private provider diagnostic" },
+              ],
+            },
+          ],
+        }),
+      ),
+    );
+    const result = await (
+      await discoveryPost(
+        extensionRequest(p.token, { action: "discover", observation }),
+      )
+    ).json();
+    expect(result).toMatchObject({ mode: "unavailable", candidates: [] });
+    expect(JSON.stringify(result)).not.toContain("private provider diagnostic");
+  });
+
+  it("adds optional indexed listing links while retaining a direct search fallback", async () => {
+    vi.stubEnv("ALONG_DISCOVERY_WEB_SEARCH", "true");
+    const finder = vi.spyOn(webListings, "findWebListings").mockResolvedValue([
+      {
+        id: "web-coupang-123",
+        title: "Navy tote bag",
+        url: "https://www.coupang.com/vp/products/123",
+        price: null,
+        match: "similar",
+        linkKind: "listing",
+        reasons: ["Found in web-indexed sources."],
+        unknowns: ["Current price and availability are unverified."],
+      },
+    ]);
+    const p = await paired();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(recognitionResponse(recognized())),
+    );
+    const result = await (
+      await discoveryPost(
+        extensionRequest(p.token, { action: "discover", observation }),
+      )
+    ).json();
+    expect(finder).toHaveBeenCalledWith(recognized().query);
+    expect(result.candidates).toHaveLength(2);
+    expect(result.candidates[0]).toMatchObject({
+      linkKind: "listing",
+      price: null,
+    });
+    expect(result.candidates[1]).toMatchObject({
+      linkKind: "search",
+      price: null,
+    });
+    expect(result.notice).toContain("Web-indexed");
+    expect(result.notice).toContain("not verified");
+  });
+
+  it.each(["empty", "failure"])(
+    "keeps direct search usable when optional web lookup returns %s",
+    async (behavior) => {
+      vi.stubEnv("ALONG_DISCOVERY_WEB_SEARCH", "true");
+      const finder = vi.spyOn(webListings, "findWebListings");
+      if (behavior === "empty") finder.mockResolvedValue([]);
+      else finder.mockRejectedValue(new Error("private web diagnostic"));
+      const p = await paired();
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(recognitionResponse(recognized())),
+      );
+      const result = await (
+        await discoveryPost(
+          extensionRequest(p.token, { action: "discover", observation }),
+        )
+      ).json();
+      expect(result.mode).toBe("live");
+      expect(result.candidates).toHaveLength(1);
+      expect(result.candidates[0]).toMatchObject({
+        linkKind: "search",
+        price: null,
+      });
+      expect(JSON.stringify(result)).not.toContain("private web diagnostic");
+    },
+  );
 });

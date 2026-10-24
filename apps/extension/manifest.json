@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Along — a little discovery, as you browse",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "With your permission, Along notices products on supported sites and brings Coupang discoveries into your existing Along conversation.",
   "minimum_chrome_version": "116",
   "permissions": ["storage", "scripting", "sidePanel", "activeTab"],

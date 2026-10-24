@@ -1,4 +1,4 @@
-import { DEFAULTS, SITES, backendOrigin, hostPattern, sourceAllowed, normalizeObservation, fingerprint, shouldObserve, cropRectangle, expiresAtMs, publicConnection, validCandidates, VISUAL_INTERVAL_MS, createSerialQueue } from './core.js';
+import { DEFAULTS, SITES, backendOrigin, hostPattern, sourceAllowed, normalizeObservation, mediaReference, observationFingerprint, shouldObserve, cropRectangle, expiresAtMs, publicConnection, validCandidates, VISUAL_INTERVAL_MS, createSerialQueue } from './core.js';
 
 let discoveryBusy = false;
 let lastStatusAt = 0;
@@ -161,11 +161,11 @@ async function claimPair(message, sender) {
   await notify();
   return { ok: true, sessionId: value.sessionId, epoch: value.epoch }; // Never expose the bearer token to the page.
 }
-async function screenshot(sender, observation, config, connection) {
-  if (!config.visual || !connection.visionAvailable || observation.kind !== 'video' || !(await chrome.permissions.contains({ origins: ['<all_urls>'] }))) return null;
-  const check = await chrome.tabs.sendMessage(sender.tab.id, { type: 'ALONG_CAPTURE_CHECK', observation }, { frameId: 0 });
-  const video = check?.video;
-  if (!video) return null;
+async function screenshot(sender, observation, mediaReference, config, connection) {
+  if (!mediaReference || !config.visual || config.demo || !connection.visionAvailable || !(await chrome.permissions.contains({ origins: ['<all_urls>'] }))) return null;
+  const check = await chrome.tabs.sendMessage(sender.tab.id, { type: 'ALONG_CAPTURE_CHECK', observation, mediaIdentity: mediaReference.identity }, { frameId: 0 });
+  const media = check?.media;
+  if (!media || media.identity !== mediaReference.identity || media.kind !== mediaReference.kind) return null;
   const tab = await chrome.tabs.get(sender.tab.id);
   const window = await chrome.windows.get(tab.windowId);
   if (!tab.active || !window.focused || tab.url !== sender.url || !sourceAllowed(tab.url, config)) return null;
@@ -176,11 +176,11 @@ async function screenshot(sender, observation, config, connection) {
   const current = await chrome.tabs.get(tab.id);
   const currentWindow = await chrome.windows.get(tab.windowId);
   if (!current.active || !currentWindow.focused || current.url !== tab.url) return null;
-  const recheck = await chrome.tabs.sendMessage(tab.id, { type: 'ALONG_CAPTURE_CHECK', observation }, { frameId: 0 });
-  if (JSON.stringify(recheck?.video) !== JSON.stringify(video)) return null;
+  const recheck = await chrome.tabs.sendMessage(tab.id, { type: 'ALONG_CAPTURE_CHECK', observation, mediaIdentity: media.identity }, { frameId: 0 });
+  if (JSON.stringify(recheck?.media) !== JSON.stringify(media)) return null;
   const bitmap = await createImageBitmap(await (await fetch(dataUrl)).blob());
   try {
-    const crop = cropRectangle(video.rect, video.viewport, bitmap);
+    const crop = cropRectangle(media.rect, media.viewport, bitmap);
     if (!crop) return null;
     const ratio = Math.min(1, 640 / Math.max(crop.width, crop.height));
     const canvas = new OffscreenCanvas(Math.max(1, Math.round(crop.width * ratio)), Math.max(1, Math.round(crop.height * ratio)));
@@ -199,12 +199,16 @@ async function discover(message, sender) {
   if (!sourceUrl || discoveryBusy) return { skipped: true };
   const observation = normalizeObservation(message.observation, sourceUrl);
   if (!observation) return { skipped: true };
+  const media = mediaReference(message.media);
   const tab = await chrome.tabs.get(sender.tab.id);
   const window = await chrome.windows.get(tab.windowId);
   const now = Date.now();
   const { gates = {} } = await chrome.storage.session.get('gates');
-  const visualAttempt = config.visual && (await auth())?.visionAvailable && observation.kind === 'video';
-  const key = `${fingerprint(observation)}${visualAttempt ? `:${Math.floor(now / VISUAL_INTERVAL_MS)}` : ''}`;
+  const visualEnabled = !config.demo && config.visual && (await auth())?.visionAvailable;
+  // Social media in visual mode must provide trustworthy pixels; a failed/ambiguous capture is not a caption-only match.
+  if (visualEnabled && observation.kind !== 'product' && !media) return { skipped: true };
+  const visualAttempt = Boolean(visualEnabled && media);
+  const key = observationFingerprint(observation, media, now, visualAttempt);
   const gate = gates[new URL(sourceUrl).origin] || { seen: {}, lastAt: 0 };
   if (!shouldObserve({ settings: config, url: sourceUrl, dwellMs: Math.min(Number(message.dwellMs) || 0, 60000), visible: message.visible === true && tab.active && tab.url === sourceUrl, focused: window.focused, now, lastAt: gate.lastAt, duplicate: Boolean(gate.seen[key] && now - gate.seen[key] < 600000), cooldownMs: visualAttempt ? VISUAL_INTERVAL_MS : 45000 })) return { skipped: true };
   discoveryBusy = true;
@@ -213,7 +217,8 @@ async function discover(message, sender) {
     if (!connection) return { skipped: true };
     if (connection.mode === 'demo' && !config.demo) return { skipped: true };
     if (connection.mode === 'unavailable' && !config.demo) { await recordNotice('Live discovery is unavailable. Enable demo mode explicitly to explore fixtures.'); return { skipped: true }; }
-    const image = await screenshot(sender, observation, config, connection);
+    const image = visualAttempt ? await screenshot(sender, observation, media, config, connection) : null;
+    if (visualAttempt && !image) return { skipped: true };
     if (image) observation.imageDataUrl = image;
     const beforeSendConfig = await settings();
     const beforeSendAuth = await auth();
@@ -230,7 +235,7 @@ async function discover(message, sender) {
     const nextConnection = await auth();
     if (nextConfig.paused || !sourceAllowed(sourceUrl, nextConfig) || nextConnection?.token !== connection.token) return { skipped: true };
     const resultTab = await chrome.tabs.get(sender.tab.id), resultWindow = await chrome.windows.get(sender.tab.windowId);
-    const currentObservation = await chrome.tabs.sendMessage(sender.tab.id, { type: 'ALONG_OBSERVATION_CHECK', observation }, { frameId: 0 });
+    const currentObservation = await chrome.tabs.sendMessage(sender.tab.id, { type: 'ALONG_OBSERVATION_CHECK', observation, mediaIdentity: media?.identity }, { frameId: 0 });
     if (!resultTab.active || !resultWindow.focused || resultTab.url !== sourceUrl || !currentObservation?.same) return { skipped: true };
     const { results = [] } = await chrome.storage.session.get('results');
     const candidates = validCandidates(result, nextConfig.demo);

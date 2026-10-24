@@ -22,6 +22,7 @@ jobs:
       - run: npm test --workspace @along/shopper
       - run: npm run test:extension
       - run: npx playwright install --with-deps chromium
+      - run: npm run test:extension:media
       - run: npm run test:e2e -w @along/shopper
       - run: npm run test:canvas -w @along/shopper
       - run: npm run test:extension:e2e

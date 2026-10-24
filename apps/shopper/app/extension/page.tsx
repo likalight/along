@@ -93,9 +93,10 @@ export default function ExtensionGuide() {
         </section>
       </div>
       <p className={styles.small}>
-        Live Coupang search requires approved Partners credentials on the Along
-        server. Visual recognition requires a separately enabled image provider.
-        When either is unavailable, Along says so.
+        Recognition can suggest a Coupang search without Partners API access.
+        Optional web search can add public product links; prices and availability
+        are checked on Coupang. Visual recognition needs a separately enabled
+        image provider. Direct Partners results require approved credentials.
       </p>
     </main>
   );

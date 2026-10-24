@@ -16,7 +16,7 @@ function renderResults() {
   for (const record of state.results) {
     const section = node('article', 'discovery');
     const heading = node('div', 'discovery-heading');
-    heading.append(node('span', `pill${record.mode === 'demo' ? ' demo' : ''}`, record.mode === 'demo' ? 'DEMO · FIXTURE DATA' : 'LIVE DISCOVERY'));
+    heading.append(node('span', `pill${record.mode === 'demo' ? ' demo' : ''}`, record.mode === 'demo' ? 'DEMO · FIXTURE DATA' : 'PRODUCT DISCOVERY'));
     section.append(heading, node('p', 'source-title', `From: ${record.source.title}`));
     if (record.notice) section.append(node('p', 'small', record.notice));
     for (const candidate of record.candidates) {
@@ -25,8 +25,8 @@ function renderResults() {
       if (candidate.imageUrl && safeUrl(candidate.imageUrl, { images: true })) {
         const image = node('img', 'product-image'); image.src = candidate.imageUrl; image.alt = ''; image.loading = 'lazy'; image.referrerPolicy = 'no-referrer'; image.addEventListener('error', () => image.remove()); top.append(image);
       }
-      const copy = node('div', 'product-copy'); copy.append(node('h3', '', candidate.title), node('p', 'price', money(candidate.price)));
-      copy.append(node('p', 'match', candidate.linkKind === 'search' ? 'Search suggestion · listing not verified' : candidate.match === 'exact' ? 'Exact match reported by source' : 'Similar item · not an exact match'));
+      const copy = node('div', 'product-copy'); copy.append(node('h3', '', candidate.title), node('p', 'price', candidate.price ? money(candidate.price) : 'See prices on Coupang'));
+      copy.append(node('p', 'match', candidate.linkKind === 'search' ? 'Suggested search · no listing verified' : candidate.match === 'exact' ? 'Exact match reported by source' : 'Possible match · check on Coupang'));
       top.append(copy); card.append(top);
       const details = node('div', 'details');
       if (candidate.reasons?.length) details.append(node('p', '', candidate.reasons.slice(0, 3).join(' · ')));
@@ -35,7 +35,7 @@ function renderResults() {
       const actions = node('div', 'card-actions');
       const discuss = node('button', 'discuss', 'Discuss with Along'); discuss.type = 'button';
       discuss.addEventListener('click', async () => { discuss.disabled = true; try { await send('ALONG_HANDOFF', { observationId: record.observationId, candidateId: candidate.id }); } catch (err) { error(err); } finally { discuss.disabled = false; } });
-      const listing = node('a', 'listing', candidate.linkKind === 'search' ? 'Search ↗' : 'View ↗'); listing.href = candidate.url; listing.target = '_blank'; listing.rel = 'noopener noreferrer';
+      const listing = node('a', 'listing', candidate.linkKind === 'search' ? 'Search Coupang ↗' : 'View on Coupang ↗'); listing.href = candidate.url; listing.target = '_blank'; listing.rel = 'noopener noreferrer';
       actions.append(discuss, listing); card.append(actions); section.append(card);
     }
     $('results').append(section);

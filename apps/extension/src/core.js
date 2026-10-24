@@ -6,7 +6,7 @@ export const SITES = Object.freeze([
   { name: 'Amazon', origin: 'https://www.amazon.com', detail: 'Product pages' },
   { name: 'Amazon Singapore', origin: 'https://www.amazon.sg', detail: 'Product pages' },
   { name: 'TikTok', origin: 'https://www.tiktok.com', detail: 'Public posts and visible videos' },
-  { name: 'Instagram', origin: 'https://www.instagram.com', detail: 'Public posts and visible videos' },
+  { name: 'Instagram', origin: 'https://www.instagram.com', detail: 'Public posts, photos and videos' },
   { name: 'YouTube', origin: 'https://www.youtube.com', detail: 'Video titles and visible videos' },
 ]);
 export const DWELL_MS = 5000;
@@ -58,6 +58,14 @@ export function fingerprint(observation) {
   let hash = 2166136261;
   for (const ch of `${observation.pageUrl}|${observation.title}|${observation.text || ''}`) hash = Math.imul(hash ^ ch.charCodeAt(0), 16777619);
   return (hash >>> 0).toString(36);
+}
+export function mediaReference(value) {
+  if (!value || !['photo', 'video'].includes(value.kind) || typeof value.identity !== 'string' || !/^[a-zA-Z0-9:-]{1,100}$/.test(value.identity)) return null;
+  return { kind: value.kind, identity: value.identity };
+}
+export function observationFingerprint(observation, media, now, visualAttempt) {
+  const identity = mediaReference(media);
+  return `${fingerprint(observation)}${identity ? `:${identity.kind}:${identity.identity}` : ''}${visualAttempt && identity?.kind === 'video' ? `:${Math.floor(now / VISUAL_INTERVAL_MS)}` : ''}`;
 }
 export function shouldObserve({ settings, url, dwellMs, visible, focused, now, lastAt = 0, duplicate = false, cooldownMs = COOLDOWN_MS }) {
   return !settings.paused && settings.consentVersion === 1 && sourceAllowed(url, settings) && visible && focused && dwellMs >= DWELL_MS && !duplicate && now - lastAt >= Math.max(VISUAL_INTERVAL_MS, cooldownMs);

@@ -87,7 +87,7 @@ Conversation routing is bounded and deterministic. Prepared illustrations and su
 
 The [Along Chrome companion](./docs/extension.md) can notice products on enabled Amazon, TikTok, Instagram and YouTube desktop pages, show a small nudge, and open similar candidates in a side panel. Choose **Discuss with Along** to continue your existing conversation; drafts, pauses and the purchase-approval boundary are preserved.
 
-Run `npm run build:extension`, then load `apps/extension/dist/along` through Chrome's **Load unpacked** control. Site access requires consent. **Demo mode is an explicit opt-in** with authored prices and Coupang search links. Live discovery stays unavailable until approved server-side Coupang Partners credentials are configured. Optional video-crop interpretation requires separate permission and a configured vision provider; it does not promise exact product identity. See the [setup, permissions and provider limitations](./docs/extension.md) before enabling it.
+Run `npm run build:extension`, then load `apps/extension/dist/along` through Chrome's **Load unpacked** control. Site access requires consent. **Demo mode is an explicit opt-in** with authored prices and Coupang search links. Set `ALONG_DISCOVERY_PROVIDER=search` with a server-side OpenAI key for real recognition and ordinary Coupang search links, without Partners credentials. Optional web search adds source-backed public product links with no price or stock claims. Direct Partners results still require approved credentials. Video and main post-photo interpretation require separate permission; recognition does not promise exact product identity. See the [setup, permissions and provider limitations](./docs/extension.md) before enabling it.
 
 ## What Along does
 
@@ -240,7 +240,7 @@ Along is a hackathon prototype. This README describes the code on main; historic
 | Authoritative session backend | In-memory, session-scoped access with a two-hour TTL; restarting the process loses sessions. |
 | Catalog and provenance checks | Curated fixture data; no live retailer ingestion or inventory guarantees. |
 | Image and link references | Validated uploads, prepared illustrations and supported source URLs; no general vision or unrestricted fetching. |
-| Chrome discovery companion | Explicit fixture demo and gated provider adapters; heuristic desktop extraction, optional video crops, no verified live-provider rehearsal or exact identity guarantee. |
+| Chrome discovery companion | Fixture demo, AI recognition/search links and optional source-backed public listing discovery; supported video/photo capture, no exact identity or current marketplace-data guarantee. |
 | Browser speech and provider-secret minting | Browser-dependent speech; provider audio transport and trusted voice approval remain unfinished. |
 | Docker Compose demo | One application process; no database or shared multi-instance session storage. |
 

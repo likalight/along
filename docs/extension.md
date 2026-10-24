@@ -28,33 +28,45 @@ Enable each site explicitly after accepting the disclosure. The current selector
 | --- | --- |
 | `www.amazon.com`, `www.amazon.sg` | Product pages: visible product title, structured product data and feature text. |
 | `www.tiktok.com` | Supported public post captions and a visible video. |
-| `www.instagram.com` | Supported feed, post and reel captions and a visible video. |
+| `www.instagram.com` | Supported feed, post and reel captions, a dominant visible video or main post photo. |
 | `www.youtube.com` | Watch/Shorts titles and a visible video. |
 
 Detection requires a focused, active tab and stable context for five seconds. Text requests have a 45-second cooldown; optional visual attempts are spaced at least 15 seconds apart. Duplicate discoveries do not repeatedly nudge. Selector changes, login gates, ambiguous feeds, fast scrolling and unsupported layouts can prevent detection. Native mobile apps and arbitrary websites are not supported. This is a heuristic reader of selected public page context, not an exhaustive product scanner.
 
 The manifest includes `storage`, `scripting`, `sidePanel` and `activeTab`. Site and app host access is optional and requested during setup; scripts are registered only for enabled sites and the configured Along origin. The backend address must be HTTPS, or HTTP on `localhost`/`127.0.0.1` for development. Private-message, account, login, cart and checkout routes are excluded, and the extractor does not read input values.
 
-**Visual discovery is a separate opt-in.** Automatic screenshots need Chrome's broader `<all_urls>` host permission because a fresh `activeTab` gesture is not available for each automatic sample. Along still restricts its own capture to enabled supported sites in the active, focused tab. It checks the source, visible video and intersecting form/dialog geometry before and after capture, crops the visible video locally, and sends a JPEG at most 640 pixels on its longest edge. It does not upload or retain the original viewport screenshot or capture audio. Chrome's granted access is broader than this internal allowlist. See Chrome's [captureVisibleTab API](https://developer.chrome.com/docs/extensions/reference/api/tabs#method-captureVisibleTab) and [side panel API](https://developer.chrome.com/docs/extensions/reference/api/sidePanel).
+**Visual discovery is a separate opt-in.** Automatic screenshots need Chrome's broader `<all_urls>` host permission because a fresh `activeTab` gesture is not available for each automatic sample. Along still restricts its own capture to enabled supported sites in the active, focused tab. It checks the source, visible media and intersecting form/dialog geometry before and after capture, crops the visible media locally, and sends a JPEG at most 640 pixels on its longest edge. It does not upload or retain the original viewport screenshot or capture audio. Chrome's granted access is broader than this internal allowlist. See Chrome's [captureVisibleTab API](https://developer.chrome.com/docs/extensions/reference/api/tabs#method-captureVisibleTab) and [side panel API](https://developer.chrome.com/docs/extensions/reference/api/sidePanel).
 
-The visual adapter suggests a search keyword from one sampled video crop; it does not identify every object, guarantee an exact model, track objects across a video, or implement a general crop tool for arbitrary page images. Protected video, overlays, multiple visible videos and uncertain model output are skipped. Live candidates are labelled **similar**, and fit, variant, authenticity, stock, delivery and complete checkout totals remain unverified.
+The visual adapter suggests a search keyword from one sampled media crop; it does not identify every object, guarantee an exact model, track objects across a video, or implement a general crop tool for arbitrary page images. Protected media, obstructing overlays, similarly prominent media and uncertain model output are skipped. Possible listing candidates are labelled **similar**, and fit, variant, authenticity, stock, delivery and complete checkout totals remain unverified.
 
 Pause stops observations. Disable a site to stop detection there, or revoke its permission in Chrome. Clear discoveries removes extension results. Disconnect removes the extension's token and results; it does not end the Along conversation. Browser session storage, restricted to trusted extension contexts, holds the token and recent results; closing the browser clears it. Preferences remain in local storage. See the packaged [privacy disclosure](../apps/extension/ui/privacy.html).
 
 ## Live provider configuration
 
-Without a configured provider, the API returns **unavailable** and no candidates. It never silently substitutes demo results. A `live` status means the adapter is configured; it is not a successful connection test or proof of approved use.
+Without a configured provider, the API returns **unavailable** and no candidates. It never silently substitutes demo results. A `live` status means the adapter is configured; it is not a successful connection test or proof of an exact match, current inventory or approved use.
+
+### Recognition without Partners API access
+
+Set `ALONG_DISCOVERY_PROVIDER=search` with a server-only `OPENAI_API_KEY`. This mode recognizes a clearly evidenced product from page context or an opted-in visual crop and creates a Korean Coupang search query. It does not require Coupang credentials or the Partners approval flag. Generic captions, ambiguous objects and low-confidence recognition stay quiet. The suggestion has no claimed price or inventory; **Search Coupang** opens ordinary search results, and **Discuss with Along** preserves the existing conversation.
+
+Optionally set `ALONG_DISCOVERY_WEB_SEARCH=true` to look for public product links using OpenAI web search. Results must be backed by the search tool's sources and pass a strict Coupang product-URL check. The default `gpt-4.1-mini` uses a `site:` search query plus server-side URL validation because its web-search API rejects the domain `filters` parameter. Only the recognized product query is sent to web search, not the original page URL, crop or caption. These are **web-found links**, not verified current listings: prices, stock, seller, variant and delivery remain unknown. Timeout, invalid sources or no relevant link fall back to the ordinary search suggestion. This optional lookup adds latency and provider charges.
+
+Set `ALONG_DISCOVERY_VISION=true` to permit visual recognition on the server, then enable **Visual discovery** and the desired sites in Chrome. Text recognition does not require visual permission. The extension supports a dominant visible video or main Instagram post photo; avatars, small images, ambiguous media and obstructing forms/dialogs are excluded. Photo/carousel identity is checked before and after capture. It does not scan every image or every social website.
+
+### Direct Partners results
 
 Provide server variables through the process environment or `apps/shopper/.env.local`; never place these keys in the extension or `NEXT_PUBLIC_*` variables. The root [`.env.example`](../.env.example) lists the settings. Container deployments must explicitly forward them to the shopper process.
 
 | Variable | Default / purpose |
 | --- | --- |
-| `ALONG_DISCOVERY_PROVIDER` | Empty. Set to `coupang` to select the adapter. |
+| `ALONG_DISCOVERY_PROVIDER` | Empty. `search` enables recognition/search links; `coupang` selects direct Partners results. |
+| `ALONG_DISCOVERY_WEB_SEARCH` | `false`. Optional public product-link enrichment in `search` mode; no Partners credentials required. |
+| `ALONG_DISCOVERY_WEB_MODEL` | `gpt-4.1-mini`. Model for optional web-link retrieval. |
 | `COUPANG_PARTNERS_APPROVED` | `false`. Operator assertion that API access and this extension placement/use have been approved; setting it does not obtain approval. |
 | `COUPANG_ACCESS_KEY`, `COUPANG_SECRET_KEY` | Empty. Server-only Coupang Partners credentials. |
 | `COUPANG_SEARCH_PATH` | `/v2/providers/affiliate_open_api/apis/openapi/v1/products/search`. The legacy path without `/v1` is the only other allowed path. Confirm the account's documented endpoint before live testing. |
 | `ALONG_DISCOVERY_VISION` | `false`. Set to `true` only when optional crop processing is intended. |
-| `OPENAI_API_KEY` | Required for optional vision as well as the app's separate voice-secret mint feature. |
+| `OPENAI_API_KEY` | Required for search-mode recognition, optional web search and vision, as well as the separate voice-secret mint feature. |
 | `ALONG_DISCOVERY_VISION_MODEL` | `gpt-4.1-mini`. A compatible image-input Responses model supporting strict structured output. |
 
 Coupang's [seller OpenAPI](https://developers.coupang.com/en/api) manages seller operations; this adapter targets the separate [Coupang Partners Open API](https://partners.coupang.com/#help/open-api) keyword search. Its guide describes API-key eligibility after final approval, HMAC authentication, product-search fields and limits. It does not document an image-search endpoint or grant blanket permission for a proactive browser extension. Review the [operating policy](https://partners.coupang.com/#help/operating-policy) and [terms](https://partners.coupang.com/#help/terms), and confirm software/placement, transient retention, link handling and quotas with Coupang before enabling production use. The approval flag does not replace that confirmation.
@@ -63,7 +75,7 @@ The adapter calls only `api-gateway.coupang.com`, limits each response to ten ca
 
 Optional vision sends the bounded crop and page context to the fixed OpenAI Responses endpoint with `store: false`, a strict output schema, a 12-second timeout and a process-wide ceiling of 15 requests per minute. Low confidence, refusals and malformed responses produce no visual match. See the official [image-input guide](https://developers.openai.com/api/docs/guides/images-vision?api-mode=responses) and [structured-output guide](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses). Provider calls may incur charges and have their own retention terms; `store: false` is not a claim of zero provider retention.
 
-No real Coupang search or paid vision call has been exercised in the automated tests. The implemented endpoint, account eligibility, current response behavior and extension permission from Coupang still require a separate approved live rehearsal. Provider failures remain unavailable rather than fabricating listings.
+Automated tests mock external AI and marketplace responses. Real Coupang Partners calls still require a separate approved rehearsal. Source-backed web links and ordinary searches do not provide an approved marketplace feed or verified live offers. Provider failures never fabricate listings.
 
 ## Same-conversation handoff
 
@@ -88,6 +100,7 @@ npm run build:extension
 npm run test:extension
 npm test -w @along/shopper -- tests/discovery.test.ts
 npx playwright install chromium
+npm run test:extension:media
 npm run test:extension:e2e
 ```
 

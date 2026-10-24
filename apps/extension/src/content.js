@@ -4,8 +4,9 @@
   const D = globalThis.AlongDetection;
   let config = { enabled: false }, stableKey = '', stableSince = 0, pending = false, lastSent = '', lastSentAt = 0;
   let host = null, dismissed = new Set(), stopped = false;
-  let videoSequence = 0;
-  const videoIds = new WeakMap();
+  let mediaSequence = 0;
+  const mediaIds = new WeakMap();
+  const postSelector = 'article, [data-e2e="recommend-list-item-container"], ytd-reel-video-renderer, [data-along-post]';
   const visible = element => {
     if (!element || element.closest('[contenteditable], input, textarea, [role="textbox"]')) return false;
     const box = element.getBoundingClientRect();
@@ -16,6 +17,29 @@
     const el = [...root.querySelectorAll(selector)].find(visible);
     return el ? D.text(el.textContent) : '';
   };
+  function visibleMedia() {
+    const viewport = { width: innerWidth, height: innerHeight };
+    const videos = [...document.querySelectorAll('video')].filter(visible);
+    const photoSelector = 'article img, [data-along-post] img, [data-e2e="recommend-list-item-container"] img, #landingImage, #imgTagWrapperId img';
+    const photos = [...document.querySelectorAll(photoSelector)];
+    // Instagram's single-post layout sometimes omits <article>. Never use a generic feed/body image sweep.
+    if (location.hostname === 'www.instagram.com' && /^\/(p|reel)\//.test(location.pathname)) photos.push(...document.querySelectorAll('main img'));
+    const candidates = videos.map(element => ({ element, kind: 'video', rect: element.getBoundingClientRect() }));
+    for (const element of new Set(photos)) {
+      if (!visible(element) || !element.complete || element.naturalWidth < 200 || element.naturalHeight < 200 || element.closest('header, nav, [role="navigation"]') || /avatar|profile|logo|icon|프로필/i.test(element.alt || '')) continue;
+      const rect = element.getBoundingClientRect();
+      // A video's poster is not a second independent photo.
+      if (videos.some(video => D.intersects(rect, video.getBoundingClientRect()))) continue;
+      candidates.push({ element, kind: 'photo', rect });
+    }
+    const selected = D.dominantMedia(candidates, viewport);
+    if (!selected) return null;
+    const { element, kind, rect } = selected;
+    if (!mediaIds.has(element)) mediaIds.set(element, ++mediaSequence);
+    let hash = 2166136261;
+    for (const ch of element.currentSrc || element.src || '') hash = Math.imul(hash ^ ch.charCodeAt(0), 16777619);
+    return { element, container: element.closest(postSelector), kind, identity: `${mediaIds.get(element)}:${(hash >>> 0).toString(36)}`, rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }, viewport };
+  }
   function observation() {
     let item = null;
     // Structured product data only: no page-body dump, form values, cookies or account data.
@@ -32,47 +56,48 @@
       const title = text('#productTitle, [data-along-product-title]');
       if (title) item = { title, text: text('#feature-bullets, [data-along-product-description]'), kind: 'product' };
     }
-    let video = null;
-    const videos = [...document.querySelectorAll('video')].filter(visible).sort((a, b) => D.visibleArea(b.getBoundingClientRect(), { width: innerWidth, height: innerHeight }) - D.visibleArea(a.getBoundingClientRect(), { width: innerWidth, height: innerHeight }));
-    if (videos.length === 1) {
-      const r = videos[0].getBoundingClientRect();
-      if (!videoIds.has(videos[0])) videoIds.set(videos[0], ++videoSequence);
-      let identity = String(videoIds.get(videos[0]));
-      for (const ch of videos[0].currentSrc || videos[0].src || '') identity = String(Math.imul(Number(identity) ^ ch.charCodeAt(0), 31) >>> 0);
-      video = { identity, rect: { x: r.x, y: r.y, width: r.width, height: r.height }, viewport: { width: innerWidth, height: innerHeight } };
-    }
+    let media = visibleMedia();
     if (!item) {
       // Select known public caption/title surfaces. Never read comments or private-message containers.
       const selector = '[data-along-post-caption], [data-e2e="video-desc"], [data-e2e="browse-video-desc"], article h1, article [data-testid="post-caption"], ytd-watch-metadata h1, ytd-reel-video-renderer[is-active] h2, ytd-shorts h2';
-      const container = videos.length === 1 ? videos[0].closest('article, [data-e2e="recommend-list-item-container"], ytd-reel-video-renderer, [data-along-post]') : null;
+      const container = media?.container;
       const captions = [...(container || document).querySelectorAll(selector)].filter(visible);
-      // If attribution is ambiguous, use metadata only; never attach a different post's pixels.
-      if (!container && captions.length > 1) video = null;
+      // Multiple visible post captions without a selected post are ambiguous.
+      if (!container && captions.length > 1) return null;
       let caption = captions[0] ? D.text(captions[0].textContent) : '';
-      if (!caption && video) caption = D.text(document.querySelector('meta[property="og:title"]')?.content, 240);
-      if (caption.length > 3) item = { title: caption.slice(0, 240), text: caption, kind: video ? 'video' : 'post' };
-      else if (video && config.visual && config.visionAvailable) item = { title: 'Visible video', text: '', kind: 'video' };
+      if (!caption && media?.kind === 'photo') caption = D.text(media.element.alt, 240);
+      const singlePost = /^\/(p|reel|shorts)\//.test(location.pathname) || location.pathname === '/watch' || /^\/@[^/]+\/(video|photo)\//.test(location.pathname);
+      if (!caption && media && singlePost) caption = D.text(document.querySelector('meta[property="og:title"]')?.content, 240);
+      if (caption.length > 3) item = { title: caption.slice(0, 240), text: caption, kind: media?.kind === 'video' ? 'video' : 'post' };
+      else if (media && config.visual && config.visionAvailable) item = { title: media.kind === 'video' ? 'Visible video' : 'Visible photo', text: '', kind: media.kind === 'video' ? 'video' : 'post' };
     }
     if (!item) return null;
-    return { observation: { ...item, pageUrl: location.href }, video };
+    return { observation: { ...item, pageUrl: location.href }, media };
   }
-  function captureCheck(expected) {
+  function captureCheck(expected, mediaIdentity) {
     if (!config.enabled || !config.visual || !config.visionAvailable || document.visibilityState !== 'visible' || !document.hasFocus()) return null;
     const current = observation();
-    if (!current?.video || current.observation.kind !== 'video' || !D.sameObservation(current.observation, expected)) return null;
-    const r = current.video.rect;
+    if (!current?.media || current.media.identity !== mediaIdentity || !D.sameObservation(current.observation, expected)) return null;
+    const r = current.media.rect;
     const region = { left: r.x, top: r.y, right: r.x + r.width, bottom: r.y + r.height };
     // Read geometry only. Never read input values. Any intersecting form/modal makes capture ineligible.
     for (const element of document.querySelectorAll('input, textarea, [contenteditable="true"], [role="textbox"], [role="dialog"], dialog[open], [aria-modal="true"]')) {
       const style = getComputedStyle(element), box = element.getBoundingClientRect();
       if (style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity) !== 0 && box.width > 0 && box.height > 0 && D.intersects(region, box)) return null;
     }
-    return current.video;
+    // Reject occluded media, including non-dialog popovers. No pixels from an unrelated overlay are sent.
+    const left = Math.max(0, region.left), top = Math.max(0, region.top), right = Math.min(innerWidth, region.right), bottom = Math.min(innerHeight, region.bottom);
+    for (const [fx, fy] of [[0.5, 0.5], [0.25, 0.25], [0.75, 0.25], [0.25, 0.75], [0.75, 0.75]]) {
+      const hit = document.elementFromPoint(left + (right - left) * fx, top + (bottom - top) * fy);
+      if (!hit || !(hit === current.media.element || hit.contains(current.media.element))) return null;
+    }
+    const { kind, identity, rect, viewport } = current.media;
+    return { kind, identity, rect, viewport };
   }
   chrome.runtime.onMessage.addListener((message, sender, reply) => {
     if (sender.id !== chrome.runtime.id) return false;
-    if (message.type === 'ALONG_CAPTURE_CHECK') { reply({ video: captureCheck(message.observation) }); return false; }
-    if (message.type === 'ALONG_OBSERVATION_CHECK') { reply({ same: config.enabled && document.visibilityState === 'visible' && D.sameObservation(observation()?.observation, message.observation) }); return false; }
+    if (message.type === 'ALONG_CAPTURE_CHECK') { reply({ media: captureCheck(message.observation, message.mediaIdentity) }); return false; }
+    if (message.type === 'ALONG_OBSERVATION_CHECK') { const current = observation(); reply({ same: config.enabled && document.visibilityState === 'visible' && D.sameObservation(current?.observation, message.observation) && (!message.mediaIdentity || current?.media?.identity === message.mediaIdentity) }); return false; }
     return false;
   });
   async function refresh() {
@@ -107,14 +132,15 @@
     if (stopped || !config.enabled || !config.connected || pending || document.visibilityState !== 'visible' || !document.hasFocus()) { stableSince = 0; return; }
     const found = observation();
     if (!found) { stableKey = ''; stableSince = 0; return; }
-    const key = JSON.stringify(found.observation);
+    const key = JSON.stringify([found.observation, found.media?.identity]);
     const now = Date.now();
     if (key !== stableKey || !stableSince) { stableKey = key; stableSince = now; return; }
-    const videoRetry = config.visual && config.visionAvailable && found.observation.kind === 'video' && now - lastSentAt >= 15000;
+    const videoRetry = config.visual && config.visionAvailable && found.media?.kind === 'video' && now - lastSentAt >= 15000;
     if (now - stableSince < 5000 || now - lastSentAt < 10000 || lastSent === key && now - lastSentAt < 600000 && !videoRetry) return;
     pending = true;
     try {
-      const response = await chrome.runtime.sendMessage({ type: 'ALONG_OBSERVE', ...found, dwellMs: now - stableSince, visible: true });
+      const media = found.media ? { kind: found.media.kind, identity: found.media.identity } : null;
+      const response = await chrome.runtime.sendMessage({ type: 'ALONG_OBSERVE', observation: found.observation, media, dwellMs: now - stableSince, visible: true });
       lastSentAt = now;
       if (!response.skipped && !response.error) lastSent = key;
       if (response.result && key === stableKey && location.href === found.observation.pageUrl) showChip(response.result);
