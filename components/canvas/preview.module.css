@@ -1,0 +1,255 @@
+.preview {
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse at 80% 10%, #f3f6fa 0, transparent 50%), #f5f6f3;
+  padding-bottom: 32px;
+  color: #20343f;
+  font-family: Arial, Helvetica, sans-serif;
+}
+.header {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+  max-width: 1240px;
+  margin: auto;
+  padding: 30px 40px 24px;
+  border-bottom: 1px solid #dfe5e4;
+}
+.wordmark {
+  font-family: Georgia, serif;
+  color: #243b4b;
+  text-decoration: none;
+  font-size: 32px;
+  letter-spacing: -1.6px;
+}
+.wordmark span {
+  display: inline-block;
+  font-family: Arial;
+  font-size: 9px;
+  color: #4c82c8;
+  vertical-align: top;
+  margin-top: 11px;
+  margin-left: 3px;
+}
+.tagline {
+  font-size: 10px;
+  color: #7a8991;
+  letter-spacing: 0.04em;
+}
+.fixture {
+  margin-left: auto;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #7890a2;
+}
+.scenario {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  max-width: 1240px;
+  margin: auto;
+  padding: 21px 40px 0;
+}
+.scenario > span:first-child {
+  font-size: 9px;
+  color: #8b98a0;
+  margin-right: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.scenario button {
+  font: 10px Arial;
+  color: #6b7d89;
+  border: 1px solid #dce4e5;
+  background: transparent;
+  border-radius: 18px;
+  padding: 6px 11px;
+  cursor: pointer;
+}
+.scenario button[aria-pressed="true"] {
+  background: #e6eef8;
+  border-color: #d0def1;
+  color: #2d619b;
+}
+.scenario button:focus-visible,
+.dock button:focus-visible,
+.dock input:focus-visible {
+  outline: 3px solid #4d7fc5;
+  outline-offset: 3px;
+}
+.revision {
+  font-size: 8px;
+  color: #97a1a8;
+  margin-left: auto;
+}
+.dock {
+  display: block;
+  max-width: 610px;
+  margin: 0 auto;
+  padding: 15px 24px 10px;
+  position: relative;
+}
+.anchor {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-bottom: 21px;
+}
+.anchor strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+.anchor p {
+  font-size: 9px;
+  color: #7a8a97;
+  margin: 3px 0 0;
+  max-width: 400px;
+  line-height: 1.7;
+}
+.orb {
+  display: block;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 33% 28%,
+    #b7e5ff 0,
+    #3c8bdf 32%,
+    #316ac4 52%,
+    #234e98 75%
+  );
+  box-shadow:
+    inset -5px -7px 9px #193e8055,
+    0 5px 17px #467cc733;
+}
+.dock form {
+  display: flex;
+  padding: 7px;
+  background: #ffffffd9;
+  border: 1px solid #d6dfe4;
+  border-radius: 30px;
+  box-shadow: 0 6px 18px #25416308;
+  gap: 8px;
+}
+.dock input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  padding: 9px 14px;
+  font: 11px Arial;
+  color: #344e62;
+  border-radius: 25px;
+}
+.dock input::placeholder {
+  color: #8e9ba5;
+}
+.dock button {
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  width: 37px;
+  height: 37px;
+  flex-shrink: 0;
+  background: #315f9f;
+  color: #fff;
+  cursor: pointer;
+}
+.dock button:disabled {
+  opacity: 0.5;
+}
+.note {
+  font-size: 8px;
+  color: #8d9ba4;
+  text-align: center;
+  margin-top: 13px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+}
+.error {
+  color: #a25247;
+  font-size: 11px;
+  margin: 13px 15px;
+}
+.loading {
+  padding: 120px;
+  text-align: center;
+  color: #748794;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  font-size: 14px;
+}
+.srOnly {
+  position: absolute;
+  clip: rect(0, 0, 0, 0);
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+@media (max-width: 700px) {
+  .header {
+    padding: 23px 22px;
+    gap: 16px;
+  }
+  .wordmark {
+    font-size: 29px;
+  }
+  .tagline {
+    display: none;
+  }
+  .fixture {
+    font-size: 8px;
+  }
+  .scenario {
+    padding: 18px 18px 0;
+    gap: 6px;
+  }
+  .scenario > span:first-child {
+    width: 100%;
+    margin-bottom: 3px;
+  }
+  .scenario button {
+    font-size: 9px;
+    padding: 6px 10px;
+    min-height: 44px;
+  }
+  .revision {
+    font-size: 7px;
+  }
+  .dock {
+    padding: 15px 18px 5px;
+  }
+  .note {
+    font-size: 7px;
+    line-height: 1.7;
+  }
+  .anchor {
+    justify-content: flex-start;
+    padding: 0 10px;
+  }
+  .dock input {
+    font-size: 16px;
+    padding: 9px;
+  }
+  .dock button {
+    width: 44px;
+    height: 44px;
+  }
+  .orb {
+    width: 43px;
+    height: 43px;
+  }
+  .loading {
+    padding: 80px 20px;
+  }
+}

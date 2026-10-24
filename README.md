@@ -175,6 +175,7 @@ Along is an early hackathon project, not a production marketplace.
 | Catalog, provenance, scenarios, and validation | Implemented in [PR #16](https://github.com/likalight/along/pull/16) and integrated through [PR #15](https://github.com/likalight/along/pull/15). |
 | Session backend and simulated approval | Implemented with voice/text approval, multimodal state, and CI in [PR #15](https://github.com/likalight/along/pull/15). See the [acceptance matrix](./backend/ACCEPTANCE.md). |
 | Shopper session shell | Implemented with deterministic fixtures in [PR #19](https://github.com/likalight/along/pull/19); see the [shell guide](./docs/session-shell.md). Live integration remains pending. |
+| Product canvas and evidence | Implemented with deterministic fixtures in [PR #18](https://github.com/likalight/along/pull/18); try `/canvas-preview` and see the [canvas guide](./docs/product-canvas.md). Live catalog and voice wiring remain pending. |
 | End-to-end demo rehearsal | Pending; the target is a seven-minute presentation. |
 
 The agreed frontend direction is **Next.js App Router + TypeScript**, **Motion for React**, and an **ElevenLabs UI Orb**. The orb is a visual component; it does not establish the selected speech/model provider or a paid service commitment.
