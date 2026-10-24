@@ -51,6 +51,27 @@ export type LiveDemoCompletion = {
   transcript: string;
   affirmationSummaryId?: string;
 };
+/** A server-owned interpretation of the observed shopper reply, never request JSON. */
+export type InterpretedCheckoutApproval = {
+  intent: "approve_order";
+  transcript: string;
+  summaryId: string;
+  summaryRevision: number;
+  requiresApprovalQuestion: boolean;
+};
+function validateInterpretedApproval(interpretation: InterpretedCheckoutApproval,
+  transcript: unknown, summaryId: unknown, summaryRevision: unknown) {
+  object(interpretation);
+  keys(interpretation, ["intent", "transcript", "summaryId", "summaryRevision", "requiresApprovalQuestion"]);
+  requireThat(interpretation.intent === "approve_order" &&
+    typeof interpretation.requiresApprovalQuestion === "boolean" &&
+    typeof transcript === "string" && transcript.trim().length > 0 && transcript.length <= 4000,
+    "INVALID_APPROVAL", "A valid server interpretation of the shopper reply is required.");
+  requireThat(interpretation.transcript === transcript,
+    "UNTRUSTED_APPROVAL", "The interpretation must match the exact shopper reply.");
+  requireThat(interpretation.summaryId === summaryId && interpretation.summaryRevision === summaryRevision,
+    "STALE_SUMMARY", "The interpretation must refer to this order review.", 409);
+}
 const boundedDimensions = (width: number, height: number) => width > 0 && height > 0 && width <= 8192 && height <= 8192 && width * height <= 16_777_216;
 const crcTable = Array.from({ length: 256 }, (_, initial) => {
   let value = initial;
@@ -975,18 +996,31 @@ export class SessionStore {
    * Live delegation text has no finality/confidence or exact playback evidence.
    * This method can only issue the existing synthetic receipt for a proxy offer;
    * it never mints an approval nonce or calls a payment/order integration. */
-  completeLiveDemo(id: string, raw: LiveDemoCompletion) {
+  completeLiveDemo(id: string, raw: LiveDemoCompletion, interpretedApproval?: InterpretedCheckoutApproval) {
     object(raw);
     keys(raw, ["epoch", "expectedRevision", "summaryId", "summaryRevision", "responseTurnId", "delegationId", "transcript", "affirmationSummaryId"]);
     requireThat(typeof raw.delegationId === "string" && /^[A-Za-z0-9_-]{1,256}$/.test(raw.delegationId), "INVALID_DELEGATION", "A server-observed delegation is required.");
-    const reply = classifyCheckoutReply(raw.transcript);
+    // Only the server can supply this separate argument. Public request keys
+    // above intentionally cannot carry an interpretation or bypass the legacy
+    // text check. Bind interpretation to the original reply and reviewed order.
+    if (interpretedApproval !== undefined) {
+      validateInterpretedApproval(interpretedApproval, raw.transcript, raw.summaryId, raw.summaryRevision);
+    }
+    const reply = interpretedApproval
+      ? interpretedApproval.requiresApprovalQuestion ? "assent" : "approve"
+      : classifyCheckoutReply(raw.transcript);
     requireThat(reply !== "other", "AMBIGUOUS_APPROVAL", "Would you like to place this order, or change the details?");
     requireThat(raw.affirmationSummaryId === undefined || (typeof raw.affirmationSummaryId === "string" && raw.affirmationSummaryId.length <= 128), "INVALID_SUMMARY", "A confirmation prompt must refer to an order summary.");
     // A retry may observe the revision advanced by its own successful receipt.
     // Stable identity/payload still prevents replaying a delegation for another order.
     const { expectedRevision, ...identity } = raw;
     const eventId = `live-demo-${hash(raw.delegationId).slice(0, 40)}`;
-    return this.once(id, raw.epoch, eventId, identity, () => {
+    const payload = interpretedApproval ? { ...identity, interpretedApproval: {
+      intent: interpretedApproval.intent, transcript: interpretedApproval.transcript,
+      summaryId: interpretedApproval.summaryId, summaryRevision: interpretedApproval.summaryRevision,
+      requiresApprovalQuestion: interpretedApproval.requiresApprovalQuestion,
+    } } : identity;
+    return this.once(id, raw.epoch, eventId, payload, () => {
       const s = this.get(id);
       this.revision(s, expectedRevision);
       this.mutable(s);
@@ -1026,7 +1060,7 @@ export class SessionStore {
     });
   }
 
-  approve(id: string, raw: unknown, typed = false) {
+  approve(id: string, raw: unknown, typed = false, interpretedApproval?: InterpretedCheckoutApproval) {
     object(raw);
     keys(raw, [
       "expectedRevision",
@@ -1040,6 +1074,12 @@ export class SessionStore {
       "echoDetected",
     ]);
     const s = this.get(id);
+    if (interpretedApproval !== undefined) {
+      validateInterpretedApproval(interpretedApproval, raw.transcript, raw.summaryId, s.summary?.revision);
+      requireThat(s.turn?.input?.modality === (typed ? "text" : "voice") &&
+        s.turn.input.text === raw.transcript,
+        "UNTRUSTED_APPROVAL", "The interpretation must match the current shopper input.");
+    }
     // Retries of the same already accepted approval produce the same receipt even after revision advanced.
     if (s.receipt) {
       requireThat(
@@ -1093,24 +1133,26 @@ export class SessionStore {
       "Approval must be final, confident shopper speech without echo.",
     );
     requireThat(
-      typeof o.transcript === "string" && o.transcript.length <= 200,
+      typeof o.transcript === "string" && o.transcript.length <= (interpretedApproval ? 4000 : 200),
       "INVALID_APPROVAL",
       "Invalid approval transcript.",
     );
-    requireThat(!/[“”"‘’']/.test(o.transcript), "AMBIGUOUS_APPROVAL", "Quoted content is not a deliberate purchase instruction.");
-    const normalized = intentText(o.transcript);
-    const accepted = [
-      "confirm this simulated purchase",
-      "yes confirm this simulated purchase",
-      "confirm purchase",
-      "yes confirm purchase",
-      "yes buy it",
-    ];
-    requireThat(
-      accepted.includes(normalized),
-      "AMBIGUOUS_APPROVAL",
-      "Ask for explicit purchase confirmation; ambiguous assent is not approval.",
-    );
+    if (!interpretedApproval) {
+      requireThat(!/[“”"‘’']/.test(o.transcript), "AMBIGUOUS_APPROVAL", "Quoted content is not a deliberate purchase instruction.");
+      const normalized = intentText(o.transcript);
+      const accepted = [
+        "confirm this simulated purchase",
+        "yes confirm this simulated purchase",
+        "confirm purchase",
+        "yes confirm purchase",
+        "yes buy it",
+      ];
+      requireThat(
+        accepted.includes(normalized),
+        "AMBIGUOUS_APPROVAL",
+        "Ask for explicit purchase confirmation; ambiguous assent is not approval.",
+      );
+    }
     const q = quoteOffer(
       m.quote.offer.id,
       m.quote.quantity,
