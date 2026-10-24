@@ -33,6 +33,8 @@ export class ConciergeClient {
       agentToken?: string;
     } = {},
   ) {
+    if (options.agentToken && "window" in globalThis)
+      throw new Error("agentToken is a server-only credential; use a trusted backend bridge.");
     this.baseUrl = baseUrl.replace(/\/$/, "");
     Object.assign(this, options);
   }
@@ -108,7 +110,7 @@ export class ConciergeClient {
         turnId: summary.responseTurnId,
         textHash: summary.textHash,
         event,
-      })
+      }, event !== "displayed")
     ).session;
   }
   async approve(observation: VoiceObservation) {
@@ -130,7 +132,7 @@ export class ConciergeClient {
   }
   async *events(
     signal?: AbortSignal,
-  ): AsyncGenerator<SessionEvent | { type: "session.expired" }> {
+  ): AsyncGenerator<SessionEvent | { type: "session.expired" | "session.ended" }> {
     const response = await fetch(this.baseUrl + this.path("events"), {
       headers: this.headers(),
       signal,

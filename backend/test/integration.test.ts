@@ -5,10 +5,11 @@ import { once } from "node:events";
 import { randomUUID } from "node:crypto";
 import { createApp } from "../src/server.ts";
 import { teamProfile } from "../src/team-catalog.ts";
+import { destination } from "../../catalog/src/offers.ts";
 import { quoteOffer } from "../src/catalog.ts";
 async function harness(t: any) {
   const agentToken = randomUUID(),
-    { server } = createApp({ agentToken, profile: teamProfile });
+    { server } = createApp({ agentToken });
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
   t.after(() => {
@@ -30,7 +31,7 @@ async function harness(t: any) {
     });
     return { status: r.status, body: await r.json() };
   };
-  const created = await req("/sessions", { scenarioId: "work-gym-bag" });
+  const created = await req("/sessions", { scenarioId: "work-gym" });
   token = created.body.accessToken;
   id = created.body.session.sessionId;
   return {
@@ -88,7 +89,7 @@ async function textSummary(h: any) {
       "actions",
       action(s, "set_constraints", {
         constraints: {
-          category: "bags",
+          category: "everyday-bags",
           currency: "USD",
           budgetMinor: 15000,
           deliveryWithinDays: 1,
@@ -108,6 +109,10 @@ async function textSummary(h: any) {
   assert.equal(s.summary.presentationMode, "text");
   s = (
     await h.post("presentation", {
+      epoch: s.epoch,
+      eventId: randomUUID(),
+      expectedRevision: s.revision,
+      summaryRevision: s.summary.revision,
       summaryId: s.summary.id,
       turnId: s.summary.responseTurnId,
       textHash: s.summary.textHash,
@@ -116,7 +121,7 @@ async function textSummary(h: any) {
   ).body.session;
   return s;
 }
-test("contract #2: three category constraints reject unavailable, missing hardware, wrong depth and deadline", () => {
+test("legacy profile regression: unavailable, missing hardware, wrong depth and deadline", () => {
   assert.equal(teamProfile.catalog.products.length, 24);
   const q = (id: string, c: any = {}) =>
     quoteOffer(id, 1, c, [], teamProfile.catalog, teamProfile.destination);
@@ -217,7 +222,7 @@ test("contract #2: typed display + fresh exact confirmation creates one receipt;
   assert.equal(r1.status, 200);
   assert.equal(r1.body.receipt.id, r2.body.receipt.id);
   assert.equal(r1.body.receipt.acceptedOrder.totalMinor, 11900);
-  assert.equal(r1.body.receipt.acceptedOrder.destination, "DEMO-DESTINATION");
+  assert.equal(r1.body.receipt.acceptedOrder.destination, destination);
   assert.equal(r1.body.session.view, "receipt");
 });
 test("contract #2: stale display, stop race, mode switch and reset cannot revive approval or session images", async (t) => {
@@ -235,13 +240,13 @@ test("contract #2: stale display, stop race, mode switch and reset cannot revive
   s = (await h.post("inputs", input(s, "Confirm this simulated purchase.")))
     .body.session;
   const pending = approval(s);
-  s = (await h.post("cancel", { turnId: s.turn.id })).body.session;
+  s = (await h.post("cancel", { turnId: s.turn.id, epoch: s.epoch, eventId: randomUUID(), expectedRevision: s.revision })).body.session;
   assert.notEqual((await h.post("confirm", pending)).status, 200);
   s = (await h.post("mode", { expectedRevision: s.revision, mode: "voice" }))
     .body.session;
   assert.equal(s.summary, null);
   const bytes = Buffer.from(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=",
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII=",
     "base64",
   );
   const uploaded = await fetch(`${h.base}/sessions/${h.id}/attachments`, {

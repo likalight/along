@@ -1,7 +1,9 @@
 /** Public integration contract v1. Money is integer minor units with explicit currency; null means UNKNOWN. */
+import type { Catalog as CanonicalCatalog, Product as CanonicalProduct, Offer as CanonicalOffer, Evidence as CanonicalEvidence } from "../../catalog/src/types.ts";
 export type Money = number;
 export type Currency = "SGD" | "USD";
 export type Evidence = {
+  canonical?: CanonicalEvidence;
   id: string;
   subjectType: "product" | "seller";
   subjectId: string;
@@ -21,6 +23,7 @@ export type Compatibility = {
   mattressDepthInches?: number;
 };
 export type Product = {
+  canonical?: CanonicalProduct;
   variantId?: string;
   referencePrice?: { amountMinor: number; currency: Currency; kind: string };
   compatibility?: {
@@ -62,6 +65,7 @@ export type Product = {
   }[];
 };
 export type Offer = {
+  canonical?: CanonicalOffer;
   variantId?: string;
   destination?: string;
   setupCost?: Money | null;
@@ -91,6 +95,19 @@ export type Offer = {
   classification: "proxy" | "snapshot" | "real";
 };
 export type Constraints = {
+  deadline?: string;
+  productId?: string;
+  variantId?: string;
+  laptopInches?: number;
+  separateShoeCompartment?: boolean;
+  minimumCapacityL?: number;
+  bedWidthIn?: number;
+  bedLengthIn?: number;
+  mattressDepthIn?: number;
+  composition?: string;
+  hostConnection?: string;
+  availableHardwareIds?: string[];
+  bagMaxDimensionsCm?: { height?: number; width?: number; depth?: number };
   compatibility?: Compatibility;
   currency?: Currency;
   budgetMinor?: number;
@@ -119,6 +136,7 @@ export type ShoppingView = {
 };
 export type Selection = { offerId: string; quantity: number };
 export type Proposal = {
+  displayOrder?: string[];
   expectedRevision: number;
   turnId: string;
   needs?: string[];
@@ -141,6 +159,7 @@ export type Conflict = {
   field?: string;
 };
 export type Quote = {
+  tax?: number | null;
   setupCost: number | null;
   destination: string;
   product: Product;
@@ -184,6 +203,7 @@ export type Turn = {
   approvalWindow: { summaryId: string; nonce: string } | null;
 };
 export type Summary = {
+  playbackId: string | null;
   presentationMode: "voice" | "text";
   id: string;
   revision: number;
@@ -205,6 +225,7 @@ export type Receipt = {
   quote: Quote;
 };
 export type Session = {
+  displayOrder: string[];
   presentationMode: "voice" | "text";
   stage: string;
   comparisonIds: string[];
@@ -263,6 +284,7 @@ export type Scenario = {
 export type SessionEvent = { type: "session.snapshot"; session: Session };
 
 export type CatalogData = {
+  canonical?: CanonicalCatalog;
   version: string;
   currency: Currency;
   notice: string;

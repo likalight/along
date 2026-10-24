@@ -1,6 +1,6 @@
 # Catalog and attributable evidence
 
-Implementation of [issue #6](https://github.com/likalight/coupangchallenge/issues/6), using the [issue #2 contract](https://github.com/likalight/coupangchallenge/issues/2).
+Implementation of [issue #6](https://github.com/likalight/along/issues/6), using the [issue #2 contract](https://github.com/likalight/along/issues/2).
 
 The active catalog has **24 products: 12 audio configurations, six everyday bags, six bedsheet sets**. It supplies 48 complete, explicitly synthetic offers, 121 evidence records, three scenario fixtures, a bounded link map, and three original illustration fixtures. The full 50-row microphone research is retained separately.
 

@@ -1,5 +1,5 @@
 import { SessionStore } from "@concierge/backend/store";
-import { agreedProfile } from "@concierge/backend/agreed-catalog";
+import { alongProfile as agreedProfile } from "@concierge/backend/along-catalog";
 import { quoteOffer } from "@concierge/backend/quotes";
 import { acceptApproval, summaryView } from "@concierge/backend/integration";
 import type { Constraints, Proposal } from "@concierge/backend/contracts";
@@ -84,7 +84,7 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
       preferences: prefs,
       exclusions: s.excludedProductIds,
       shortlistIds: s.shortlist,
-      displayOrder: s.shortlist,
+      displayOrder: s.displayOrder,
       shortlistEntries: (s.view?.cards ?? []).map((c) => ({
         productId: c.productId,
         rank: c.rank
@@ -403,7 +403,20 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
       if (s.summary?.id === summaryId) {
         const view = summaryView(s.summary);
         return {
-          ...view,
+          id: view.id,
+          revision: view.revision,
+          productId: view.productId,
+          variantId: view.variantId,
+          offerId: view.offerId,
+          sellerId: view.sellerId,
+          quantity: view.quantity,
+          destination: view.destination,
+          conditions: view.conditions,
+          uncertainties: view.uncertainties,
+          presentationMode: view.presentationMode,
+          deliveryWindow: {
+            latestOffsetDays: s.summary.quote.offer.deliveryDays,
+          },
           currency: "USD",
           status: s.receipt
             ? "approved"
@@ -417,7 +430,8 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
             shipping: view.lineItemsMinor.shipping!,
             otherFees:
               view.lineItemsMinor.otherFees! +
-              (view.lineItemsMinor.requiredSetup ?? 0),
+              (view.lineItemsMinor.requiredSetup ?? 0) +
+              (view.lineItemsMinor.tax ?? 0),
           },
           totalMinor: view.totalMinor!,
         };

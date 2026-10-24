@@ -59,7 +59,44 @@ export function validateConstraints(x: unknown) {
     "category",
     "requiredSpecifications",
     "compatibility",
+    "deadline",
+    "productId",
+    "variantId",
+    "laptopInches",
+    "separateShoeCompartment",
+    "minimumCapacityL",
+    "bedWidthIn",
+    "bedLengthIn",
+    "mattressDepthIn",
+    "composition",
+    "hostConnection",
+    "availableHardwareIds",
+    "bagMaxDimensionsCm",
   ]);
+  for (const field of ["productId", "variantId", "composition", "hostConnection"]) {
+    if (x[field] !== undefined)
+      requireThat(typeof x[field] === "string" && x[field].trim().length > 0 && x[field].length <= 200,
+        "INVALID_CONSTRAINT", `${field} must be a nonempty bounded string.`);
+  }
+  for (const field of ["laptopInches", "minimumCapacityL", "bedWidthIn", "bedLengthIn", "mattressDepthIn"]) {
+    if (x[field] !== undefined)
+      requireThat(typeof x[field] === "number" && Number.isFinite(x[field]) && x[field] > 0 && x[field] < 1000,
+        "INVALID_COMPATIBILITY", `${field} must be a positive bounded measurement.`);
+  }
+  if (x.separateShoeCompartment !== undefined)
+    requireThat(typeof x.separateShoeCompartment === "boolean", "INVALID_CONSTRAINT", "Separate shoe compartment must be a boolean.");
+  if (x.availableHardwareIds !== undefined)
+    requireThat(strings(x.availableHardwareIds, 20), "INVALID_CONSTRAINT", "Available hardware IDs must be unique bounded strings.");
+  if (x.deadline !== undefined)
+    requireThat(typeof x.deadline === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})$/.test(x.deadline) && Number.isFinite(Date.parse(x.deadline)),
+      "INVALID_CONSTRAINT", "Deadline must include an explicit date, time and UTC offset.");
+  if (x.bagMaxDimensionsCm !== undefined) {
+    object(x.bagMaxDimensionsCm);
+    keys(x.bagMaxDimensionsCm, ["height", "width", "depth"]);
+    requireThat(Object.keys(x.bagMaxDimensionsCm).length > 0 && Object.values(x.bagMaxDimensionsCm).every(value =>
+      typeof value === "number" && Number.isFinite(value) && value > 0 && value < 1000),
+      "INVALID_COMPATIBILITY", "Maximum exterior bag dimensions must be positive centimetre measurements.");
+  }
   if (x.compatibility !== undefined) {
     object(x.compatibility);
     keys(x.compatibility, [
@@ -72,7 +109,7 @@ export function validateConstraints(x: unknown) {
     for (const [k, v] of Object.entries(x.compatibility))
       requireThat(
         k === "hostConnection"
-          ? typeof v === "string" && v.length <= 50
+          ? typeof v === "string" && v.trim().length > 0 && v.length <= 50
           : typeof v === "number" && Number.isFinite(v) && v > 0 && v < 1000,
         "INVALID_COMPATIBILITY",
         "Use a bounded connector name or positive dimensions in inches.",

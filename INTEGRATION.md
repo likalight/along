@@ -1,6 +1,6 @@
 # Along: combined integration handoff
 
-This branch combines backend #6–9, the catalog team's branch, and the AI harness. It is a working **text integration rehearsal**, not a claim that the final UI or live voice works.
+This branch combines backend #6–9 (including main’s acceptance hardening), the canonical catalog, the AI harness, and the frontend session shell + product canvas. The actual shopper UI completes a **production-build text journey**; live AI/provider voice remains pending.
 
 ## Run
 
@@ -9,8 +9,11 @@ Node 22.18+ (tested on Node 24).
 ```sh
 npm ci
 npm run build
+npm run start -w @along/shopper -- --port 4322
+# Open http://127.0.0.1:4322 for the integrated shopper UI.
+# Optional diagnostic harness, in another terminal:
 npm run start -w @coupang/web -- --hostname 127.0.0.1 --port 4321
-# another terminal
+# HTTP rehearsal against that harness:
 node scripts/rehearse-integration.mjs
 ```
 
@@ -19,12 +22,20 @@ For edits: `npm run build` once, then `npm run dev -- --port 4320` (or pass flag
 ## Ownership and source of truth
 
 - `catalog/data/catalog.json` is the canonical 24-product/48-offer dataset. Run the catalog package's build after editing its source, then `npm run sync:catalog` to refresh generated TS modules and public SVGs. Generated modules are checked in for reproducibility; never edit them manually.
-- `backend/src/agreed-catalog.ts` normalizes the canonical dataset without replacing facts or prices. Required audio hardware already included in `otherFeesMinor` is counted once. Quantity is bounded to one fixture bundle. Unknown facts remain unknown.
+- `backend/src/along-catalog.ts` normalizes the canonical dataset without replacing facts or prices. Required audio hardware already included in `otherFeesMinor` is counted once. Quantity is bounded to one fixture bundle. Unknown facts remain unknown.
 - `packages/agent/src/session/AuthoritativeSessionStore.ts` is the integration adapter. It uses the actual backend store; `FixtureSessionStore` remains only for the teammate's isolated harness tests.
-- `apps/web/src/server/runtime.ts` is the live local runtime. Next.js endpoints call the adapter directly, so **no separate backend process or agent secret is needed for this Next.js integration**.
+- `apps/shopper/lib/integration/runtime.ts` and the diagnostic `apps/web/src/server/runtime.ts` own separate process-local sessions. Next.js endpoints call the adapter directly, so **no separate backend process or agent secret is needed for this Next.js integration**.
 - Optional standalone backend on port 4318 also defaults to the canonical catalog. Its `/v1/integration` shape differs from the AI harness's Zod snapshot. Do not mix the two session transports. Original historical fixtures are explicit test profiles only.
 
-## Frontend endpoints
+## Shopper frontend transport
+
+`apps/shopper` preserves the frontend controller interface: POST `/api/session` with actions `connect`, `input`, `cancel`, `mode`, `presented`, `lifecycle`. Its projection maps canonical IDs, exact quotes and accepted backend state into the product canvas. `/api/attachments` accepts only authenticated, structurally validated PNG/JPEG/WebP bytes up to 2 MiB, an owned prepared illustration, or an allowlisted catalog source URL. Arbitrary URLs are never fetched.
+
+The summary acknowledgment occurs after the summary component mounts, not before its entrance transition. Ordinary draft edits do not cancel an already presented summary; actual interruption does. Browser Speech Recognition/Synthesis is available as a fallback but has not been audibly rehearsed here. Voice purchase confirmation remains disabled until a trusted live voice adapter provides final/confidence/echo/source evidence. Text mode requires a new summary and fresh typed confirmation.
+
+`/canvas-preview`, `/presenter`, and `lib/session/store.ts` retain the original isolated frontend fixtures for development; they are not the integrated shopper state. Historical browser tests against those fixtures are not evidence for the production journey.
+
+## Diagnostic harness endpoints
 
 All responses are JSON. Use same-origin browser fetch with the HttpOnly session cookie set by session creation. Never put tokens in URLs or model prompts.
 
@@ -46,10 +57,10 @@ Errors after an accepted input may return the latest snapshot alongside the erro
 
 ## Human rehearsal
 
-1. Choose Bag inspiration and Start Chat.
+1. Open the shopper UI on port 4322 and choose “I’d rather type”.
 2. Enter: `I need a backpack for a 14-inch laptop and separate shoes under 150 dollars tomorrow`.
 3. Confirm BAG-001-A is USD 104 but disabled as late. BAG-001-B is USD 119 and arrives in one scenario day.
-4. Prepare purchase summary. Wait until presentation is eligible.
+4. Click the eligible offer’s review button to prepare the purchase summary. Wait until presentation is eligible.
 5. Enter: `Keep tomorrow but change the budget to 100 dollars`. Summary/selection must disappear; no matching option or receipt.
 6. Restore budget to USD 150, still tomorrow. Prepare a fresh summary.
 7. Type `Confirm this simulated purchase`. One labelled simulated receipt should appear.
@@ -57,11 +68,11 @@ Errors after an accepted input may return the latest snapshot alongside the erro
 
 ## Verified versus pending
 
-Verified: optimized Next build; 14 backend behavioral checks; 16 existing agent-harness checks updated to canonical IDs; combined HTTP rehearsal (`scripts/rehearse-integration.mjs`); actual built-in browser bag journey including changed constraints and receipt. The CLI backend demo emulates audio callbacks and explicitly labels that limitation.
+Verified: optimized Next 16 builds for both apps; 50 backend acceptance checks and all three HTTP purchase rehearsals; 29 frontend checks; 16 agent-harness checks; combined HTTP rehearsal (`scripts/rehearse-integration.mjs`); actual built-in browser bag journey including changed constraints and receipt. The CLI backend demo emulates audio callbacks and explicitly labels that limitation.
 
-Pending integration: final shopper frontend branch, actual live model/voice transport, audible summary completion and interruption callbacks, trusted final shopper speech events, uploaded-image vision processing, deployed persistence and multi-instance session routing. Current storage is in-process and expires after two hours; restarting loses sessions. Deterministic parsing is bounded rehearsal logic, not a general-purpose AI. Prepared images are labelled illustrations, never claimed as model recognition. No playable catalog video is available.
+Pending integration: actual live model/voice transport, audible summary completion and interruption callbacks, trusted final shopper speech events, uploaded-image vision processing, deployed persistence and multi-instance session routing. Current storage is in-process and expires after two hours; restarting loses sessions. Deterministic parsing is bounded rehearsal logic, not a general-purpose AI. Prepared images are labelled illustrations, never claimed as model recognition. No playable catalog video is available.
 
-Dependency audit on this combined branch reports advisories in Next/PostCSS/Zod; npm's suggested fixes change major versions. Coordinate the final frontend's versions and remediate before public deployment rather than force-upgrading its stack here.
+Both apps use Next 16.4.3 and React 19.2.6. Dependency audit now reports one high-severity advisory in Zod 3; the suggested fix is a Zod 4 major upgrade. Coordinate the shared contract migration before public deployment.
 
 ## Voice-team boundary
 

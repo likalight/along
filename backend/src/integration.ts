@@ -6,10 +6,11 @@ import type {
   Offer,
   Evidence,
   Proposal,
+  Quote,
 } from "./contracts.ts";
 import { SessionStore } from "./store.ts";
-import { object, keys, requireThat } from "./validation.ts";
-export const productView = (p: Product) => ({
+import { object, keys, requireThat, strings } from "./validation.ts";
+export const productView = (p: Product) => p.canonical ? structuredClone(p.canonical) : ({
   ...p,
   model: p.name,
   title: p.name,
@@ -25,7 +26,7 @@ export const productView = (p: Product) => ({
     : null,
   specs: p.specifications,
 });
-export const offerView = (o: Offer) => ({
+export const offerView = (o: Offer) => o.canonical ? structuredClone(o.canonical) : ({
   ...o,
   variantId: o.variantId ?? null,
   unitPriceMinor: o.unitPrice,
@@ -36,7 +37,7 @@ export const offerView = (o: Offer) => ({
   destination: o.destination ?? null,
   returnTerms: o.returnConditions,
 });
-export const evidenceView = (e: Evidence) => ({
+export const evidenceView = (e: Evidence) => e.canonical ? structuredClone(e.canonical) : ({
   ...e,
   checkedOn: e.capturedAt,
   rating: e.rating?.value ?? null,
@@ -47,10 +48,11 @@ export const evidenceView = (e: Evidence) => ({
   reviewScope: e.source,
   excerpt: null,
 });
-export function summaryView(m: NonNullable<Session["summary"]>) {
-  const q = m.quote;
+export function quoteView(q: Quote) {
   return {
-    ...m,
+    ...q,
+    product: productView(q.product),
+    offer: offerView(q.offer),
     productId: q.product.id,
     variantId: q.product.variantId ?? q.product.variant,
     offerId: q.offer.id,
@@ -62,14 +64,21 @@ export function summaryView(m: NonNullable<Session["summary"]>) {
       shipping: q.shipping,
       otherFees: q.otherFees,
       requiredSetup: q.setupCost,
+      tax: q.tax ?? null,
     },
     totalMinor: q.total,
     destination: q.destination,
-    deliveryWindow: q.offer.deliveryWindow ?? {
+    deliveryWindow: q.offer.canonical?.deliveryWindow ?? q.offer.deliveryWindow ?? {
       latestOffsetDays: q.offer.deliveryDays,
     },
     conditions: [q.offer.returnConditions, ...q.offer.conditions],
     uncertainties: q.offer.uncertainties,
+  };
+}
+export function summaryView(m: NonNullable<Session["summary"]>) {
+  return {
+    ...m,
+    ...quoteView(m.quote),
     status: m.approvalNonce
       ? "awaiting_approval"
       : m.playback === "interrupted"
@@ -84,7 +93,7 @@ export function sessionView(s: Session) {
     hardConstraints: s.constraints,
     exclusions: s.excludedProductIds,
     shortlistIds: s.shortlist,
-    displayOrder: s.shortlist,
+    displayOrder: s.displayOrder,
     focusedProductId: s.view?.focusProductId ?? null,
     selectedOfferId: s.selection?.offerId ?? null,
     cards: s.view?.cards ?? [],
@@ -102,14 +111,20 @@ export function sessionView(s: Session) {
       ? {
           ...s.receipt,
           sessionId: s.id,
-          acceptedOrder: s.summary ? summaryView(s.summary) : s.receipt.quote,
+          acceptedOrder: {
+            ...quoteView(s.receipt.quote),
+            summaryId: s.receipt.summaryId,
+            summaryRevision: s.receipt.summaryRevision,
+          },
         }
       : null,
   };
 }
 export function catalogView(c: CatalogData) {
+  const { canonical, ...legacy } = c;
   return {
-    ...c,
+    ...legacy,
+    ...canonical,
     products: c.products.map(productView),
     offers: c.offers.map(offerView),
     evidence: c.evidence.map(evidenceView),
@@ -118,6 +133,8 @@ export function catalogView(c: CatalogData) {
 export function integrationResponse(body: any): any {
   if (body?.products && body?.offers && body?.evidence)
     return catalogView(body);
+  if (Array.isArray(body?.eligible) && Array.isArray(body?.ineligible))
+    return { ...body, eligible: body.eligible.map(quoteView), ineligible: body.ineligible.map(quoteView) };
   if (body?.session) {
     const session = sessionView(body.session);
     return {
@@ -158,6 +175,12 @@ export function acceptAction(store: SessionStore, id: string, raw: unknown) {
     409,
   );
   object(raw.payload);
+  const evidenceIds = raw.evidenceIds ?? [];
+  requireThat(
+    strings(evidenceIds, 100) && evidenceIds.every(id => store.profile.catalog.evidence.some(e => e.id === id)),
+    "UNKNOWN_EVIDENCE",
+    "Use a bounded unique list of known evidence IDs.",
+  );
   const payload = raw.payload;
   return store.once(id, raw.epoch as number, raw.eventId as string, raw, () => {
     const current = store.get(id);
@@ -175,6 +198,7 @@ export function acceptAction(store: SessionStore, id: string, raw: unknown) {
       "STALE_TURN",
       "Turn is no longer active.",
       409,
+      { session: current },
     );
     const p: Proposal = {
       expectedRevision: raw.baseRevision as number,
@@ -183,14 +207,17 @@ export function acceptAction(store: SessionStore, id: string, raw: unknown) {
     };
     switch (raw.action) {
       case "clarify":
-        keys(payload, ["needs"]);
+        keys(payload, ["needs", "preferences"]);
         p.needs = payload.needs as string[];
+        if (payload.preferences !== undefined) p.preferences = payload.preferences as string[];
         p.stage = "understanding";
         break;
       case "set_constraints":
-        keys(payload, ["constraints", "destination"]);
+        keys(payload, ["constraints", "destination", "preferences", "exclusions"]);
         p.constraints = payload.constraints as Proposal["constraints"];
         p.destination = payload.destination as string;
+        if (payload.preferences !== undefined) p.preferences = payload.preferences as string[];
+        if (payload.exclusions !== undefined) p.excludedProductIds = payload.exclusions as string[];
         break;
       case "set_priority":
         keys(payload, ["priority"]);
@@ -198,8 +225,9 @@ export function acceptAction(store: SessionStore, id: string, raw: unknown) {
         p.stage = "buying_priorities";
         break;
       case "shortlist":
-        keys(payload, ["productIds", "cards", "stage"]);
+        keys(payload, ["productIds", "displayOrder", "cards", "stage"]);
         p.shortlist = payload.productIds as string[];
+        if (payload.displayOrder !== undefined) p.displayOrder = payload.displayOrder as string[];
         p.stage = (payload.stage as string) ?? "shortlist";
         if (payload.cards)
           p.view = {
@@ -311,6 +339,12 @@ export function acceptApproval(store: SessionStore, id: string, raw: unknown) {
   return store.once(id, raw.epoch as number, raw.eventId as string, raw, () => {
     const s = store.get(id);
     requireThat(
+      s.turn?.input?.modality === raw.modality,
+      "UNTRUSTED_APPROVAL",
+      "Approval must match a fresh shopper input of the same modality.",
+      409,
+    );
+    requireThat(
       s.summary &&
         s.summary.id === raw.summaryId &&
         s.summary.revision === raw.summaryRevision,
@@ -334,6 +368,12 @@ export function acceptApproval(store: SessionStore, id: string, raw: unknown) {
         "echoDetected",
       ]);
       observation = raw.voiceEvidence;
+      requireThat(
+        raw.voiceEvidence.transcript === s.turn?.input?.text,
+        "UNTRUSTED_APPROVAL",
+        "Voice evidence must match the accepted shopper transcript.",
+        409,
+      );
     } else observation = { transcript: s.turn?.input?.text };
     return store.approve(
       id,

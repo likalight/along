@@ -54,7 +54,7 @@ describe("attachment boundary", () => {
       }),
     );
     expect(invalid.status).toBe(400);
-    expect((await invalid.json()).error).toContain("signatures");
+    expect((await invalid.json()).error).toContain("structurally valid");
     const oversized = await POST(
       new Request("http://localhost/api/attachments", {
         method: "POST",
