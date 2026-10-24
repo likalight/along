@@ -6,3 +6,6 @@ components/ui/elevenlabs-LICENSE.md
 public
 playwright-report
 test-results
+
+# Preserve the existing project README editorial formatting.
+README.md
