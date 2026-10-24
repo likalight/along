@@ -134,6 +134,55 @@ function carouselChoices(page: Page) {
     .getByRole("button", { name: /^Focus option \d+:/ });
 }
 const preparedImage = "Prepared blue tote illustration";
+test("recovered expired sessions initialize voice without turning on the microphone", async ({
+  page,
+  baseURL,
+}) => {
+  const expiredSessionId = crypto.randomUUID();
+  await installVoiceMock(page);
+  await page.context().addCookies([
+    {
+      name: `along-session-${expiredSessionId}`,
+      value: "stale-token-from-before-server-restart",
+      url: baseURL!,
+    },
+  ]);
+  await page.addInitScript((id) => {
+    sessionStorage.setItem("along.sessionId", id);
+  }, expiredSessionId);
+  const configuredSessions: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().endsWith("/api/voice/mint"))
+      configuredSessions.push(request.postDataJSON().sessionId);
+  });
+  await page.goto("/");
+  await expect(page.getByRole("alert")).toBeVisible();
+  const start = page.getByRole("button", {
+    name: "Start talking",
+    exact: true,
+  });
+  await expect(start).toBeDisabled();
+  expect(configuredSessions).toEqual([]);
+  await page.getByRole("button", { name: "Reconnect", exact: true }).click();
+  await expect(start).toBeEnabled();
+  const recoveredId = await page.evaluate(() =>
+    sessionStorage.getItem("along.sessionId"),
+  );
+  expect(recoveredId).toBeTruthy();
+  expect(recoveredId).not.toBe(expiredSessionId);
+  expect(configuredSessions).toContain(recoveredId);
+  expect(configuredSessions).not.toContain(expiredSessionId);
+  expect(
+    await page.evaluate(() => (window as any).__voice.capturing()),
+  ).toBeFalsy();
+  await start.click();
+  await expect(
+    page.getByRole("button", { name: "Pause microphone" }),
+  ).toBeVisible();
+  expect(await page.evaluate(() => (window as any).__voice.capturing())).toBe(
+    true,
+  );
+});
 test("shopper opening and complete text journey, without presenter controls or unrelated products", async ({
   page,
 }) => {

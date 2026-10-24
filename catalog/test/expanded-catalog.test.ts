@@ -18,7 +18,9 @@ test("100-index joins original 50 details by ID without silently refreshing thei
 });
 
 test("index importer rejects omissions, duplicate IDs, changed old facts and malformed review ratings", () => {
-  assert.throws(() => importMicrophoneIndex(indexSource.replace(/^\| MIC-100.*\n/m, "")), /EXPECTED_100/);
+  const missingLastProduct = indexSource.replace(/^\| MIC-100[^\r\n]*(?:\r?\n|$)/m, "");
+  assert.notEqual(missingLastProduct, indexSource, "The omission fixture must remove MIC-100 with either source line ending");
+  assert.throws(() => importMicrophoneIndex(missingLastProduct), /EXPECTED_100/);
   assert.throws(() => importMicrophoneIndex(indexSource.replace("| MIC-100 |", "| MIC-099 |")), /EXPECTED_100/);
   assert.throws(() => importMicrophoneIndex(indexSource.replace("| 19.00 | search_snapshot | in_stock |", "| 18.00 | search_snapshot | in_stock |")), /LEGACY_INDEX_DRIFT/);
   assert.throws(() => importMicrophoneIndex(indexSource.replace("| 2/5 / 0 |", "| 9/5 / 0 |")), /INVALID_INDEX_RATING/);
@@ -47,7 +49,7 @@ test("missing new source details and nuanced review counts remain explicit", () 
 test("every product has distinct disclosed demo reviews without contaminating source aggregates", () => {
   const data = getCatalog();
   const reviews = data.products.flatMap(p => p.demoReviews!.entries);
-  assert.equal(reviews.length, 592);
+  assert.equal(reviews.length, 800);
   assert.equal(new Set(reviews.map(r => r.id)).size, reviews.length);
   for (const product of data.products) {
     assert.equal(product.demoReviews!.classification, "proxy");
@@ -65,12 +67,12 @@ test("every product has distinct disclosed demo reviews without contaminating so
 
 test("new non-tech categories use real manufacturer products and usable sourced constraints", () => {
   const data = getCatalog();
-  assert.equal(data.products.filter(p => p.category === "everyday-bags").length, 24);
+  assert.equal(data.products.filter(p => p.category === "everyday-bags").length, 50);
   const beds = data.products.filter(p => p.category === "bedsheet-sets");
-  assert.equal(beds.length, 24);
+  assert.equal(beds.length, 50);
   assert.ok(["US Twin", "US Full/Double", "US King", "US Queen"].every(size => beds.some(p => p.specs.sizeMarket === size)));
   assert.ok(new Set(beds.map(p => p.specs.compositionLabel)).size >= 4);
-  const added = data.products.filter(p => /^(BAG|BED)-/.test(p.id) && Number(p.id.slice(4)) >= 7);
+  const added = data.products.filter(p => /^(BAG|BED)-/.test(p.id) && Number(p.id.slice(4)) >= 7 && Number(p.id.slice(4)) <= 24);
   assert.equal(added.length, 36);
   assert.ok(added.every(p => p.provenance?.kind === "source_snapshot" && p.sourceUrls[0].startsWith("https://www.") && p.specs.specificationClassification === "snapshot"));
   assert.equal(quoteOffer(data, "BAG-010-A", { category: "everyday-bags", laptopInches: 16, budgetMinor: 15000 }).eligible, true);

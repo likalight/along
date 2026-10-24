@@ -1510,6 +1510,17 @@ footer { margin: 28px auto 20px; }
 /* Balance the opening within the space below the navigation. Content remains
    scrollable on short screens and returns to normal flow with product results. */
 .shell > .topbar { flex-shrink: 0; }
+.catalog-notice {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 8px 18px;
+  color: var(--muted);
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+  text-align: center;
+  font-size: 11px;
+  line-height: 1.5;
+}
 .main.orb-greeting {
   flex: 1 0 auto;
   justify-content: center;

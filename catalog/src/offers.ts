@@ -2,6 +2,7 @@ import type { Evidence, Offer, Product, Seller } from "./types.ts";
 import { emptyMetrics } from "./types.ts";
 import { microphoneArchive } from "./microphones.ts";
 import { seededNonTechProducts } from "./seeded-nontech.ts";
+import { personalNonTechPrices } from "./personal-nontech.ts";
 export const scenarioNow = "2026-10-24T10:00:00+08:00";
 export const timezone = "Asia/Singapore";
 export const destination = "DEMO-DESTINATION-01 (fictional service zone; not Singapore stock)";
@@ -12,6 +13,7 @@ export function resolveDelivery(offsetDays: number, hour = 18): string {
 }
 // Explicit authored amounts, independent of reference prices (including estimates/range floors).
 const prices: Record<string, [number, number]> = {
+  ...personalNonTechPrices,
   "MIC-001": [1900, 2400], "MIC-003": [2200, 2900], "MIC-009": [27700, 28700],
   "MIC-015": [16900, 17900], "MIC-020": [5800, 6800], "MIC-022": [10900, 11900],
   "MIC-025": [5000, 6000], "MIC-037": [8900, 9900], "MIC-038": [5900, 6900],

@@ -27,6 +27,10 @@ export function completeLiveDemoCheckout(
 ) {
   const { sessionId, ...completion } = input;
   const { core } = getRuntime().store;
+  if (project(sessionId).discoveryReference)
+    throw new Error(
+      "This browsing reference is not a catalog order. Open its Coupang link to check and buy, or return to your catalog first.",
+    );
   try {
     const result = core.completeLiveDemo(sessionId, completion, interpretation);
     return { snapshot: project(sessionId), receipt: result.receipt };

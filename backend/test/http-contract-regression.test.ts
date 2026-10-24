@@ -57,10 +57,17 @@ test("HTTP default catalog preserves the complete shared USD fixtures and serves
   for (const path of new Set(shared.products.map(p => p.image.url))) {
     const response = await fetch(h.base + path);
     assert.equal(response.status, 200);
-    assert.match(response.headers.get("content-type")!, /image\/webp/);
     const image = Buffer.from(await response.arrayBuffer());
-    assert.equal(image.subarray(0, 4).toString(), "RIFF");
-    assert.equal(image.subarray(8, 12).toString(), "WEBP");
+    if (path.endsWith(".svg")) {
+      assert.ok(["/catalog/images/bag.svg", "/catalog/images/bedding.svg"].includes(path));
+      assert.match(response.headers.get("content-type")!, /image\/svg\+xml/);
+      assert.match(image.toString(), /DEMO ILLUSTRATION/);
+      assert.doesNotMatch(image.toString(), /<script|<image|<foreignObject|(?:href|src)=["']https?:/i);
+    } else {
+      assert.match(response.headers.get("content-type")!, /image\/webp/);
+      assert.equal(image.subarray(0, 4).toString(), "RIFF");
+      assert.equal(image.subarray(8, 12).toString(), "WEBP");
+    }
   }
   assert.equal((await fetch(h.base + "/catalog/images/private.svg")).status, 404);
 });

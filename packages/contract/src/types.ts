@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DiscoveryReferenceSchema, DiscoveryAssessmentSchema } from "./discovery.js";
 
 /** Contract v1 — shared shopping session types (#2). */
 
@@ -213,6 +214,8 @@ export const SessionSnapshotSchema = z.object({
   sessionId: z.string(),
   epoch: z.number().int(),
   revision: z.number().int(),
+  discoveryReference: DiscoveryReferenceSchema.optional(),
+  discoveryAssessment: DiscoveryAssessmentSchema.optional(),
   needs: z.array(z.string()).default([]),
   hardConstraints: z.record(z.unknown()).default({}),
   preferences: z.record(z.unknown()).default({}),

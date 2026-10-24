@@ -14,6 +14,7 @@ import {
 } from "motion/react";
 import {
   ArrowUp,
+  ArrowUpRight,
   Mic,
   Pause,
   RotateCcw,
@@ -27,9 +28,15 @@ import { BrowserSpeechAdapter } from "@/lib/voice/browser-adapter";
 import { createSpeechAdapter } from "@/lib/voice/create-speech-adapter";
 import { ProductCanvas } from "./canvas/ProductCanvas";
 import { PurchaseComplete } from "./canvas/PurchaseComplete";
-import { customerCopy, customerDestinationLabel, customerNotes, customerSellerLabel } from "@/lib/canvas/customer-copy";
+import {
+  customerCopy,
+  customerDestinationLabel,
+  customerNotes,
+  customerSellerLabel,
+} from "@/lib/canvas/customer-copy";
 import { VoiceOrb } from "./voice-orb";
 import { Attachments } from "./attachments";
+import { ExtensionCompanion, DiscoveryContext } from "./extension-companion";
 import type { Session, VoiceStatus } from "@/lib/session/contract";
 const statusLabels: Record<VoiceStatus, string> = {
   ready: "Ready when you are",
@@ -75,20 +82,13 @@ export function SessionShell() {
     [...(s?.history ?? [])].reverse().find((entry) => entry.role === "user")
       ?.text;
   useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      await controller.connect();
-      const sessionId = controller.getSnapshot().snapshot?.sessionId;
-      if (!sessionId || cancelled) return;
-      const { adapter, kind, note } = await createSpeechAdapter(sessionId);
-      if (cancelled) {
-        adapter.dispose();
-        return;
-      }
-      controller.setSpeechAdapter(adapter, kind);
-      setVoiceNote(note ?? null);
-      setVoiceReady(true);
-    })();
+    const query = new URL(window.location.href).searchParams;
+    const resume =
+      query.get("discoverySession") ??
+      sessionStorage.getItem("along.sessionId");
+    void controller.connect(
+      resume && /^[A-Za-z0-9_-]{1,100}$/.test(resume) ? resume : undefined,
+    );
     const offline = () => {
       controller.interrupt();
       controller.pauseListening();
@@ -101,7 +101,6 @@ export function SessionShell() {
     window.addEventListener("online", online);
     window.addEventListener("keydown", key);
     return () => {
-      cancelled = true;
       controller.interrupt();
       controller.closeVoice();
       window.removeEventListener("offline", offline);
@@ -109,6 +108,30 @@ export function SessionShell() {
       window.removeEventListener("keydown", key);
     };
   }, [controller]);
+  useEffect(() => {
+    const sessionId = s?.sessionId;
+    if (!sessionId) return;
+    let cancelled = false;
+    setVoiceReady(false);
+    // A failed saved-session reconnect has no ID at mount. Initialize when a
+    // valid session is accepted later, without starting capture or playback.
+    void (async () => {
+      const { adapter, kind, note } = await createSpeechAdapter(sessionId);
+      if (cancelled) {
+        adapter.dispose();
+        return;
+      }
+      controller.setSpeechAdapter(adapter, kind);
+      setVoiceNote(note ?? null);
+      setVoiceReady(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [controller, s?.sessionId]);
+  useEffect(() => {
+    if (s?.sessionId) sessionStorage.setItem("along.sessionId", s.sessionId);
+  }, [s?.sessionId]);
   useEffect(() => {
     // Announce new stages without pulling focus away from an in-progress message.
     if (s?.view && document.activeElement === document.body)
@@ -128,7 +151,23 @@ export function SessionShell() {
             <span className="brand-mark">a</span>along
             <span className="brand-dot">.</span>
           </a>
+          <a
+            className="private-note"
+            href="/extension"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Chrome companion <ArrowUpRight size={12} />
+          </a>
         </header>
+        <p className="catalog-notice" role="note">
+          Demo catalog · simulated offers and orders
+        </p>
+        <ExtensionCompanion
+          controller={controller}
+          state={state}
+          hasDraft={Boolean(draft.trim())}
+        />
         <main
           className={`${opening ? "main opening" : "main active"} ${orbGreeting ? "orb-greeting" : ""}`}
         >
@@ -214,7 +253,9 @@ export function SessionShell() {
                 </div>
                 {opening && (
                   <p>
-                    <a href="/context">Personal context · manage Mac preferences</a>
+                    <a href="/context">
+                      Personal context · manage Mac preferences
+                    </a>
                   </p>
                 )}
                 {s && (
@@ -464,8 +505,16 @@ function ContentStage({
   }, [s.view, s.summaryId, onSummaryDisplayed]);
   return (
     <>
+      {s.discoveryReference && !["summary", "receipt"].includes(s.view) && (
+        <DiscoveryContext
+          reference={s.discoveryReference}
+          assessment={s.discoveryAssessment}
+          onCommand={onCommand}
+        />
+      )}
       {s.canvas &&
         s.catalog &&
+        !s.discoveryReference &&
         !["opening", "summary", "receipt", "recovery"].includes(s.view) && (
           <ProductCanvas
             narrationProductId={narrationProductId}
@@ -561,8 +610,20 @@ function ContentStage({
           </p>
           <dl>
             {[
-              ["Product", s.catalog?.products.find((product) => product.id === s.summary?.productId)?.title ?? s.summary.productId],
-              ["Variant", customerCopy(s.catalog?.products.find((product) => product.id === s.summary?.productId)?.model ?? s.summary.variantId.replace(/-DEMO$/i, ""))],
+              [
+                "Product",
+                s.catalog?.products.find(
+                  (product) => product.id === s.summary?.productId,
+                )?.title ?? s.summary.productId,
+              ],
+              [
+                "Variant",
+                customerCopy(
+                  s.catalog?.products.find(
+                    (product) => product.id === s.summary?.productId,
+                  )?.model ?? s.summary.variantId.replace(/-DEMO$/i, ""),
+                ),
+              ],
               ["Seller", customerSellerLabel(s.summary.sellerId)],
               ["Quantity", String(s.summary.quantity)],
               [
@@ -581,13 +642,18 @@ function ContentStage({
               ["Destination", customerDestinationLabel(s.summary.destination)],
               ["Delivery estimate", s.summary.deliveryWindow],
               ["Conditions", customerNotes(s.summary.conditions).join(". ")],
-              ["Before you buy", customerNotes(s.summary.uncertainties).join(". ")],
-            ].filter(([, value]) => value).map(([k, v]) => (
-              <div key={k}>
-                <dt>{k}</dt>
-                <dd>{v}</dd>
-              </div>
-            ))}
+              [
+                "Before you buy",
+                customerNotes(s.summary.uncertainties).join(". "),
+              ],
+            ]
+              .filter(([, value]) => value)
+              .map(([k, v]) => (
+                <div key={k}>
+                  <dt>{k}</dt>
+                  <dd>{v}</dd>
+                </div>
+              ))}
           </dl>
           {s.summary.spokenText && (
             <p className="exact-summary-text">{s.summary.spokenText}</p>
@@ -618,7 +684,9 @@ function ContentStage({
       {s.view === "receipt" && s.receipt && (
         <PurchaseComplete
           receipt={s.receipt}
-          product={s.catalog?.products.find((product) => product.id === s.receipt?.acceptedOrder.productId)}
+          product={s.catalog?.products.find(
+            (product) => product.id === s.receipt?.acceptedOrder.productId,
+          )}
         />
       )}
     </>

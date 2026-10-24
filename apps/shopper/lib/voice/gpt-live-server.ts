@@ -15,6 +15,10 @@ import {
   ORDER_APPROVAL_QUESTION,
 } from "./live-approval-context";
 import { compactLiveOrderReview } from "./live-checkout-response";
+import {
+  LIVE_DISCOVERY_POLICY,
+  liveDiscoveryContext,
+} from "./live-discovery-context";
 
 // Also sent once to calls already open when this policy changes in development.
 // Keep this within one Live append (500 tokens; append caps at 1,500 characters).
@@ -27,6 +31,9 @@ export const LIVE_INSTRUCTIONS = `You help shoppers choose confidently, only wit
 
 ## Role and display actions
 ${LIVE_SHOPPING_GUARDRAILS}
+
+## Browser discovery context
+${LIVE_DISCOVERY_POLICY}
 
 ## Backchannel policy
 Acknowledge required work once in your own words. Allow the shopper thinking pauses and self-corrections. A short "mm-hm" or "yeah" can be a listening sound; do not automatically abandon your thought for it. Avoid repetitive filler or repeated promises to look something up.
@@ -140,6 +147,8 @@ type Call = {
   contextRevision: number;
   contextPending?: boolean;
   contextContent?: string;
+  discoveryContextContent?: string;
+  discoveryPolicy?: string;
   guardrails?: string;
   announcedReceiptId?: string;
   turnId?: string;
@@ -173,6 +182,7 @@ function spokenUpdate(
   s: ReturnType<typeof project>,
   previousSummaryId?: string,
 ) {
+  if (s.discoveryReference) return s.message;
   if (
     s.view === "summary" &&
     s.summary &&
@@ -189,28 +199,34 @@ function spokenUpdate(
   return s.message;
 }
 function stateContext(sessionId: string, s = project(sessionId)) {
-  const carouselVisible = ["shortlist", "saved_choice"].includes(s.view);
+  const carouselVisible =
+    !s.discoveryReference && ["shortlist", "saved_choice"].includes(s.view);
   return JSON.stringify({
     view: s.view,
-    purchase: s.receipt
+    purchase: s.discoveryReference
       ? {
-          status: "confirmed",
-          receiptId: s.receipt.id,
-          delivery: s.receipt.acceptedOrder.deliveryWindow,
+          status: "external_reference",
+          checkout: "Open on Coupang; no purchase authority",
         }
-      : s.summary
+      : s.receipt
         ? {
-            status: "review_order",
-            summaryId: s.summary.id,
-            instruction:
-              "The order details are displayed. Immediately delegate an explicit purchase request, including an interruption mid-review; do not finish the readout or ask again. For an ambiguous reply ask: Would you like me to place this order?",
+            status: "confirmed",
+            receiptId: s.receipt.id,
+            delivery: s.receipt.acceptedOrder.deliveryWindow,
           }
-        : { status: "not_confirmed" },
+        : s.summary
+          ? {
+              status: "review_order",
+              summaryId: s.summary.id,
+              instruction:
+                "The order details are displayed. Immediately delegate an explicit purchase request, including an interruption mid-review; do not finish the readout or ask again. For an ambiguous reply ask: Would you like me to place this order?",
+            }
+          : { status: "not_confirmed" },
     message: spokenUpdate(s)?.slice(0, 450),
     carouselProductCount: carouselVisible ? s.displayOrder.length : 0,
-    solutionType: s.canvas?.solution ?? null,
+    solutionType: s.discoveryReference ? null : (s.canvas?.solution ?? null),
     solutionChoices:
-      s.view === "solution_types"
+      !s.discoveryReference && s.view === "solution_types"
         ? AUDIO_SOLUTION_CHOICES.map((choice, index) => ({
             position: index + 1,
             solutionType: choice.solutionType,
@@ -218,12 +234,14 @@ function stateContext(sessionId: string, s = project(sessionId)) {
           }))
         : undefined,
     shoppingTaskPending: calls.get(sessionId)?.pending ?? false,
-    focusedProduct: s.focusedProductId,
+    focusedProduct: s.discoveryReference ? null : s.focusedProductId,
     // The canvas uses catalog + displayOrder; legacy stage cards are always empty.
-    products: s.displayOrder.slice(0, 3).map((id) => ({
-      id,
-      title: s.catalog?.products.find((product) => product.id === id)?.title,
-    })),
+    products: (s.discoveryReference ? [] : s.displayOrder.slice(0, 3)).map(
+      (id) => ({
+        id,
+        title: s.catalog?.products.find((product) => product.id === id)?.title,
+      }),
+    ),
     needs: s.needs?.slice(0, 3),
     constraints: s.hardConstraints,
     preferences: s.preferences?.slice(0, 4),
@@ -245,6 +263,7 @@ function reviewKey(
     : undefined;
 }
 function approvalSummary(call: Call, snapshot = project(call.sessionId)) {
+  if (snapshot.discoveryReference) return null;
   const summary = snapshot.summary;
   const stored = getRuntime().store.core.get(call.sessionId).summary;
   return ["summary", "recovery"].includes(snapshot.view) &&
@@ -263,6 +282,18 @@ function appendContext(
   snapshot = project(call.sessionId),
 ) {
   approvalContext(call).expect(approvalSummary(call, snapshot));
+  if (call.discoveryPolicy !== LIVE_DISCOVERY_POLICY) {
+    if (!append(call, "instructions", LIVE_DISCOVERY_POLICY, delegationId))
+      return;
+    call.discoveryPolicy = LIVE_DISCOVERY_POLICY;
+  }
+  const discovery = liveDiscoveryContext(snapshot);
+  const discoveryContent = JSON.stringify(discovery);
+  if (discoveryContent !== call.discoveryContextContent) {
+    for (const content of discovery)
+      if (!append(call, "thinking", content, delegationId)) return;
+    call.discoveryContextContent = discoveryContent;
+  }
   const content = stateContext(call.sessionId, snapshot);
   if (
     content !== call.contextContent &&
@@ -370,16 +401,20 @@ async function delegate(call: Call, id: string, offset: number) {
   if (generation !== call.generation || call.closed) return;
   const s = project(call.sessionId);
   const previousTurnId = store.core.get(s.sessionId).turn?.id;
-  const summaryInView = ["summary", "recovery"].includes(s.view) && s.summary;
+  const summaryInView =
+    !s.discoveryReference &&
+    ["summary", "recovery"].includes(s.view) &&
+    s.summary;
   const currentSummary = approvalSummary(call, s);
   const approvalPromptActive = approvalContext(call).consume(currentSummary);
   let intent: CheckoutIntentDecision;
   try {
     call.pending = true;
     intent =
-      currentSession.summary ||
-      currentSession.selection ||
-      currentSession.receipt
+      !s.discoveryReference &&
+      (currentSession.summary ||
+        currentSession.selection ||
+        currentSession.receipt)
         ? await resolveCheckoutIntent(s.sessionId, checkoutText, {
             approvalPromptActive,
             assentContextCurrent:
@@ -432,7 +467,11 @@ async function delegate(call: Call, id: string, offset: number) {
     appendContext(call, id);
     return;
   }
-  if (s.receipt && intent.intent === "acknowledge_order") {
+  if (
+    !s.discoveryReference &&
+    s.receipt &&
+    intent.intent === "acknowledge_order"
+  ) {
     call.pending = false;
     call.error = undefined;
     append(
@@ -461,6 +500,7 @@ async function delegate(call: Call, id: string, offset: number) {
   // This separate server-only path is limited to the displayed demo order and
   // can issue only its synthetic receipt, never a payment or merchant order.
   if (
+    !s.discoveryReference &&
     intent.intent === "approve_order" &&
     intent.summaryId === s.summary?.id &&
     summaryInView
@@ -650,6 +690,10 @@ export async function connectGptLive(
                 type: "input_text",
                 text: `Current verified shopping state: ${stateContext(body.sessionId)}`,
               },
+              ...liveDiscoveryContext(project(body.sessionId)).map((text) => ({
+                type: "input_text",
+                text,
+              })),
             ],
           },
         ],
@@ -684,6 +728,10 @@ export async function connectGptLive(
     delegationSequence: 0,
     contextRevision: project(body.sessionId).revision,
     contextPending: false,
+    discoveryContextContent: JSON.stringify(
+      liveDiscoveryContext(project(body.sessionId)),
+    ),
+    discoveryPolicy: LIVE_DISCOVERY_POLICY,
     guardrails: LIVE_SHOPPING_GUARDRAILS,
     announcedReceiptId: project(body.sessionId).receipt?.id,
     pending: false,
@@ -782,7 +830,8 @@ export function gptLiveState(sessionId: string, callId: unknown) {
   }
   if (
     call.contextRevision !== s.revision ||
-    call.contextPending !== call.pending
+    call.contextPending !== call.pending ||
+    call.discoveryContextContent !== JSON.stringify(liveDiscoveryContext(s))
   ) {
     appendContext(call, null, s);
   }

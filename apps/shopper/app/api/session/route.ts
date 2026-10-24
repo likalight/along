@@ -14,6 +14,8 @@ import { getRuntime, narrationSegments } from "@/lib/integration/runtime";
 import { authorize, assertOrigin } from "@/lib/integration/access";
 import { project, messages } from "@/lib/integration/projection";
 import type { Input } from "@/lib/session/contract";
+import { getPendingHandoff, acknowledgeHandoff } from "@/lib/discovery/store";
+import { assertShopperOrigin } from "@/lib/discovery/security";
 import { consumeVoiceEvidence } from "@/lib/voice/server";
 import {
   resolveCheckoutIntent,
@@ -90,6 +92,47 @@ export async function POST(request: Request) {
     if (b.action === "connect") return NextResponse.json(project(sessionId));
     if (!i || i.epoch !== c.epoch || typeof i.turnId !== "string")
       throw new Error("Stale session identity; reconnect.");
+    if (b.action === "discovery") {
+      assertShopperOrigin(request);
+      if (typeof b.handoffId !== "string" || !Number.isInteger(i.revision))
+        throw new Error("Invalid discovery handoff.");
+      const pending = getPendingHandoff(sessionId);
+      if (
+        !pending ||
+        pending.handoffId !== b.handoffId ||
+        pending.epoch !== c.epoch
+      )
+        throw new Error(
+          "Discovery expired or belongs to another conversation. Send it again from the extension.",
+        );
+      if (pending.mode === "unavailable")
+        throw new Error("No verified discovery result is available.");
+      const result = await orch.importDiscovery(
+        sessionId,
+        {
+          handoffId: pending.handoffId,
+          source: pending.source,
+          candidate: pending.candidate,
+          mode: pending.mode,
+        },
+        { epoch: i.epoch, baseRevision: i.revision },
+      );
+      const current = store.core.get(sessionId);
+      if (current.epoch !== i.epoch || current.turn?.id !== result.turnId) {
+        // The reference was already accepted before audio interruption yielded.
+        // Do not keep offering a stale arrival over the shopper's newer turn.
+        acknowledgeHandoff(sessionId, pending.handoffId);
+        throw new Error(
+          "The conversation changed while the discovery arrived. Try again.",
+        );
+      }
+      messages.set(sessionId, result.speakable);
+      acknowledgeHandoff(sessionId, pending.handoffId);
+      return NextResponse.json({
+        snapshot: project(sessionId),
+        turnId: result.turnId,
+      });
+    }
     if (b.action === "activity") {
       return NextResponse.json({
         activity:
@@ -239,6 +282,7 @@ export async function POST(request: Request) {
       delete input.attachmentId;
     }
     let text = input.text?.trim() ?? "";
+    const discoveryActive = Boolean(store.get(sessionId)?.discoveryReference);
     // The browser supplies only provider identities. Transcript quality and
     // finality come from the authenticated server sideband, never request flags.
     const trustedVoice =
@@ -247,11 +291,14 @@ export async function POST(request: Request) {
         : null;
     // A retained review is not the current referent after navigation. In
     // particular, "buy this" on another product must not approve the old order.
-    const reviewInView = Boolean(c.summary && c.stage === "summary");
+    const reviewInView =
+      !discoveryActive && Boolean(c.summary && c.stage === "summary");
     const selectedProductId = agreedCatalog.offers.find(
       (offer: any) => offer.id === c.selection?.offerId,
     )?.productId;
-    const focus = c.view?.focusProductId ?? selectedProductId ?? c.shortlist[0];
+    const focus = discoveryActive
+      ? undefined
+      : (c.view?.focusProductId ?? selectedProductId ?? c.shortlist[0]);
     // A short assent answers the order question only on that summary's own
     // response turn. A later discussion cannot borrow its approval context.
     const orderQuestionActive = Boolean(
@@ -266,20 +313,22 @@ export async function POST(request: Request) {
       /^(?:(?:Focus|Save|Remove|Show offers for|Show reviews for|(?:Select|Choose) offer) [A-Z0-9-]+|Compare the first two|Back to shortlist|Restore shortlist|Show saved choices|Review summary|Prepare summary|Remove reference [A-Za-z0-9._:-]+)$/i.test(
         text,
       );
-    const checkoutIntent: CheckoutIntentDecision =
-      takeCheckoutIntent(request, sessionId, text) ??
-      (!directAction &&
-      text &&
-      ["text", "voice"].includes(input.modality) &&
-      (c.summary || c.selection || c.receipt)
-        ? await resolveCheckoutIntent(sessionId, text, {
-            approvalPromptActive: orderQuestionActive,
-          })
-        : {
-            intent: "continue_shopping",
-            authorization: "none",
-            summaryId: null,
-          });
+    const delegatedIntent = takeCheckoutIntent(request, sessionId, text);
+    const checkoutIntent: CheckoutIntentDecision = discoveryActive
+      ? { intent: "continue_shopping", authorization: "none", summaryId: null }
+      : (delegatedIntent ??
+        (!directAction &&
+        text &&
+        ["text", "voice"].includes(input.modality) &&
+        (c.summary || c.selection || c.receipt)
+          ? await resolveCheckoutIntent(sessionId, text, {
+              approvalPromptActive: orderQuestionActive,
+            })
+          : {
+              intent: "continue_shopping",
+              authorization: "none",
+              summaryId: null,
+            }));
     if (store.core.get(sessionId).revision !== intentRevision)
       throw new Error(
         "The order changed while I was checking your request. The current details are still on screen.",
@@ -307,6 +356,7 @@ export async function POST(request: Request) {
       checkoutIntent.intent === "approve_order" &&
       checkoutIntent.summaryId === c.summary?.id;
     const prepareCheckout =
+      !discoveryActive &&
       checkoutIntent.intent === "prepare_order" &&
       !reviewInView &&
       Boolean(c.selection?.offerId) &&
@@ -342,13 +392,16 @@ export async function POST(request: Request) {
     // Direction cards have their own stable order. Let the shopping agent
     // resolve those choices instead of focusing a nonexistent product card.
     const navigation =
-      c.stage === "solution_types" ? null : parseProductNavigation(text);
+      discoveryActive || c.stage === "solution_types"
+        ? null
+        : parseProductNavigation(text);
     // Navigation uses the same authenticated input and authoritative focus path.
     // Never send compound shopping instructions through this shortcut.
     if (navigation)
       text = `Focus ${resolveProductNavigation(store.get(sessionId)!, navigation)}`;
     if (/^show offers$/i.test(text) && focus) text = `Show offers for ${focus}`;
-    if (/^(compare|compare them)$/i.test(text)) text = "Compare the first two";
+    if (!discoveryActive && /^(compare|compare them)$/i.test(text))
+      text = "Compare the first two";
     if (/^save for later$/i.test(text) && focus) text = `Save ${focus}`;
     // Natural-language offer pick from the focused product's quote set.
     if (
@@ -432,7 +485,9 @@ export async function POST(request: Request) {
       /^(Compare the first two|Back to shortlist|Restore shortlist|Show saved choices|Review summary|Prepare summary)$/i.test(
         text,
       );
-    if (exact || simple || confirm || prepareCheckout) {
+    // The agent resolves explicit catalog navigation; vague commands must keep
+    // referring to the visible discovery, never an earlier hidden selection.
+    if (!discoveryActive && (exact || simple || confirm || prepareCheckout)) {
       // Confirmation is validated against stored shopper input, never model-produced text.
       store.ingestInput({
         ...input,
