@@ -3090,36 +3090,45 @@ export const agreedCatalog: any = {
         "solutionType": "desktop",
         "detailStatus": "legacy_details_available",
         "sourceReferenceFile": "microphone-demo-100/products/MIC-022-r-de-nt-usb-mini.md",
+        "manufacturerCompatibility": {
+          "sourceUrl": "https://rode.com/en-lv/user-guides/nt-usb-mini",
+          "checkedOn": "2026-10-25",
+          "claim": "RØDE documents a USB-C output on the NT-USB Mini, a supplied USB-C to USB-A cable for computers, and the optional SC17 USB-C to USB-C data cable for USB-C computer or tablet inputs. The microphone supports class-compliant USB audio. This verifies the two host connector paths, not any shopper's cable or a retailer's accessory bundle.",
+          "classification": "snapshot"
+        },
         "specificationClassification": "snapshot",
         "demoConfiguration": {
           "classification": "proxy",
           "hostConnections": [
-            "usb-a"
+            "usb-a",
+            "usb-c"
           ],
           "setupHardwareIds": [
-            "usb-a-to-c-data-cable"
+            "usb-a-and-c-data-cable-kit"
           ],
-          "notice": "Authored simulated host path and bundle. This enables demo checkout only; exact real retail compatibility, connectors, power and package contents are unverified."
+          "notice": "USB-A and USB-C computer paths are documented by RØDE; use a compatible data cable. This checkout's dual-host cable kit and USD 5 setup cost are authored simulation fixtures, not a claim about manufacturer or retailer box contents or accessory prices."
         },
         "compatibilityFixture": {
           "supportedHostConnections": [
-            "usb-a"
+            "usb-a",
+            "usb-c"
           ],
           "requiredHardwareIds": [
-            "usb-a-to-c-data-cable"
+            "usb-a-and-c-data-cable-kit"
           ],
           "classification": "proxy",
-          "notice": "Authored simulated host path and bundle. This enables demo checkout only; exact real retail compatibility, connectors, power and package contents are unverified."
+          "notice": "USB-A and USB-C computer paths are documented by RØDE; use a compatible data cable. This checkout's dual-host cable kit and USD 5 setup cost are authored simulation fixtures, not a claim about manufacturer or retailer box contents or accessory prices."
         }
       },
       "limitations": [
         "No measured café-dictation performance evidence.",
         "Included magnetic desk stand; optional boom",
-        "Host paths are bounded simulation fixtures; real compatibility is unverified."
+        "Requires a compatible USB data cable; a charge-only cable will not carry microphone audio."
       ],
       "evidenceIds": [
         "SRC-MIC-022",
         "COMPAT-MIC-022",
+        "COMPAT-MFR-MIC-022",
         "FIT-MIC-022",
         "REV-MIC-022",
         "DEMO-REVIEWS-MIC-022",
@@ -3127,7 +3136,8 @@ export const agreedCatalog: any = {
       ],
       "sourceUrls": [
         "https://www.sweetwater.com/store/detail/NTUSBMini--rode-nt-usb-mini-usb-condenser-microphone",
-        "https://www.sweetwater.com/store/detail/NTUSBMini--rode-nt-usb-mini-usb-condenser-microphone/reviews"
+        "https://www.sweetwater.com/store/detail/NTUSBMini--rode-nt-usb-mini-usb-condenser-microphone/reviews",
+        "https://rode.com/en-lv/user-guides/nt-usb-mini"
       ],
       "referencePrice": {
         "currency": "USD",
@@ -3176,7 +3186,7 @@ export const agreedCatalog: any = {
             "author": "Demo shopper Taylor",
             "rating": 4,
             "title": "Check the whole connection path",
-            "body": "I checked the demo bundle's usb-a connection before comparing prices. There is one separately priced setup component, so the microphone price alone is not the whole cost. I would separately confirm what comes in the real retail box.",
+            "body": "I checked the demo bundle's usb-a or usb-c connection before comparing prices. There is one separately priced setup component, so the microphone price alone is not the whole cost. I would separately confirm what comes in the real retail box.",
             "usedFor": "Computer compatibility",
             "postedOn": "2026-10-11",
             "verifiedPurchase": false
@@ -22858,8 +22868,8 @@ export const agreedCatalog: any = {
       "classification": "proxy",
       "setupHardware": [
         {
-          "id": "usb-a-to-c-data-cable",
-          "description": "Synthetic USB-A host to USB-C device data cable; declared demo audio path",
+          "id": "usb-a-and-c-data-cable-kit",
+          "description": "Compatible USB-A to USB-C and USB-C to USB-C data cables",
           "priceMinor": 500,
           "included": true
         }
@@ -22900,8 +22910,8 @@ export const agreedCatalog: any = {
       "classification": "proxy",
       "setupHardware": [
         {
-          "id": "usb-a-to-c-data-cable",
-          "description": "Synthetic USB-A host to USB-C device data cable; declared demo audio path",
+          "id": "usb-a-and-c-data-cable-kit",
+          "description": "Compatible USB-A to USB-C and USB-C to USB-C data cables",
           "priceMinor": 500,
           "included": true
         }
@@ -33845,7 +33855,23 @@ export const agreedCatalog: any = {
       "sourceUrl": null,
       "sourceType": "fixture",
       "classification": "proxy",
-      "claim": "Authored simulated host path and bundle. This enables demo checkout only; exact real retail compatibility, connectors, power and package contents are unverified."
+      "claim": "USB-A and USB-C computer paths are documented by RØDE; use a compatible data cable. This checkout's dual-host cable kit and USD 5 setup cost are authored simulation fixtures, not a claim about manufacturer or retailer box contents or accessory prices."
+    },
+    {
+      "rating": null,
+      "ratingCount": null,
+      "writtenReviewCount": null,
+      "purchaseCount": null,
+      "purchaseCountPeriod": null,
+      "reviewScope": null,
+      "subjectType": "product",
+      "subjectId": "MIC-022",
+      "checkedOn": "2026-10-25",
+      "sourceUrl": "https://rode.com/en-lv/user-guides/nt-usb-mini",
+      "claim": "RØDE documents a USB-C output on the NT-USB Mini, a supplied USB-C to USB-A cable for computers, and the optional SC17 USB-C to USB-C data cable for USB-C computer or tablet inputs. The microphone supports class-compliant USB audio. This verifies the two host connector paths, not any shopper's cable or a retailer's accessory bundle.",
+      "id": "COMPAT-MFR-MIC-022",
+      "sourceType": "manufacturer",
+      "classification": "snapshot"
     },
     {
       "rating": null,

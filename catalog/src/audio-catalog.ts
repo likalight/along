@@ -70,10 +70,20 @@ export function importMicrophoneIndex(source: string, legacy = legacyMicrophoneA
 export const microphoneArchive = importMicrophoneIndex(readFileSync(new URL("../sources/microphone-demo-data-100.md", import.meta.url), "utf8"));
 export const activeAudioIds = microphoneArchive.records.map(r => r.id);
 
+// Later manufacturer verification supplements the immutable supplied archive.
+// Hardware supplied by our checkout fixture remains separately authored below.
+const manufacturerCompatibility: Record<string, { sourceUrl: string; checkedOn: string; claim: string }> = {
+  "MIC-022": {
+    sourceUrl: "https://rode.com/en-lv/user-guides/nt-usb-mini",
+    checkedOn: "2026-10-25",
+    claim: "RØDE documents a USB-C output on the NT-USB Mini, a supplied USB-C to USB-A cable for computers, and the optional SC17 USB-C to USB-C data cable for USB-C computer or tablet inputs. The microphone supports class-compliant USB audio. This verifies the two host connector paths, not any shopper's cable or a retailer's accessory bundle.",
+  },
+};
 type Path = { supportedHostConnections: string[]; requiredHardwareIds: string[]; classification: "proxy"; notice: string };
 const legacyPaths: Record<string, [string[], string[]]> = {
   "MIC-001": [["usb-c"], []], "MIC-003": [["usb-a"], []], "MIC-009": [["usb-a"], []],
-  "MIC-015": [["usb-c"], []], "MIC-020": [["usb-a"], ["usb-a-to-c-data-cable"]], "MIC-022": [["usb-a"], ["usb-a-to-c-data-cable"]],
+  "MIC-015": [["usb-c"], []], "MIC-020": [["usb-a"], ["usb-a-to-c-data-cable"]],
+  "MIC-022": [["usb-a", "usb-c"], ["usb-a-and-c-data-cable-kit"]],
   "MIC-025": [["usb-a"], []], "MIC-037": [["usb-c"], ["usb-c-trs-mic-interface"]], "MIC-038": [["usb-c"], []],
   "MIC-040": [["usb-c"], ["usb-c-data-cable"]], "MIC-044": [["usb-c"], ["usb-c-data-cable", "desktop-mic-stand"]],
   "MIC-047": [["usb-c"], ["usb-c-trs-mic-interface", "desktop-mic-stand"]],
@@ -114,8 +124,9 @@ function pathFor(row: AudioRow): Path {
       }
     }
   }
-  return { supportedHostConnections, requiredHardwareIds, classification: "proxy", notice:
-    "Authored simulated host path and bundle. This enables demo checkout only; exact real retail compatibility, connectors, power and package contents are unverified." };
+  return { supportedHostConnections, requiredHardwareIds, classification: "proxy", notice: manufacturerCompatibility[row.id]
+    ? "USB-A and USB-C computer paths are documented by RØDE; use a compatible data cable. This checkout's dual-host cable kit and USD 5 setup cost are authored simulation fixtures, not a claim about manufacturer or retailer box contents or accessory prices."
+    : "Authored simulated host path and bundle. This enables demo checkout only; exact real retail compatibility, connectors, power and package contents are unverified." };
 }
 export function buildAudio() {
   const products: Product[] = [], evidence: Evidence[] = [];
@@ -127,6 +138,12 @@ export function buildAudio() {
     const evidenceIds = [specId, compatibilityId];
     const path = pathFor(r);
     evidence.push({ ...base, id: compatibilityId, sourceUrl: null, sourceType: "fixture", classification: "proxy", claim: path.notice });
+    const manufacturer = manufacturerCompatibility[id];
+    if (manufacturer) {
+      const manufacturerId = `COMPAT-MFR-${id}`;
+      evidenceIds.push(manufacturerId);
+      evidence.push({ ...base, ...manufacturer, id: manufacturerId, sourceType: "manufacturer", classification: "snapshot" });
+    }
     if (r.authoredFit) { evidenceIds.push(`FIT-${id}`); evidence.push({ ...base, id: `FIT-${id}`, sourceUrl: null, sourceType: "authored", classification: "proxy", claim: r.authoredFit.assessment }); }
     if (r.reviewSource) { evidenceIds.push(`REV-${id}`); evidence.push({ ...base, ...r.buyerMetrics, id: `REV-${id}`, sourceUrl: r.reviewSource,
       sourceType: "review", classification: "snapshot", claim: r.feedbackParaphrase ?? "Source aggregate/count captured; individual review text not supplied." }); }
@@ -134,9 +151,12 @@ export function buildAudio() {
       provenance: { kind: "source_snapshot", notice: `Team-supplied source snapshot dated ${r.checkedOn}; ${r.detailStatus === "legacy_details_available" ? "original technical archive retained" : "linked detail file not supplied"}.` },
       image: { url: "/catalog/images/audio.svg", alt: "Generic demo audio illustration, not a photograph of this model", source: "Authored demo illustration", classification: "proxy" },
       specs: { ...r.technical, sourceVariant: r.model, representationGroup: r.representationGroup, family: r.representationGroup, solutionType: r.representationGroup.startsWith("Headphones") ? "headset" : r.representationGroup.startsWith("Lavaliers") ? "clip" : "desktop", detailStatus: r.detailStatus, sourceReferenceFile: r.referenceFile,
+        ...(manufacturer ? { manufacturerCompatibility: { ...manufacturer, classification: "snapshot" } } : {}),
         specificationClassification: "snapshot", demoConfiguration: { classification: "proxy", hostConnections: path.supportedHostConnections, setupHardwareIds: path.requiredHardwareIds, notice: path.notice }, compatibilityFixture: path },
-      limitations: ["No measured café-dictation performance evidence.", r.technical.additional_hardware, "Host paths are bounded simulation fixtures; real compatibility is unverified.", ...(r.detailStatus === "linked_file_not_supplied" ? [r.variantNotes] : [])],
-      evidenceIds, sourceUrls: [r.productSource!, ...(r.reviewSource && r.reviewSource !== r.productSource ? [r.reviewSource] : [])],
+      limitations: ["No measured café-dictation performance evidence.", r.technical.additional_hardware,
+        manufacturer ? "Requires a compatible USB data cable; a charge-only cable will not carry microphone audio." : "Host paths are bounded simulation fixtures; real compatibility is unverified.",
+        ...(r.detailStatus === "linked_file_not_supplied" ? [r.variantNotes] : [])],
+      evidenceIds, sourceUrls: [r.productSource!, ...(r.reviewSource && r.reviewSource !== r.productSource ? [r.reviewSource] : []), ...(manufacturer ? [manufacturer.sourceUrl] : [])],
       referencePrice: r.referencePrice, sourceAvailability: r.availability, buyerMetrics: r.buyerMetrics, authoredFit: r.authoredFit,
       video: { status: "missing", reason: "No permission-verified playable product video/excerpt was supplied." } });
   }

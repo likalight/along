@@ -24,6 +24,35 @@ import {
   allowsRemovingShoeCompartment,
 } from "../intent/criteriaUpdates.js";
 
+const usbConnector = "usb[- ]?(?:type[- ]?)?[ac]";
+const usbPath = new RegExp(`(${usbConnector})\\s*(?:-?to-?|→|/)\\s*(${usbConnector})`, "i");
+
+/** Adapter ends describe a path, not which port is on the shopper's computer. */
+function adapterContext(text: string) {
+  const mentionsHardware = /\b(?:adapter|adaptor|dongle|cable)\b/i.test(text);
+  // Scope uncertainty to each sentence/clause. "I want to buy it" must not
+  // erase a separate factual answer about the computer or an owned adapter.
+  const unquoted = text.replace(/["“][^"”]*["”]|(?:^|\s)'[^']+'(?=\s|$)/g, " ");
+  const clauses = (unquoted.match(/[^.!?;\n]+[.!?;]?/g) ?? []).flatMap((sentence) =>
+    /[?"“”]|\b(?:if|unless|maybe|perhaps|suppose|hypothetically)\b/i.test(sentence)
+      ? [] : sentence.split(/\s+(?:and|but)\s+/i),
+  );
+  let host: string | undefined, pathLabel: string | undefined, ownsAdapter = false;
+  for (const clause of clauses) {
+    if (/\b(?:don't|do not|not|never|haven't|have not|need|want|looking for)\b/i.test(clause)) continue;
+    const statedHost = clause.match(new RegExp(
+      `\\b(?:(?:my|the) (?:laptop|computer|macbook|pc) (?:has|uses|takes|supports)|i use) (?:a |an |only )?(${usbConnector})(?![- ]*to\\b|\\s+(?:adapter|adaptor|dongle|cable)\\b)\\b`, "i",
+    ))?.[1];
+    if (statedHost) host = statedHost;
+    const path = clause.match(usbPath);
+    if (path && /\b(?:adapter|adaptor|dongle|cable)\b/i.test(clause)) {
+      pathLabel = `${normalizeHostConnection(path[1])} to ${normalizeHostConnection(path[2])}`;
+      ownsAdapter = /\b(?:i (?:do )?have|i own|my (?:usb|adapter|adaptor|dongle|cable))\b/i.test(clause);
+    }
+  }
+  return { mentionsHardware, host, pathLabel, ownsAdapter };
+}
+
 type Field = { schema: z.ZodTypeAny; json: Record<string, unknown> };
 const string = (description = ""): Field => ({
   schema: z.string().max(2000),
@@ -106,7 +135,7 @@ const definitions = {
       category: nullable(enumeration(["audio", "bags", "bedding"])),
       maxDeliveryDays: nullable(number),
       compatibility: object({
-        hostConnection: nullable(string("Only the shopper's specific host connector, such as usb-a or usb-c. Generic USB describes a product interface family, not the host connector: leave null and remember it as an audioConnectionFamily preference. Never infer USB-A or USB-C from generic USB.")),
+        hostConnection: nullable(string("Only the shopper's specific computer connector, such as usb-a or usb-c. Adapter/cable ends such as USB-A to USB-C are a connection path, not the host connector: leave unchanged and remember the explicit path in preferences. Generic USB is an interface family, not a connector. Never infer a port from an unspecified dongle or the first end of an adapter.")),
         laptopInches: nullable(number),
         bedWidthInches: nullable(number),
         bedLengthInches: nullable(number),
@@ -523,8 +552,15 @@ export function executeShoppingTool(opts: {
       )
         throw new Error("Keep the existing delivery deadline unless the shopper explicitly changes it. Ask which delivery window they want if unclear; this is a validation limit, not a temporary service failure.");
       const compatibility = { ...((old.compatibility as object) ?? {}) };
+      const adapter = adapterContext(input.text ?? "");
       for (const [key, value] of Object.entries(args.compatibility)) {
         if (value === null) continue;
+        if (key === "hostConnection" && (adapter.mentionsHardware || usbPath.test(String(value)))) {
+          // Preserve an accepted port; a bare adapter correction cannot replace
+          // it, and a composite path must never become a literal host value.
+          if (adapter.host) Object.assign(compatibility, { hostConnection: normalizeHostConnection(adapter.host) });
+          continue;
+        }
         const normalized = key === "hostConnection" ? normalizeHostConnection(String(value)) : value;
         if (normalized !== undefined) Object.assign(compatibility, { [key]: normalized });
       }
@@ -563,6 +599,8 @@ export function executeShoppingTool(opts: {
         preferences: Object.fromEntries(
           [
             ...args.preferences.map((p: any) => [p.key, p.value]),
+            ...(adapter.pathLabel ? [["adapterConnection", adapter.pathLabel]] : []),
+            ...(adapter.ownsAdapter ? [["ownedAdapter", adapter.pathLabel]] : []),
             ...(args.compatibility.hostConnection !== null && normalizeHostConnection(args.compatibility.hostConnection) === undefined
               ? [["audioConnectionFamily", "usb"]] : []),
           ],
@@ -612,9 +650,39 @@ export function executeShoppingTool(opts: {
       evidenceIds: args.evidenceIds ?? [],
     };
     const result = store.apply(proposal);
+    // A failed checkout must explain the actual accepted connector and blocker.
+    // A generic selection error otherwise looks like missing shopper context
+    // and encourages asking the same hardware question on every retry.
+    let checkoutFailure: Record<string, unknown> | undefined;
+    if (!result.ok && (name === "select_offer" || name === "prepare_summary") &&
+        store instanceof AuthoritativeSessionStore) {
+      const offerId = typeof args.offerId === "string" ? args.offerId : result.snapshot.selectedOfferId;
+      const quote = offerId ? store.quotes(input.sessionId, getOffer(offerId)?.productId)
+        .find((candidate) => candidate.offer.id === offerId) : undefined;
+      if (quote && !quote.eligible) {
+        const constraints = store.core.get(input.sessionId).constraints;
+        const hostConnection = normalizeHostConnection(constraints.hostConnection) ??
+          normalizeHostConnection(constraints.compatibility?.hostConnection);
+        const missingHost = quote.conflicts.some((conflict) => conflict.code === "HOST_CONNECTION_REQUIRED");
+        checkoutFailure = {
+          offerId,
+          productId: quote.product.id,
+          conflicts: quote.conflicts,
+          hostConnection: hostConnection ?? null,
+          supportedHostConnections: quote.product.compatibility?.hostConnections ?? [],
+          needsHostConnection: missingHost,
+          nextStep: missingHost
+            ? "Ask once for the computer's specific connector. When the shopper answers, remember it and retry this requested offer without asking whether they still want to buy."
+            : hostConnection
+              ? "The shopper's connector is already known. Reuse it; do not ask for it again or invent a different port, cable, or adapter. Explain the actual conflict and resolve only the missing fact or supported alternative. Once eligible, continue the requested order review; approval still belongs to the shopper."
+              : "Explain the listed conflict and resolve only the missing fact. Continue the requested order review when eligible; approval still belongs to the shopper.",
+        };
+      }
+    }
     return finish({
       ...result,
       proposal,
+      ...(checkoutFailure ? { data: { reason: result.reason, checkout: checkoutFailure } } : {}),
       ...(name === "prepare_summary" && result.ok
         ? { canonicalSummary: true }
         : {}),

@@ -301,6 +301,132 @@ test("combined offer review still rejects incompatible offers before changing se
   assert.deepEqual(store.core.get(input.sessionId), before);
 });
 
+test("blocked checkout distinguishes an unknown connector from a known incompatible connector", () => {
+  const { run, store, input } = setup();
+  const missing = run("prepare_summary", { offerId: "MIC-003-A" });
+  assert.equal(missing.ok, false);
+  const missingContext = (missing.data as { checkout: {
+    hostConnection: string | null;
+    needsHostConnection: boolean;
+    conflicts: Array<{ code: string }>;
+    nextStep: string;
+  } }).checkout;
+  assert.equal(missingContext.hostConnection, null);
+  assert.equal(missingContext.needsHostConnection, true);
+  assert.ok(missingContext.conflicts.some((conflict) => conflict.code === "HOST_CONNECTION_REQUIRED"));
+  assert.match(missingContext.nextStep, /remember it and retry this requested offer/);
+
+  const saved = run("remember_requirements", remember({
+    compatibility: { ...remember().compatibility, hostConnection: "USB-C" },
+  }));
+  assert.equal(saved.ok, true, saved.reason);
+  const mismatch = run("prepare_summary", { offerId: "MIC-003-A" });
+  assert.equal(mismatch.ok, false);
+  const knownContext = (mismatch.data as { checkout: typeof missingContext }).checkout;
+  assert.equal(knownContext.hostConnection, "usb-c");
+  assert.equal(knownContext.needsHostConnection, false);
+  assert.ok(knownContext.conflicts.some((conflict) => conflict.code === "INCOMPATIBLE_HARDWARE"));
+  assert.match(knownContext.nextStep, /do not ask for it again/);
+  assert.equal((store.get(input.sessionId)!.hardConstraints.compatibility as { hostConnection: string }).hostConnection, "usb-c");
+  assert.equal(store.core.get(input.sessionId).receipt, null);
+});
+
+test("remembered USB-C resumes the requested NT-USB Mini review without changing the shopper's connector", () => {
+  const { run, store, input } = setup();
+  input.text = "Yes, it is a USB-C to USB-C, which connects it to my laptop. Let's purchase.";
+  const saved = run("remember_requirements", remember({
+    category: "audio",
+    compatibility: { ...remember().compatibility, hostConnection: "USB-C" },
+  }));
+  assert.equal(saved.ok, true, saved.reason);
+  const result = run("prepare_summary", { offerId: "MIC-022-A" });
+  assert.equal(result.ok, true, result.reason);
+  assert.equal(result.canonicalSummary, true);
+  const current = store.core.get(input.sessionId);
+  assert.equal(current.summary!.quote.product.id, "MIC-022");
+  assert.equal(current.constraints.compatibility!.hostConnection, "usb-c");
+  assert.equal(current.receipt, null);
+});
+
+for (const proposedHost of ["USB-A to USB-C", "usb-a"]) test(`adapter correction preserves known host instead of storing ${proposedHost}`, () => {
+  const { run, store, input } = setup();
+  input.text = "My laptop has USB-C";
+  assert.equal(run("remember_requirements", remember({
+    compatibility: { ...remember().compatibility, hostConnection: "usb-c" },
+  })).ok, true);
+  input.text = "I have a USB-A to USB-C dongle";
+  const saved = run("remember_requirements", remember({
+    compatibility: { ...remember().compatibility, hostConnection: proposedHost },
+  }));
+  assert.equal(saved.ok, true, saved.reason);
+  assert.equal((saved.snapshot.hardConstraints.compatibility as { hostConnection: string }).hostConnection, "usb-c");
+  assert.equal(saved.snapshot.preferences.adapterConnection, "usb-a to usb-c");
+  assert.equal(saved.snapshot.preferences.ownedAdapter, "usb-a to usb-c");
+  const reviewed = run("prepare_summary", { offerId: "MIC-022-A" });
+  assert.equal(reviewed.ok, true, reviewed.reason);
+  assert.equal(store.core.get(input.sessionId).receipt, null);
+});
+
+test("adapter ends and an unspecified dongle do not establish an unknown computer port", () => {
+  for (const text of ["USB-A to USB-C dongle", "Yes, I have a dongle for it"]) {
+    const { run, input } = setup();
+    input.text = text;
+    const saved = run("remember_requirements", remember({
+      compatibility: { ...remember().compatibility, hostConnection: "usb-a" },
+    }));
+    assert.equal(saved.ok, true, saved.reason);
+    assert.equal((saved.snapshot.hardConstraints.compatibility as { hostConnection?: string }).hostConnection, undefined);
+    assert.equal(saved.snapshot.preferences.ownedAdapter, undefined);
+    assert.equal(saved.snapshot.preferences.adapterConnection, text.startsWith("USB") ? "usb-a to usb-c" : undefined);
+    const review = run("prepare_summary", { offerId: "MIC-022-A" });
+    assert.equal(review.ok, false);
+    assert.equal((review.data as { checkout: { needsHostConnection: boolean } }).checkout.needsHostConnection, true);
+  }
+});
+
+test("a separate explicit computer-port statement can accompany an adapter path", () => {
+  const { run, input } = setup();
+  input.text = "I have a USB-A to USB-C dongle. My laptop has USB-C.";
+  const saved = run("remember_requirements", remember({
+    compatibility: { ...remember().compatibility, hostConnection: "USB-A to USB-C" },
+  }));
+  assert.equal(saved.ok, true, saved.reason);
+  assert.equal((saved.snapshot.hardConstraints.compatibility as { hostConnection: string }).hostConnection, "usb-c");
+  assert.equal(saved.snapshot.preferences.adapterConnection, "usb-a to usb-c");
+});
+
+for (const text of [
+  "I want to buy the RODE. My laptop has USB-C and I have a USB-A to USB-C dongle",
+  "Do I need anything else? My laptop has USB-C and I have a USB-A to USB-C dongle",
+  "I use USB-C and have a dongle",
+]) test(`separate purchase/question wording does not erase an explicit computer connector: ${text}`, () => {
+  const { run, input } = setup();
+  input.text = text;
+  const saved = run("remember_requirements", remember({
+    compatibility: { ...remember().compatibility, hostConnection: "usb-c" },
+  }));
+  assert.equal(saved.ok, true, saved.reason);
+  assert.equal((saved.snapshot.hardConstraints.compatibility as { hostConnection: string }).hostConnection, "usb-c");
+  if (text.includes("USB-A to USB-C"))
+    assert.equal(saved.snapshot.preferences.ownedAdapter, "usb-a to usb-c");
+  const reviewed = run("prepare_summary", { offerId: "MIC-022-A" });
+  assert.equal(reviewed.ok, true, reviewed.reason);
+});
+
+for (const text of [
+  'The instructions say "My laptop has USB-C". I have a USB-A to USB-C dongle.',
+  "My laptop does not have USB-C. I have a USB-A to USB-C dongle.",
+  "If my laptop has USB-C and I have a USB-A to USB-C dongle, will it work?",
+]) test(`quoted, negated and hypothetical connector statements do not establish the computer port: ${text}`, () => {
+  const { run, input } = setup();
+  input.text = text;
+  const saved = run("remember_requirements", remember({
+    compatibility: { ...remember().compatibility, hostConnection: "usb-c" },
+  }));
+  assert.equal(saved.ok, true, saved.reason);
+  assert.equal((saved.snapshot.hardConstraints.compatibility as { hostConnection?: string }).hostConnection, undefined);
+});
+
 test("capacity and shoe compartment requirements survive later preferences", () => {
   const { run, store, input } = setup();
   assert.equal(

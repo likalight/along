@@ -34,6 +34,7 @@ const hardware: Record<string, { description: string; priceMinor: number }> = {
   "usb-c-xlr-audio-kit": { description: "Synthetic USB-C audio interface with XLR microphone input, XLR cable and switchable phantom power", priceMinor: 7900 },
   "usb-c-trrs-mic-interface": { description: "Synthetic USB-C CTIA headset microphone interface, not a headphone-only adapter", priceMinor: 1800 },
   "usb-a-to-c-data-cable": { description: "Synthetic USB-A host to USB-C device data cable; declared demo audio path", priceMinor: 500 },
+  "usb-a-and-c-data-cable-kit": { description: "Compatible USB-A to USB-C and USB-C to USB-C data cables", priceMinor: 500 },
   "usb-c-trs-mic-interface": { description: "Synthetic USB-C interface with powered 3.5mm TRS microphone input; not a headphone-only adapter", priceMinor: 2000 },
   "usb-c-data-cable": { description: "Synthetic compatible USB data cable (not charge-only)", priceMinor: 800 },
   "desktop-mic-stand": { description: "Synthetic compatible desktop microphone stand", priceMinor: 1200 },
