@@ -4,6 +4,7 @@ import { initialSession } from "@/lib/session/fixtures";
 import {
   LiveProductFocus,
   mentionedProduct,
+  requestsChromeReview,
 } from "@/lib/session/live-product-focus";
 import { products } from "@/lib/canvas/fixtures";
 import type { Product } from "@/lib/canvas/contracts";
@@ -186,17 +187,18 @@ describe("live carousel presentation focus", () => {
     h.controller.dispose();
   });
 
-  it("clears immediately on barge-in and user speech; ignores interrupted tail captions", async () => {
+  it("holds the displayed card through barge-in and ignores interrupted tail captions", async () => {
     const h = await liveHarness();
     h.callbacks.speaking?.(true);
     h.callbacks.caption?.("assistant", "Logitech H390");
     h.callbacks.bargeIn();
-    expect(h.controller.getSnapshot().narrationProductId).toBeNull();
+    expect(h.controller.getSnapshot().narrationProductId).toBe("MIC-003");
     h.callbacks.speaking?.(true);
     h.callbacks.caption?.("assistant", "Logitech H390 or the Shure MV6 Gen 2");
-    expect(h.controller.getSnapshot().narrationProductId).toBeNull();
+    expect(h.controller.getSnapshot().narrationProductId).toBe("MIC-003");
     h.callbacks.caption?.("user", "What about the second option?");
-    expect(h.controller.getSnapshot().narrationProductId).toBeNull();
+    // Clear the interrupted narration, then honor the shopper's visual request.
+    expect(h.controller.getSnapshot().narrationProductId).toBe("MIC-003");
     h.callbacks.caption?.("assistant", "Option two is the Logitech H390");
     expect(h.controller.getSnapshot().narrationProductId).toBe("MIC-003");
     h.controller.dispose();
@@ -235,7 +237,7 @@ describe("live carousel presentation focus", () => {
     h.callbacks.caption?.("assistant", "Logitech H390");
     h.callbacks.bargeIn();
     h.callbacks.caption?.("assistant", "Logitech H390 is still old output");
-    expect(h.controller.getSnapshot().narrationProductId).toBeNull();
+    expect(h.controller.getSnapshot().narrationProductId).toBe("MIC-003");
 
     // The adapter signals the guarded output boundary before releasing the
     // first fresh caption, even when transcription missed the shopper's speech.
@@ -257,4 +259,129 @@ describe("live carousel presentation focus", () => {
     expect(h.controller.getSnapshot().mode).toBe("text");
     h.controller.dispose();
   });
+});
+
+describe("presentation command regressions", () => {
+  it("keeps spoken focus through unrelated accepted revisions", async () => {
+    const h = await liveHarness();
+    h.callbacks.speaking?.(true);
+    h.callbacks.caption?.("assistant", "The Logitech H390 is wired");
+    h.callbacks.backend?.({
+      pending: false,
+      snapshot: { ...h.snapshot, revision: 3 },
+    });
+    expect(h.controller.getSnapshot().narrationProductId).toBe("MIC-003");
+    h.controller.dispose();
+  });
+  it("matches spoken base models without configuration suffixes, but not ambiguous variants", () => {
+    const micro = {
+      ...visibleProducts[0],
+      id: "MIC-063",
+      brand: "RØDE",
+      model: "Wireless Micro, USB-C, Black",
+      title: "RØDE Wireless Micro, USB-C, Black",
+    };
+    expect(
+      mentionedProduct(
+        "The Rode Wireless Micro is compact",
+        shortlist([micro]),
+      ),
+    ).toBe("MIC-063");
+    const other = {
+      ...micro,
+      id: "another",
+      model: "Wireless Micro, Lightning, Black",
+      title: "RØDE Wireless Micro, Lightning, Black",
+    };
+    expect(
+      mentionedProduct("The Rode Wireless Micro", shortlist([micro, other])),
+    ).toBeNull();
+  });
+  it("moves a spoken next command once while fragments arrive without changing the order", async () => {
+    const h = await liveHarness();
+    h.callbacks.caption?.("user", "Next");
+    h.callbacks.caption?.("user", "Next product");
+    expect(h.controller.getSnapshot().narrationProductId).toBe("MIC-003");
+    expect(h.controller.getSnapshot().snapshot).toBe(h.snapshot);
+    expect(h.transport.send).not.toHaveBeenCalled();
+    h.controller.dispose();
+  });
+  it("only recognizes direct Chrome review commands, not negations or quoted discussion", () => {
+    expect(requestsChromeReview("Take me to the Chrome tab")).toBe(true);
+    expect(requestsChromeReview("Please open YouTube")).toBe(true);
+    expect(requestsChromeReview("Don't take me to Chrome")).toBe(false);
+    expect(
+      requestsChromeReview("What happens if I say take me to Chrome?"),
+    ).toBe(false);
+  });
+});
+
+it("reconciles speech that names a product before the first shortlist reaches the browser", async () => {
+  const h = await liveHarness();
+  h.callbacks.backend?.({
+    pending: true,
+    snapshot: {
+      ...h.snapshot,
+      revision: 3,
+      displayOrder: [],
+      focusedProductId: null,
+    },
+  });
+  h.callbacks.speaking?.(true);
+  h.callbacks.caption?.("assistant", "The Logitech H390 suits you");
+  expect(h.controller.getSnapshot().narrationProductId).toBeNull();
+  h.callbacks.backend?.({
+    pending: false,
+    snapshot: { ...h.snapshot, revision: 4 },
+  });
+  expect(h.controller.getSnapshot().narrationProductId).toBe("MIC-003");
+  h.controller.dispose();
+});
+
+it("Chrome voice navigation targets the narrated product once, never checkout", async () => {
+  const h = await liveHarness();
+  h.callbacks.speaking?.(true);
+  h.callbacks.caption?.("assistant", "The Logitech H390 is wired");
+  h.callbacks.bargeIn();
+  h.callbacks.caption?.("user", "Take me to the Chrome tab");
+  const request = h.controller.getSnapshot().voiceReviewRequest;
+  expect(request?.productId).toBe("MIC-003");
+  h.callbacks.caption?.("user", "Take me to the Chrome tab.");
+  expect(h.controller.getSnapshot().voiceReviewRequest).toBe(request);
+  expect(h.controller.getSnapshot().snapshot?.selectedOfferId).toBeNull();
+  expect(h.transport.send).not.toHaveBeenCalled();
+  h.controller.dispose();
+});
+
+it("never flashes the first card when a new reply starts after a spoken navigation", async () => {
+  const h = await liveHarness();
+  const frames: (string | null)[] = [];
+  h.callbacks.caption?.("user", "Show the third option");
+  h.controller.subscribe(() =>
+    frames.push(h.controller.getSnapshot().narrationProductId),
+  );
+  h.callbacks.bargeIn();
+  h.callbacks.playbackResumed?.();
+  h.callbacks.speaking?.(true);
+  h.callbacks.caption?.(
+    "assistant",
+    "Unlike the Apple EarPods, this one has a desktop stand.",
+  );
+  h.callbacks.speaking?.(false);
+  h.controller.pauseListening();
+  expect(frames.length).toBeGreaterThan(0);
+  expect(frames.every((id) => id === "MIC-015")).toBe(true);
+  expect(h.controller.getSnapshot().snapshot?.selectedOfferId).toBeNull();
+  h.controller.dispose();
+});
+
+it("routes an explicit watch-on-YouTube voice command to Chrome", async () => {
+  const h = await liveHarness();
+  h.callbacks.caption?.("user", "I want to watch it on YouTube");
+  expect(h.controller.getSnapshot().voiceReviewRequest?.destination).toBe(
+    "chrome",
+  );
+  expect(requestsChromeReview("I want to watch a video review")).toBe(false);
+  expect(requestsChromeReview("Don't open YouTube")).toBe(false);
+  h.controller.dispose();
 });

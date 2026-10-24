@@ -14,12 +14,15 @@ import {
 } from "motion/react";
 import {
   ArrowUp,
+  ArrowUpRight,
   Mic,
   Pause,
   RotateCcw,
   Keyboard,
   ArrowRight,
   MessageSquare,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { SessionController } from "@/lib/session/controller";
 import { httpTransport } from "@/lib/session/http-transport";
@@ -27,9 +30,17 @@ import { BrowserSpeechAdapter } from "@/lib/voice/browser-adapter";
 import { createSpeechAdapter } from "@/lib/voice/create-speech-adapter";
 import { ProductCanvas } from "./canvas/ProductCanvas";
 import { PurchaseComplete } from "./canvas/PurchaseComplete";
-import { customerCopy, customerDestinationLabel, customerNotes, customerSellerLabel } from "@/lib/canvas/customer-copy";
+import {
+  customerCopy,
+  customerDestinationLabel,
+  customerNotes,
+  customerSellerLabel,
+} from "@/lib/canvas/customer-copy";
+import { ProductVideoHandoff } from "./product-video-handoff";
+import { ContextOverview } from "./context-overview";
 import { VoiceOrb } from "./voice-orb";
 import { Attachments } from "./attachments";
+import { ExtensionCompanion, DiscoveryContext } from "./extension-companion";
 import type { Session, VoiceStatus } from "@/lib/session/contract";
 const statusLabels: Record<VoiceStatus, string> = {
   ready: "Ready when you are",
@@ -49,6 +60,10 @@ export function SessionShell() {
     controller.getSnapshot,
     controller.getSnapshot,
   );
+  const [chrome, setChrome] = useState<
+    "unavailable" | "available" | "connected"
+  >("unavailable");
+  const [showContext, setShowContext] = useState(false);
   const [draft, setDraft] = useState("");
   const [voiceNote, setVoiceNote] = useState<string | null>(null);
   const [voiceReady, setVoiceReady] = useState(false);
@@ -75,11 +90,57 @@ export function SessionShell() {
     [...(s?.history ?? [])].reverse().find((entry) => entry.role === "user")
       ?.text;
   useEffect(() => {
+    const query = new URL(window.location.href).searchParams;
+    if (query.get("fresh") === "1") {
+      sessionStorage.removeItem("along.sessionId");
+      sessionStorage.removeItem("along.extensionConnection");
+      history.replaceState(null, "", "/");
+    }
+    const resume =
+      query.get("fresh") === "1"
+        ? null
+        : (query.get("discoverySession") ??
+          sessionStorage.getItem("along.sessionId"));
+    void controller.connect(
+      resume && /^[A-Za-z0-9_-]{1,100}$/.test(resume) ? resume : undefined,
+    );
+    const offline = () => {
+      controller.interrupt();
+      controller.pauseListening();
+    };
+    const online = () => void controller.reconnect();
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      const settings = document.querySelector<HTMLDetailsElement>(
+        ".conversation-options[open]",
+      );
+      if (settings) {
+        settings.open = false;
+        settings.querySelector<HTMLElement>("summary")?.focus();
+        e.preventDefault();
+        return;
+      }
+      controller.interrupt();
+    };
+    window.addEventListener("offline", offline);
+    window.addEventListener("online", online);
+    window.addEventListener("keydown", key);
+    return () => {
+      controller.interrupt();
+      controller.closeVoice();
+      window.removeEventListener("offline", offline);
+      window.removeEventListener("online", online);
+      window.removeEventListener("keydown", key);
+    };
+  }, [controller]);
+  useEffect(() => {
+    const sessionId = s?.sessionId;
+    if (!sessionId) return;
     let cancelled = false;
+    setVoiceReady(false);
+    // A failed saved-session reconnect has no ID at mount. Initialize when a
+    // valid session is accepted later, without starting capture or playback.
     void (async () => {
-      await controller.connect();
-      const sessionId = controller.getSnapshot().snapshot?.sessionId;
-      if (!sessionId || cancelled) return;
       const { adapter, kind, note } = await createSpeechAdapter(sessionId);
       if (cancelled) {
         adapter.dispose();
@@ -89,31 +150,22 @@ export function SessionShell() {
       setVoiceNote(note ?? null);
       setVoiceReady(true);
     })();
-    const offline = () => {
-      controller.interrupt();
-      controller.pauseListening();
-    };
-    const online = () => void controller.reconnect();
-    const key = (e: KeyboardEvent) => {
-      if (e.key === "Escape") controller.interrupt();
-    };
-    window.addEventListener("offline", offline);
-    window.addEventListener("online", online);
-    window.addEventListener("keydown", key);
     return () => {
       cancelled = true;
-      controller.interrupt();
-      controller.closeVoice();
-      window.removeEventListener("offline", offline);
-      window.removeEventListener("online", online);
-      window.removeEventListener("keydown", key);
     };
-  }, [controller]);
+  }, [controller, s?.sessionId]);
+  useEffect(() => {
+    if (s?.sessionId) sessionStorage.setItem("along.sessionId", s.sessionId);
+  }, [s?.sessionId]);
   useEffect(() => {
     // Announce new stages without pulling focus away from an in-progress message.
     if (s?.view && document.activeElement === document.body)
       stageRef.current?.focus({ preventScroll: true });
   }, [s?.view]);
+  function newConversation() {
+    controller.closeVoice();
+    window.location.assign("/?fresh=1");
+  }
   async function submit() {
     if (!draft.trim()) return;
     const text = draft;
@@ -129,6 +181,21 @@ export function SessionShell() {
             <span className="brand-dot">.</span>
           </a>
         </header>
+        <div hidden={!showContext}>
+          {showContext && (
+            <ContextOverview
+              session={s}
+              chrome={chrome}
+              onNewConversation={newConversation}
+            />
+          )}
+          <ExtensionCompanion
+            onConnectionChange={setChrome}
+            controller={controller}
+            state={state}
+            hasDraft={Boolean(draft.trim())}
+          />
+        </div>
         <main
           className={`${opening ? "main opening" : "main active"} ${orbGreeting ? "orb-greeting" : ""}`}
         >
@@ -206,17 +273,16 @@ export function SessionShell() {
                         s?.view !== "summary" && (
                           <p className="assistant-reply">
                             <span className="sr-only">Along: </span>
-                            {state.liveCaption || s?.message}
+                            {state.liveCaption ||
+                              (state.status === "thinking" || state.livePending
+                                ? (state.activity?.label ??
+                                  "Finding options for you…")
+                                : s?.message)}
                           </p>
                         )}
                     </>
                   )}
                 </div>
-                {opening && (
-                  <p>
-                    <a href="/context">Personal context · manage Mac preferences</a>
-                  </p>
-                )}
                 {s && (
                   <ContentStage
                     narrationProductId={state.narrationProductId}
@@ -245,6 +311,11 @@ export function SessionShell() {
               </motion.div>
             </AnimatePresence>
           </section>
+          <ProductVideoHandoff
+            controller={controller}
+            state={state}
+            connected={chrome === "connected"}
+          />
           {s && s.history.length > 0 && (
             <details className="transcript">
               <summary>
@@ -274,7 +345,11 @@ export function SessionShell() {
             {state.error && (
               <div className="error-banner" role="alert">
                 <p>{state.error}</p>
-                <button onClick={() => void controller.reconnect()}>
+                <button
+                  onClick={() =>
+                    void (s ? controller.reconnect() : newConversation())
+                  }
+                >
                   <RotateCcw size={14} /> Reconnect
                 </button>
               </div>
@@ -323,9 +398,45 @@ export function SessionShell() {
                 <Keyboard size={17} />
                 {state.mode === "text" ? "Typing · mic off" : "Type instead"}
               </button>
+              <button
+                className="text-button speaker-toggle"
+                aria-label={state.outputMuted ? "Unmute Along" : "Mute Along"}
+                aria-pressed={state.outputMuted}
+                title={
+                  state.outputMuted
+                    ? "Unmute voice replies"
+                    : "Mute voice replies; keep listening"
+                }
+                onClick={() => controller.setOutputMuted(!state.outputMuted)}
+              >
+                {state.outputMuted ? (
+                  <VolumeX size={18} />
+                ) : (
+                  <Volume2 size={18} />
+                )}
+                <span>{state.outputMuted ? "Muted" : "Sound on"}</span>
+              </button>
               <details className="conversation-options">
                 <summary>Settings</summary>
                 <div className="options-panel">
+                  <button
+                    type="button"
+                    className="text-button"
+                    aria-pressed={showContext}
+                    onClick={(event) => {
+                      setShowContext((value) => !value);
+                      event.currentTarget
+                        .closest("details")
+                        ?.removeAttribute("open");
+                    }}
+                  >
+                    {showContext
+                      ? "Hide context"
+                      : "Show context & connections"}
+                  </button>
+                  <a href="/setup" target="_blank" rel="noopener noreferrer">
+                    Companion setup ↗
+                  </a>
                   {voiceReady && controller.speechKind === "live" && (
                     <label className="voice-choice">
                       Voice
@@ -349,6 +460,10 @@ export function SessionShell() {
                       </select>
                     </label>
                   )}
+                  <p className="voice-help">
+                    Preview environment · offers and orders are simulated. No
+                    payment is taken.
+                  </p>
                   <p className="voice-help">
                     {state.mode === "voice"
                       ? controller.speechKind === "live"
@@ -464,8 +579,16 @@ function ContentStage({
   }, [s.view, s.summaryId, onSummaryDisplayed]);
   return (
     <>
+      {s.discoveryReference && !["summary", "receipt"].includes(s.view) && (
+        <DiscoveryContext
+          reference={s.discoveryReference}
+          assessment={s.discoveryAssessment}
+          onCommand={onCommand}
+        />
+      )}
       {s.canvas &&
         s.catalog &&
+        !s.discoveryReference &&
         !["opening", "summary", "receipt", "recovery"].includes(s.view) && (
           <ProductCanvas
             narrationProductId={narrationProductId}
@@ -549,6 +672,9 @@ function ContentStage({
           data-summary-id={s.summary.id}
           data-summary-status={s.summary.status}
         >
+          <p className="voice-help">
+            Simulated checkout · no payment will be taken.
+          </p>
           <p className="summary-label">
             Your order ·{" "}
             {s.summary.status === "invalidated"
@@ -561,8 +687,20 @@ function ContentStage({
           </p>
           <dl>
             {[
-              ["Product", s.catalog?.products.find((product) => product.id === s.summary?.productId)?.title ?? s.summary.productId],
-              ["Variant", customerCopy(s.catalog?.products.find((product) => product.id === s.summary?.productId)?.model ?? s.summary.variantId.replace(/-DEMO$/i, ""))],
+              [
+                "Product",
+                s.catalog?.products.find(
+                  (product) => product.id === s.summary?.productId,
+                )?.title ?? s.summary.productId,
+              ],
+              [
+                "Variant",
+                customerCopy(
+                  s.catalog?.products.find(
+                    (product) => product.id === s.summary?.productId,
+                  )?.model ?? s.summary.variantId.replace(/-DEMO$/i, ""),
+                ),
+              ],
               ["Seller", customerSellerLabel(s.summary.sellerId)],
               ["Quantity", String(s.summary.quantity)],
               [
@@ -581,13 +719,18 @@ function ContentStage({
               ["Destination", customerDestinationLabel(s.summary.destination)],
               ["Delivery estimate", s.summary.deliveryWindow],
               ["Conditions", customerNotes(s.summary.conditions).join(". ")],
-              ["Before you buy", customerNotes(s.summary.uncertainties).join(". ")],
-            ].filter(([, value]) => value).map(([k, v]) => (
-              <div key={k}>
-                <dt>{k}</dt>
-                <dd>{v}</dd>
-              </div>
-            ))}
+              [
+                "Before you buy",
+                customerNotes(s.summary.uncertainties).join(". "),
+              ],
+            ]
+              .filter(([, value]) => value)
+              .map(([k, v]) => (
+                <div key={k}>
+                  <dt>{k}</dt>
+                  <dd>{v}</dd>
+                </div>
+              ))}
           </dl>
           {s.summary.spokenText && (
             <p className="exact-summary-text">{s.summary.spokenText}</p>
@@ -618,7 +761,9 @@ function ContentStage({
       {s.view === "receipt" && s.receipt && (
         <PurchaseComplete
           receipt={s.receipt}
-          product={s.catalog?.products.find((product) => product.id === s.receipt?.acceptedOrder.productId)}
+          product={s.catalog?.products.find(
+            (product) => product.id === s.receipt?.acceptedOrder.productId,
+          )}
         />
       )}
     </>

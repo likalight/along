@@ -694,3 +694,48 @@ test("unresolved microphone guidance does not block a shopper switching to bags"
   assert.equal(shown.snapshot.view, "shortlist");
   assert.deepEqual(shown.snapshot.displayOrder, [bag.id]);
 });
+
+// Media must not silently switch the shopper's model or grant purchasing authority.
+test("Wireless PRO review uses the exact visible product and leaves checkout untouched", () => {
+  const h = setup();
+  assert.equal(h.run("show_product_video", { productId: "MIC-062" }).ok, false);
+  assert.equal(h.run("shortlist", { entries: [{ productId: "MIC-062", fitReason: "Wearable", compromise: "Crowded-room performance unverified" }] }).ok, true);
+  const before = h.store.get(h.input.sessionId)!;
+  const result = h.run("show_product_video", { productId: "MIC-062" });
+  assert.equal(result.ok, true);
+  assert.equal((result.data as any).url, "https://www.youtube.com/shorts/WCsWHqMdPJI");
+  assert.equal(result.snapshot.revision, before.revision);
+  assert.equal(result.snapshot.selectedOfferId, before.selectedOfferId);
+  assert.equal(h.run("show_product_video", { productId: "MIC-040" }).ok, false);
+  assert.equal(h.store.core.get(h.input.sessionId).receipt, null);
+});
+
+
+test("related review preserves the visible product and explicit YouTube destination", () => {
+  const h = setup();
+  h.run("shortlist", {
+    entries: [
+      {
+        productId: "MIC-040",
+        fitReason: "Wearable",
+        compromise: "Check host compatibility",
+      },
+    ],
+  });
+  const before = h.store.get(h.input.sessionId)!;
+  h.input.text = "I want to watch it on YouTube";
+  const review = h.run("show_product_video", { productId: "MIC-040" });
+  assert.equal(review.ok, true);
+  assert.equal((review.data as any).destination, "chrome");
+  assert.equal((review.data as any).requestedProductId, "MIC-040");
+  assert.equal((review.data as any).productId, "MIC-062");
+  assert.match((review.data as any).instruction, /RELATED MODEL/);
+  assert.equal(review.snapshot.focusedProductId, before.focusedProductId);
+  assert.equal(review.snapshot.selectedOfferId, before.selectedOfferId);
+  h.input.text = "Show me a video review";
+  assert.equal(
+    (h.run("show_product_video", { productId: "MIC-040" }).data as any)
+      .destination,
+    "inline",
+  );
+});

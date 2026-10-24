@@ -411,6 +411,30 @@ export class SessionStore {
     s.lastOutcome = "cancelled";
     return this.commit(s);
   }
+  /** A deliberate reference handoff is context, never approval or a mode change. */
+  importReference(id: string, raw: { epoch: number; baseRevision: number; eventId: string; text: string }) {
+    object(raw);
+    keys(raw, ["epoch", "baseRevision", "eventId", "text"]);
+    requireThat(typeof raw.text === "string" && raw.text.length > 0 && raw.text.length <= 2000,
+      "INVALID_REFERENCE", "Use a bounded, labelled reference description.");
+    return this.once(id, raw.epoch, raw.eventId, raw, () => {
+      const s = this.get(id);
+      this.revision(s, raw.baseRevision);
+      this.mutable(s);
+      this.invalidate(s);
+      const turnId = randomUUID();
+      this.record(id).usedTurnIds.add(turnId);
+      s.turn = { id: turnId, startedAt: new Date().toISOString(), status: "active", approvalWindow: null };
+      s.history.push({ turnId, eventId: raw.eventId, modality: "link", text: raw.text,
+        productIds: [...s.displayOrder], createdAt: new Date().toISOString() });
+      s.history = s.history.slice(-100);
+      s.mediaOwner = null;
+      if (["summary", "recovery", "opening"].includes(s.stage))
+        s.stage = s.shortlist.length ? "shortlist" : "understanding";
+      s.lastOutcome = "discovery_reference_imported";
+      return this.commit(s);
+    });
+  }
   reset(id: string, expected: number) {
     const s = this.get(id);
     this.revision(s, expected);

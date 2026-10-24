@@ -1,4 +1,8 @@
 import type { CanvasData, Presentation } from "../canvas/contracts";
+import type {
+  DiscoveryReference,
+  DiscoveryAssessment,
+} from "@coupang/contract";
 export type View =
   | "opening"
   | "understanding"
@@ -82,6 +86,10 @@ export type Summary = {
 };
 export type NarrationSegment = { text: string; productId: string | null };
 export type Session = {
+  productVideoRequest?: import("@coupang/contract").ProductVideoRequest;
+  discoveryReference?: DiscoveryReference;
+  discoveryAssessment?: DiscoveryAssessment;
+  conversationMode?: "text" | "voice";
   narrationSegments?: NarrationSegment[];
   canvas?: Presentation;
   catalog?: CanvasData;
@@ -144,6 +152,10 @@ export interface SessionTransport {
     signal?: AbortSignal,
   ): Promise<{ activity: TurnActivity | null }>;
   connect(sessionId?: string): Promise<Session>;
+  discovery?(
+    identity: Identity,
+    handoffId: string,
+  ): Promise<{ snapshot: Session; turnId: string }>;
   send(
     input: Input,
     signal: AbortSignal,

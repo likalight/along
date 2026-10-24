@@ -36,6 +36,7 @@ export interface SpeechAdapter {
   prepareTurn?(): Promise<void>;
   sync?(): Promise<void>;
   setVoice?(voice: VoiceChoice): void;
+  setOutputMuted?(muted: boolean): void;
   start(callbacks: SpeechCallbacks): Promise<void>;
   stop(): void;
   speak(

@@ -24,7 +24,8 @@ describe("completed purchase presentation", () => {
     expect(markup).toContain("USD 104.00");
     expect(markup).toContain("28 Oct 2026, 6:00 pm SGT");
     expect(markup).toContain("Singapore");
-    expect(markup).not.toMatch(/tomorrow|shipped|on its way|simulated|hypothetical|demo/i);
+    expect(markup).toContain("Simulated order · no payment was taken");
+    expect(markup).not.toMatch(/tomorrow|shipped|on its way|hypothetical|demo/i);
   });
 
   it("keeps a missing delivery estimate explicit rather than supplying a date", () => {

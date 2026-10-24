@@ -5,6 +5,8 @@ import sharp from "sharp";
 
 const root = new URL("../", import.meta.url);
 const catalog = JSON.parse(readFileSync(new URL("catalog/data/catalog.json", root), "utf8"));
+const additions = JSON.parse(readFileSync(new URL("catalog/sources/personal-nontech-additions.json", root), "utf8"));
+const illustrations = new Map(additions.records.map(row => [row.product.id, row.product.image.url]));
 const mediaRoot = new URL("catalog/public/catalog/images/products/", root);
 const outputRoot = new URL("output/catalogue-images/", root);
 const originals = new URL("originals/", outputRoot);
@@ -28,6 +30,22 @@ if (prepare) {
 
 const failures = [], assets = [], hashes = new Map(), reusedPhotos = [];
 for (const product of catalog.products) {
+  const fallback = illustrations.get(product.id);
+  if (fallback && product.image.url === fallback) {
+    if (!/^\/catalog\/images\/(bag|bedding)\.svg$/.test(fallback) || product.image.classification !== "proxy" ||
+      product.image.originalUrl || product.image.sourceUrl || !/illustration/i.test(product.image.source)) {
+      failures.push(`${product.id}: invalid illustration disclosure`); continue;
+    }
+    const path = new URL(`catalog/public${fallback}`, root);
+    if (!existsSync(path)) { failures.push(`${product.id}: disclosed illustration missing`); continue; }
+    const bytes = readFileSync(path), svg = bytes.toString("utf8"), metadata = await sharp(bytes).metadata();
+    if (!/DEMO ILLUSTRATION/.test(svg) || /<script|<image|<foreignObject|(?:href|src)=["']https?:/i.test(svg) ||
+      metadata.format !== "svg" || metadata.width < 160 || metadata.height < 160) failures.push(`${product.id}: invalid illustration asset`);
+    assets.push({ id: product.id, title: product.title, category: product.category, url: fallback,
+      width: metadata.width, height: metadata.height, bytes: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex"),
+      classification: "proxy", mediaKind: "illustration", disclosure: product.image.source });
+    continue;
+  }
   const expected = `/catalog/images/products/${product.id}.webp`;
   const path = new URL(`${product.id}.webp`, mediaRoot);
   if (product.image.url !== expected && !prepare) failures.push(`${product.id}: canonical image URL is not ${expected}`);
@@ -42,9 +60,9 @@ for (const product of catalog.products) {
   assets.push({ id: product.id, title: product.title, category: product.category, url: expected, width: metadata.width, height: metadata.height, bytes: bytes.length, sha256, classification: product.image.classification, sourceUrl: product.image.sourceUrl, originalUrl: product.image.originalUrl, disclosure: product.image.source });
 }
 const manifests = readdirSync(outputRoot).filter(name => /manifest\.json$/.test(name) && name !== "asset-manifest.json");
-const report = { productCount: catalog.products.length, productImageCount: assets.length, sourcedPhotoCount: assets.filter(a => a.originalUrl).length, totalBytes: assets.reduce((sum, a) => sum + a.bytes, 0), reusedPhotos, earlierGenerationManifests: manifests, failures, assets };
+const report = { productCount: catalog.products.length, productImageCount: assets.length, sourcedPhotoCount: assets.filter(a => a.originalUrl).length, illustrationCount: assets.filter(a => a.mediaKind === "illustration").length, totalBytes: assets.reduce((sum, a) => sum + a.bytes, 0), reusedPhotos, earlierGenerationManifests: manifests, failures, assets };
 writeFileSync(new URL("asset-manifest.json", outputRoot), JSON.stringify(report, null, 2) + "\n");
-console.log(`${report.sourcedPhotoCount}/${catalog.products.length} sourced product photos; ${(report.totalBytes / 1024 / 1024).toFixed(1)} MiB. ${failures.length ? `${failures.length} issue(s).` : "All media checks pass."}`);
+console.log(`${report.productImageCount}/${catalog.products.length} images: ${report.sourcedPhotoCount} sourced photos, ${report.illustrationCount} disclosed illustrations; ${(report.totalBytes / 1024 / 1024).toFixed(1)} MiB. ${failures.length ? `${failures.length} issue(s).` : "All media checks pass."}`);
 if (failures.length && !prepare) {
   console.error(failures.join("\n"));
   process.exitCode = 1;

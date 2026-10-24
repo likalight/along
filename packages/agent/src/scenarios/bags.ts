@@ -1,6 +1,6 @@
 import { parseBudget } from "../intent/requirements.js";
 import type { AgentProposal, SessionSnapshot } from "@coupang/contract";
-import { PRODUCTS } from "../fixtures/catalog.js";
+import { PRODUCTS, completeTotalMinor, offersForProduct } from "../fixtures/catalog.js";
 
 export function bagClarifyShapeColour(
   base: Omit<AgentProposal, "action" | "payload" | "evidenceIds">,
@@ -29,6 +29,18 @@ export function buildBagDiscovery(snapshot: SessionSnapshot): {
   let bags = PRODUCTS.filter(
     (p) => p.category === "bags" && !snapshot.exclusions.includes(p.id),
   );
+
+  const budget = snapshot.hardConstraints["budgetMinor"];
+  const currency = snapshot.hardConstraints["currency"] ?? "USD";
+  if (typeof budget === "number" && Number.isFinite(budget)) {
+    // Apply the accepted ceiling before ranking or taking three. Otherwise a
+    // roomy but unaffordable top three can hide all the suitable cheaper bags.
+    // This candidate filter never replaces the authoritative quote checks.
+    bags = bags.filter((product) => offersForProduct(product.id).some((offer) => {
+      const total = completeTotalMinor(offer);
+      return offer.currency === currency && total !== null && total <= budget;
+    }));
+  }
 
   if (snapshot.preferences["bagPriority"] === "capacity") {
     // Prefer known roomier bags; never invent a capacity for missing specs.

@@ -15,18 +15,25 @@ import {
   ORDER_APPROVAL_QUESTION,
 } from "./live-approval-context";
 import { compactLiveOrderReview } from "./live-checkout-response";
+import {
+  LIVE_DISCOVERY_POLICY,
+  liveDiscoveryContext,
+} from "./live-discovery-context";
 
 // Also sent once to calls already open when this policy changes in development.
 // Keep this within one Live append (500 tokens; append caps at 1,500 characters).
 export const LIVE_SHOPPING_GUARDRAILS = `Stay in Along's shopping role. You cannot debug software, inspect code, change the app, or act as a developer. Redirect unrelated requests to shopping. You cannot approve purchases yourself.
 Start with the shopper's problem. If the approach is unclear, ask one useful everyday question and discuss the relevant tradeoff. Do not recite every microphone type, impose choice cards or run a questionnaire. Offer a small visual comparison only if helpful or requested. Use what they already told you; move to products when a direction is clear.
-Generate <|SpawnThinking|> to display products, record choices or corrected preferences, navigate, or handle checkout. A clarified budget must update the filter now; never ask them to repeat a value you heard. Treat display complaints as shopping requests. Let unchanged work finish. Acknowledge work once, then listen.
-Use confirmed backend results. Never claim products are visible when carouselProductCount is zero or an order is complete without a receipt. Name each new product so the carousel can follow. Speak in connected, relaxed phrases. Yield to deliberate interruptions, then answer after a short natural pause; do not await shopping work for answers you already know. Say any limit aloud with a next step, never silently stop. Keep demo/simulation language out of conversation. After a receipt, warmly confirm once using its delivery estimate; never invent shipment.`;
+Generate <|SpawnThinking|> to display photos/products or open a curated review inside Along, record choices or corrected preferences, navigate, or handle checkout. A clarified budget must update the filter now; never ask them to repeat a value you heard. Treat display complaints as shopping requests. Let unchanged work finish. Acknowledge work once, then listen.
+Use confirmed backend results. Never claim visible products when carouselProductCount is zero or completed orders without a receipt. Name each new product so the carousel can follow. Speak in connected, relaxed phrases. Yield to deliberate interruptions, then answer after a short natural pause; do not await shopping work for answers you already know. Say any limit aloud with a next step, never silently stop. Keep demo/simulation language out of conversation. After a receipt, warmly confirm once using its delivery estimate; never invent shipment.`;
 
 export const LIVE_INSTRUCTIONS = `You help shoppers choose confidently, only within Along's shopping platform and catalog. Sound like a thoughtful person helping a friend: relaxed, warm and responsive. Use connected thoughts, varied sentence lengths and comfortable pauses. Be concise when the answer is simple, but take enough time to explain a useful tradeoff. Do not sound like a checklist, read every field aloud, or force each answer into a clipped one-liner. Occasional light humour is welcome, never forced.
 
 ## Role and display actions
 ${LIVE_SHOPPING_GUARDRAILS}
+
+## Browser discovery context
+${LIVE_DISCOVERY_POLICY}
 
 ## Backchannel policy
 Acknowledge required work once in your own words. Allow the shopper thinking pauses and self-corrections. A short "mm-hm" or "yeah" can be a listening sound; do not automatically abandon your thought for it. Avoid repetitive filler or repeated promises to look something up.
@@ -41,6 +48,7 @@ When a request is outside your role, a fact cannot be verified, or the backend r
 Generate <|SpawnThinking|> when showing requested choices, recording a direction, retrieving or navigating products, substantial comparison, changed constraints, or checkout require backend work. Help with broad problems conversationally before choosing specific products. Recommend a direction and advance in the same turn when their situation supports it; do not ask them to approve every reversible step. Default to best fit and value and explain the leading tradeoff. Ask one focused question only when it changes the next useful recommendation and a reversible assumption or comparison will not suffice. Do not force an exhaustive category menu or a second decision after they already indicated a preference. Ordinary conversation does not need delegation, but a clarification that supplies or corrects a budget, preference or requirement does: pass the newly heard value to the backend immediately, even if the shopper only says "around fifty dollars". Never ask them to repeat an understood correction in another message or treat an outdated filter as an unchangeable limit. Until the update returns, acknowledge their intent without claiming the stored filter has changed. Display requests still need backend work even when you know the choices. Start work before acknowledging it naturally. Never invent prices, availability, progress, or completed actions.
 
 ## Backend tools
+For product video requests, including "take me to the Chrome tab", "open YouTube" or "show the review", immediately delegate. These refer to the current product review, not general browser control. For an explicit YouTube or Chrome request, the harness opens the review through the Chrome extension. Otherwise it plays inside Along. A related microphone model review is allowed when clearly labelled; never change the shopper's selected product to match the video. Along pauses microphone capture and voice replies during the review. Continue conversation closes the player and resumes the same conversation. If the customer chooses Chrome, Back to Along returns them here. Do not promise voice-controlled return while the microphone is paused; describe the requested destination accurately. Never claim it opened, playback started, or you watched it; the browser has not confirmed that yet.
 The Along shopping harness can show choices, remember preferences, retrieve and filter products, compare, navigate and prepare checkout. Backend results are authoritative. Once a direction is clear, prefer three qualifying products; do not pad results. Name each product when moving to it, then relate its useful difference to the shopper's needs. Avoid reciting a templated pros-and-cons script. Reuse verified results and explain material uncertainty in plain language.
 
 ## Purchase policy
@@ -140,6 +148,8 @@ type Call = {
   contextRevision: number;
   contextPending?: boolean;
   contextContent?: string;
+  discoveryContextContent?: string;
+  discoveryPolicy?: string;
   guardrails?: string;
   announcedReceiptId?: string;
   turnId?: string;
@@ -173,6 +183,7 @@ function spokenUpdate(
   s: ReturnType<typeof project>,
   previousSummaryId?: string,
 ) {
+  if (s.discoveryReference) return s.message;
   if (
     s.view === "summary" &&
     s.summary &&
@@ -189,28 +200,34 @@ function spokenUpdate(
   return s.message;
 }
 function stateContext(sessionId: string, s = project(sessionId)) {
-  const carouselVisible = ["shortlist", "saved_choice"].includes(s.view);
+  const carouselVisible =
+    !s.discoveryReference && ["shortlist", "saved_choice"].includes(s.view);
   return JSON.stringify({
     view: s.view,
-    purchase: s.receipt
+    purchase: s.discoveryReference
       ? {
-          status: "confirmed",
-          receiptId: s.receipt.id,
-          delivery: s.receipt.acceptedOrder.deliveryWindow,
+          status: "external_reference",
+          checkout: "Open on Coupang; no purchase authority",
         }
-      : s.summary
+      : s.receipt
         ? {
-            status: "review_order",
-            summaryId: s.summary.id,
-            instruction:
-              "The order details are displayed. Immediately delegate an explicit purchase request, including an interruption mid-review; do not finish the readout or ask again. For an ambiguous reply ask: Would you like me to place this order?",
+            status: "confirmed",
+            receiptId: s.receipt.id,
+            delivery: s.receipt.acceptedOrder.deliveryWindow,
           }
-        : { status: "not_confirmed" },
+        : s.summary
+          ? {
+              status: "review_order",
+              summaryId: s.summary.id,
+              instruction:
+                "The order details are displayed. Immediately delegate an explicit purchase request, including an interruption mid-review; do not finish the readout or ask again. For an ambiguous reply ask: Would you like me to place this order?",
+            }
+          : { status: "not_confirmed" },
     message: spokenUpdate(s)?.slice(0, 450),
     carouselProductCount: carouselVisible ? s.displayOrder.length : 0,
-    solutionType: s.canvas?.solution ?? null,
+    solutionType: s.discoveryReference ? null : (s.canvas?.solution ?? null),
     solutionChoices:
-      s.view === "solution_types"
+      !s.discoveryReference && s.view === "solution_types"
         ? AUDIO_SOLUTION_CHOICES.map((choice, index) => ({
             position: index + 1,
             solutionType: choice.solutionType,
@@ -218,12 +235,14 @@ function stateContext(sessionId: string, s = project(sessionId)) {
           }))
         : undefined,
     shoppingTaskPending: calls.get(sessionId)?.pending ?? false,
-    focusedProduct: s.focusedProductId,
+    focusedProduct: s.discoveryReference ? null : s.focusedProductId,
     // The canvas uses catalog + displayOrder; legacy stage cards are always empty.
-    products: s.displayOrder.slice(0, 3).map((id) => ({
-      id,
-      title: s.catalog?.products.find((product) => product.id === id)?.title,
-    })),
+    products: (s.discoveryReference ? [] : s.displayOrder.slice(0, 3)).map(
+      (id) => ({
+        id,
+        title: s.catalog?.products.find((product) => product.id === id)?.title,
+      }),
+    ),
     needs: s.needs?.slice(0, 3),
     constraints: s.hardConstraints,
     preferences: s.preferences?.slice(0, 4),
@@ -245,6 +264,7 @@ function reviewKey(
     : undefined;
 }
 function approvalSummary(call: Call, snapshot = project(call.sessionId)) {
+  if (snapshot.discoveryReference) return null;
   const summary = snapshot.summary;
   const stored = getRuntime().store.core.get(call.sessionId).summary;
   return ["summary", "recovery"].includes(snapshot.view) &&
@@ -263,6 +283,18 @@ function appendContext(
   snapshot = project(call.sessionId),
 ) {
   approvalContext(call).expect(approvalSummary(call, snapshot));
+  if (call.discoveryPolicy !== LIVE_DISCOVERY_POLICY) {
+    if (!append(call, "instructions", LIVE_DISCOVERY_POLICY, delegationId))
+      return;
+    call.discoveryPolicy = LIVE_DISCOVERY_POLICY;
+  }
+  const discovery = liveDiscoveryContext(snapshot);
+  const discoveryContent = JSON.stringify(discovery);
+  if (discoveryContent !== call.discoveryContextContent) {
+    for (const content of discovery)
+      if (!append(call, "thinking", content, delegationId)) return;
+    call.discoveryContextContent = discoveryContent;
+  }
   const content = stateContext(call.sessionId, snapshot);
   if (
     content !== call.contextContent &&
@@ -370,16 +402,20 @@ async function delegate(call: Call, id: string, offset: number) {
   if (generation !== call.generation || call.closed) return;
   const s = project(call.sessionId);
   const previousTurnId = store.core.get(s.sessionId).turn?.id;
-  const summaryInView = ["summary", "recovery"].includes(s.view) && s.summary;
+  const summaryInView =
+    !s.discoveryReference &&
+    ["summary", "recovery"].includes(s.view) &&
+    s.summary;
   const currentSummary = approvalSummary(call, s);
   const approvalPromptActive = approvalContext(call).consume(currentSummary);
   let intent: CheckoutIntentDecision;
   try {
     call.pending = true;
     intent =
-      currentSession.summary ||
-      currentSession.selection ||
-      currentSession.receipt
+      !s.discoveryReference &&
+      (currentSession.summary ||
+        currentSession.selection ||
+        currentSession.receipt)
         ? await resolveCheckoutIntent(s.sessionId, checkoutText, {
             approvalPromptActive,
             assentContextCurrent:
@@ -432,7 +468,11 @@ async function delegate(call: Call, id: string, offset: number) {
     appendContext(call, id);
     return;
   }
-  if (s.receipt && intent.intent === "acknowledge_order") {
+  if (
+    !s.discoveryReference &&
+    s.receipt &&
+    intent.intent === "acknowledge_order"
+  ) {
     call.pending = false;
     call.error = undefined;
     append(
@@ -461,6 +501,7 @@ async function delegate(call: Call, id: string, offset: number) {
   // This separate server-only path is limited to the displayed demo order and
   // can issue only its synthetic receipt, never a payment or merchant order.
   if (
+    !s.discoveryReference &&
     intent.intent === "approve_order" &&
     intent.summaryId === s.summary?.id &&
     summaryInView
@@ -641,26 +682,39 @@ export async function connectGptLive(
         delegation: { type: "client" },
         instructions: LIVE_INSTRUCTIONS,
         audio: { output: { voice } },
+        // Live startup history permits one text part per message.
         input: [
-          {
-            type: "message",
-            role: "developer",
-            content: [
-              {
-                type: "input_text",
-                text: `Current verified shopping state: ${stateContext(body.sessionId)}`,
-              },
-            ],
-          },
-        ],
+          `Current verified shopping state: ${stateContext(body.sessionId)}`,
+          ...liveDiscoveryContext(project(body.sessionId)),
+        ].map((text) => ({
+          type: "message",
+          role: "developer",
+          content: [{ type: "input_text", text }],
+        })),
       },
       transport: { type: "webrtc", sdp: body.sdp },
     }),
   });
-  if (!response.ok)
+  if (!response.ok) {
+    const failure = await response.json().catch(() => null);
+    // Keep diagnostics on the server; never log the SDP, headers or shopping context.
+    const safe = (value: unknown) =>
+      typeof value === "string"
+        ? value
+            .replace(/sk-[A-Za-z0-9_-]+|Bearer\s+\S+/gi, "[redacted]")
+            .slice(0, 350)
+        : undefined;
+    console.error("GPT-Live session rejected", {
+      status: response.status,
+      code: safe(failure?.error?.code),
+      parameter: safe(failure?.error?.param),
+      message: safe(failure?.error?.message),
+      requestId: response.headers.get("x-request-id"),
+    });
     throw new Error(
       `GPT-Live could not start (${response.status}). Text shopping remains available.`,
     );
+  }
   const result = await response.json();
   if (
     typeof result.session?.id !== "string" ||
@@ -684,6 +738,10 @@ export async function connectGptLive(
     delegationSequence: 0,
     contextRevision: project(body.sessionId).revision,
     contextPending: false,
+    discoveryContextContent: JSON.stringify(
+      liveDiscoveryContext(project(body.sessionId)),
+    ),
+    discoveryPolicy: LIVE_DISCOVERY_POLICY,
     guardrails: LIVE_SHOPPING_GUARDRAILS,
     announcedReceiptId: project(body.sessionId).receipt?.id,
     pending: false,
@@ -782,7 +840,8 @@ export function gptLiveState(sessionId: string, callId: unknown) {
   }
   if (
     call.contextRevision !== s.revision ||
-    call.contextPending !== call.pending
+    call.contextPending !== call.pending ||
+    call.discoveryContextContent !== JSON.stringify(liveDiscoveryContext(s))
   ) {
     appendContext(call, null, s);
   }

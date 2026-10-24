@@ -116,6 +116,18 @@ export function buildAlongProfile(): CatalogProfile {
 
 export const alongProfile = buildAlongProfile();
 
+/** Only this validated, recursively immutable source may reuse integrity validation.
+ * Fresh profiles and caller-owned clones remain mutable and are checked on every quote. */
+const immutableCanonical = alongProfile.catalog.canonical!;
+function freezeSource(value: unknown, visited = new WeakSet<object>()): void {
+  if (value === null || typeof value !== "object" || visited.has(value)) return;
+  visited.add(value);
+  for (const child of Object.values(value)) freezeSource(child, visited);
+  Object.freeze(value);
+}
+validateCanonical(immutableCanonical);
+freezeSource(immutableCanonical);
+
 function deadlineForDays(data: Catalog, days: number): string {
   // Calendar-day delivery means 18:00 in the explicit Asia/Singapore fixture timezone, not a rolling 24 hours.
   const date = new Date(`${data.scenarioNow.slice(0, 10)}T00:00:00Z`);
@@ -159,7 +171,7 @@ export function quoteAlongOffer(offerId: string, quantity: number, constraints: 
     if (!conflicts.some(existing => existing.code === code && existing.field === field)) conflicts.push({ code, message, field, offerId });
   };
   let canonicalValid = true;
-  try { validateCanonical(canonical); } catch (error) {
+  try { if (canonical !== immutableCanonical) validateCanonical(canonical); } catch (error) {
     canonicalValid = false;
     conflict("INVALID_CATALOG", `Catalog integrity failed: ${error instanceof Error ? error.message : "unknown data error"}. Approval is blocked.`);
   }

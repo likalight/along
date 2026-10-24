@@ -2,12 +2,14 @@ import { EventEmitter } from "node:events";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { AUDIO_SOLUTION_CHOICES } from "@/lib/canvas/solution-choices";
 import { ORDER_APPROVAL_QUESTION } from "@/lib/voice/live-approval-context";
+import type { DiscoveryReference } from "@coupang/contract";
 import type { CheckoutIntentDecision } from "@/lib/checkout/intent";
 const state = vi.hoisted(() => ({
   turn: "",
   revision: 0,
   view: "understanding",
   displayOrder: [] as string[],
+  discoveryReference: undefined as DiscoveryReference | undefined,
   summary: null as {
     id: string;
     revision: number;
@@ -54,6 +56,7 @@ vi.mock("@/lib/integration/projection", () => ({
     revision: state.revision,
     view: state.view,
     displayOrder: state.displayOrder,
+    discoveryReference: state.discoveryReference,
     catalog: { products: [{ id: "mic-1", title: "USB microphone" }] },
     cards: [],
     message: state.message,
@@ -181,6 +184,7 @@ describe("GPT-Live task ownership", () => {
     state.revision = 0;
     state.view = "understanding";
     state.displayOrder = [];
+    state.discoveryReference = undefined;
     state.summary = null;
     state.summaryDisplayed = true;
     state.receipt = null;
@@ -195,12 +199,30 @@ describe("GPT-Live task ownership", () => {
     });
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        Response.json({
+      vi.fn(async (_url, init) => {
+        // Match the provider boundary that rejected the merged discovery payload:
+        // every initial message must contain exactly one text part.
+        const body = JSON.parse(String(init.body));
+        if (
+          body.session.input.some(
+            (message: { content: unknown[] }) => message.content.length !== 1,
+          )
+        ) {
+          return Response.json(
+            {
+              error: {
+                code: "array_above_max_length",
+                param: "session.input[0].content",
+              },
+            },
+            { status: 400 },
+          );
+        }
+        return Response.json({
           session: { id: crypto.randomUUID() },
           transport: { sdp: "answer" },
-        }),
-      ),
+        });
+      }),
     );
   });
   afterEach(() => {
@@ -209,6 +231,96 @@ describe("GPT-Live task ownership", () => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
+  });
+  const reference = (): DiscoveryReference => ({
+    handoffId: "live-browser-handoff",
+    mode: "live",
+    source: {
+      title: "A bag in a video",
+      url: "https://www.youtube.com/watch?v=example",
+    },
+    candidate: {
+      id: "search-bag",
+      title: "A similar bag",
+      url: "https://www.coupang.com/np/search?q=bag",
+      linkKind: "search",
+      price: null,
+      match: "similar",
+      reasons: ["Similar shape"],
+      unknowns: ["Laptop fit"],
+    },
+  });
+  it("syncs a selected browsing reference into the existing sideband and clears it on return", async () => {
+    const c = await connect("discovery-context");
+    state.view = "shortlist";
+    state.displayOrder = ["mic-1"];
+    state.discoveryReference = reference();
+    state.revision++;
+    await controlGptLive("discovery-context", c.callId, "sync");
+    const contexts = () =>
+      c.socket.sent
+        .map((raw) => JSON.parse(raw))
+        .filter(
+          (event) =>
+            event.type === "session.thinking.append" &&
+            event.content.startsWith("{"),
+        )
+        .map((event) => JSON.parse(event.content));
+    expect(
+      contexts().find((context) => context.discovery)?.discovery,
+    ).toMatchObject({
+      handoffId: "live-browser-handoff",
+      title: "A similar bag",
+      priceSnapshot: null,
+      linkKind: "search",
+    });
+    expect(contexts().find((context) => context.purchase)).toMatchObject({
+      purchase: { status: "external_reference" },
+      carouselProductCount: 0,
+      products: [],
+      focusedProduct: null,
+    });
+    const count = c.socket.sent.length;
+    gptLiveState("discovery-context", c.callId);
+    expect(c.socket.sent).toHaveLength(count);
+    state.discoveryReference = undefined;
+    state.revision++;
+    await controlGptLive("discovery-context", c.callId, "sync");
+    expect(contexts()).toContainEqual({
+      discovery: null,
+      discoveryAssessment: null,
+    });
+  });
+  it("includes an already imported reference when voice is first connected", async () => {
+    state.discoveryReference = reference();
+    await connect("discovery-on-start");
+    const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string);
+    const inputs = body.session.input.flatMap(
+      (message: { content: { text: string }[] }) =>
+        message.content.map((item) => item.text),
+    );
+    expect(
+      inputs.some((text: string) =>
+        text.includes('"handoffId":"live-browser-handoff"'),
+      ),
+    ).toBe(true);
+  });
+  it("does not confirm a stale catalog review while a browsing reference is active", async () => {
+    reviewedOrder();
+    state.discoveryReference = reference();
+    nextIntent("approve_order");
+    state.post.mockResolvedValue(
+      Response.json({
+        snapshot: { message: "Open the Coupang link to check this reference." },
+      }),
+    );
+    const c = await connect("discovery-no-catalog-checkout");
+    delegate(c.socket, "Please buy it", "external-purchase", 100);
+    await vi.advanceTimersByTimeAsync(351);
+    expect(state.complete).not.toHaveBeenCalled();
+    expect(state.intent).not.toHaveBeenCalled();
+    expect(state.post).toHaveBeenCalledOnce();
+    expect(state.receipt).toBeNull();
   });
   it("stop speaking leaves backend work running", async () => {
     state.post.mockImplementation(async (req: Request) => {

@@ -1,9 +1,13 @@
+import { PRODUCT_VIDEOS, type ProductVideoRequest } from "@coupang/contract";
 import type {
   InputEvent,
   LifecycleEvent,
   SessionSnapshot,
   SpeakableResult,
+  DiscoveryReference,
+  DiscoveryImportIdentity,
 } from "@coupang/contract";
+import { isExplicitCatalogRequest, type DiscoveryImportResult } from "../discovery/reference.js";
 import { routeInput } from "../intent/router.js";
 import type { FixtureSessionStore } from "../session/FixtureSessionStore.js";
 import { SessionThread } from "../thread/SessionThread.js";
@@ -58,6 +62,62 @@ export class VoiceOrchestrator {
     return this.store.get(sessionId);
   }
 
+  async importDiscovery(sessionId: string, reference: DiscoveryReference, identity: DiscoveryImportIdentity): Promise<DiscoveryImportResult> {
+    const result = this.store.importDiscovery(sessionId, reference, identity);
+    if (result.duplicate) return result;
+    const active = this.turnsFor(sessionId).active;
+    if (active) this.turnsFor(sessionId).cancel(active.turnId, "discovery_handoff");
+    await this.voice.interrupt(sessionId, "discovery_handoff");
+    const current = this.store.get(sessionId);
+    if (!current || current.epoch !== result.snapshot.epoch || current.revision !== result.snapshot.revision)
+      return { ...result, duplicate: true, snapshot: current ?? result.snapshot };
+    const thread = this.thread(sessionId, current);
+    reduce(thread, { type: "discovery_reference", data: { handoffId: reference.handoffId, turnId: result.turnId } });
+    reduce(thread, { type: "assistant_transcript", data: { turnId: result.turnId, text: result.speakable } });
+    await this.voice.append(sessionId, "commentary", result.speakable, { turnId: result.turnId });
+    return result;
+  }
+
+  getProductVideoRequest(
+    sessionId: string,
+    turnId?: string,
+  ): ProductVideoRequest | undefined {
+    if (!turnId) return;
+    const events = this.threads.get(sessionId)?.events ?? [];
+    if (
+      !events.some(
+        (e) => e.type === "delegation_completed" && e.data.turnId === turnId,
+      )
+    )
+      return;
+    for (const event of [...events].reverse()) {
+      if (
+        event.type !== "tool_result" ||
+        event.data.turnId !== turnId ||
+        !event.data.ok
+      )
+        continue;
+      try {
+        const result = JSON.parse(event.data.summary);
+        const video = PRODUCT_VIDEOS.find(
+          (v) => v.id === result.productVideoId,
+        );
+        if (video)
+          return {
+            ...video,
+            requestId: turnId,
+            requestedProductId:
+              typeof result.requestedProductId === "string"
+                ? result.requestedProductId
+                : video.productId,
+            destination: result.destination === "chrome" ? "chrome" : "inline",
+          };
+      } catch {
+        /* Ordinary tool summaries are not media commands. */
+      }
+    }
+  }
+
   getConversation(
     sessionId: string,
   ): Array<{ role: "user" | "assistant"; text: string }> {
@@ -83,6 +143,10 @@ export class VoiceOrchestrator {
     }
 
     this.store.ingestInput(input);
+    const returningToCatalog = !!snap.discoveryReference &&
+      (input.modality === "text" || input.modality === "voice") &&
+      isExplicitCatalogRequest(input.text ?? "") && !/^back to my catalog[.!]?$/i.test((input.text ?? "").trim());
+    if (returningToCatalog) this.store.clearDiscovery(input.sessionId);
     const turns = this.turnsFor(input.sessionId);
     // New typed/voice turn cancels in-flight speech + work
     const active = turns.active;
@@ -126,9 +190,11 @@ export class VoiceOrchestrator {
       },
     );
 
-    const route = this.options?.agent
+    const boundedRoute = routeInput(input, basedOn);
+    const useModel = !["discovery_return", "catalog_product"].includes(boundedRoute) ? this.options?.agent : undefined;
+    const route = useModel
       ? "open_ended"
-      : routeInput(input, basedOn);
+      : boundedRoute;
     const normalized: InputEvent = {
       ...input,
       baseRevision: basedOn.revision,
@@ -136,17 +202,17 @@ export class VoiceOrchestrator {
 
     let result;
     try {
-      result = this.options?.agent
+      result = useModel
         ? await openEndedLoop({
             input: normalized,
             thread,
             store: this.store,
             cancel: turn.cancelToken.signal,
-            config: this.options.agent,
+            config: useModel,
           })
         : await agentLoop({
             input: normalized,
-            route: routeInput(input, basedOn),
+            route: boundedRoute,
             thread,
             store: this.store,
             cancel: turn.cancelToken.signal,
@@ -159,6 +225,8 @@ export class VoiceOrchestrator {
       });
       throw error;
     }
+    if (returningToCatalog && result.speakable[0])
+      result.speakable[0].content = `Back to your catalog choices. ${result.speakable[0].content}`;
 
     const current = this.store.get(input.sessionId)!;
     // Own applies advance revision; only drop when this turn was cancelled (barge-in / newer input).

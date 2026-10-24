@@ -134,6 +134,55 @@ function carouselChoices(page: Page) {
     .getByRole("button", { name: /^Focus option \d+:/ });
 }
 const preparedImage = "Prepared blue tote illustration";
+test("recovered expired sessions initialize voice without turning on the microphone", async ({
+  page,
+  baseURL,
+}) => {
+  const expiredSessionId = crypto.randomUUID();
+  await installVoiceMock(page);
+  await page.context().addCookies([
+    {
+      name: `along-session-${expiredSessionId}`,
+      value: "stale-token-from-before-server-restart",
+      url: baseURL!,
+    },
+  ]);
+  await page.addInitScript((id) => {
+    sessionStorage.setItem("along.sessionId", id);
+  }, expiredSessionId);
+  const configuredSessions: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().endsWith("/api/voice/mint"))
+      configuredSessions.push(request.postDataJSON().sessionId);
+  });
+  await page.goto("/");
+  await expect(page.getByRole("alert")).toBeVisible();
+  const start = page.getByRole("button", {
+    name: "Start talking",
+    exact: true,
+  });
+  await expect(start).toBeDisabled();
+  expect(configuredSessions).toEqual([]);
+  await page.getByRole("button", { name: "Reconnect", exact: true }).click();
+  await expect(start).toBeEnabled();
+  const recoveredId = await page.evaluate(() =>
+    sessionStorage.getItem("along.sessionId"),
+  );
+  expect(recoveredId).toBeTruthy();
+  expect(recoveredId).not.toBe(expiredSessionId);
+  expect(configuredSessions).toContain(recoveredId);
+  expect(configuredSessions).not.toContain(expiredSessionId);
+  expect(
+    await page.evaluate(() => (window as any).__voice.capturing()),
+  ).toBeFalsy();
+  await start.click();
+  await expect(
+    page.getByRole("button", { name: "Pause microphone" }),
+  ).toBeVisible();
+  expect(await page.evaluate(() => (window as any).__voice.capturing())).toBe(
+    true,
+  );
+});
 test("shopper opening and complete text journey, without presenter controls or unrelated products", async ({
   page,
 }) => {
@@ -529,4 +578,186 @@ test("WebGL context exceptions preserve the text journey", async ({ page }) => {
   await textMode(page);
   await say(page, "bag");
   await expect(page.locator(".orb-fallback")).toBeVisible();
+});
+
+test("inline review pauses voice, stops media before resuming, and preserves the conversation", async ({
+  page,
+  context,
+}) => {
+  await installVoiceMock(page);
+  // Exercise the real app/controller lifecycle without depending on YouTube availability.
+  // Actual YouTube playback is checked separately in personal Chrome.
+  await page.route("https://www.youtube.com/embed/**", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: "<!doctype html><title>Review player fixture</title><button>Play review fixture</button>",
+    }),
+  );
+  await textMode(page);
+  await say(page, "Show catalog MIC-062");
+  const sessionId = await page.evaluate(() =>
+    sessionStorage.getItem("along.sessionId"),
+  );
+  await page
+    .getByRole("textbox", { name: "Your message" })
+    .fill("Keep this thought");
+  await page
+    .getByRole("button", { name: /Start talking|Talk to Along/ })
+    .click();
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__voice.capturing()))
+    .toBe(true);
+  const pagesBefore = context.pages().length;
+  await page.getByRole("button", { name: "Watch review", exact: true }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await expect(
+    page.locator('iframe[title="Rode Wireless Pro — Review & Audio Test"]'),
+  ).toBeVisible();
+  expect(context.pages()).toHaveLength(pagesBefore);
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__voice.capturing()))
+    .toBe(false);
+  await expect(page.locator(".voice-status")).toContainText("Paused");
+  await page
+    .getByRole("button", { name: "Continue conversation", exact: true })
+    .click();
+  await expect(page.locator("dialog")).toHaveCount(0);
+  await expect(page.locator("iframe")).toHaveCount(0);
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__voice.capturing()))
+    .toBe(true);
+  expect(
+    await page.evaluate(() => sessionStorage.getItem("along.sessionId")),
+  ).toBe(sessionId);
+  // Closing without continuing must never silently restart the microphone.
+  await page.getByRole("button", { name: "Watch review", exact: true }).click();
+  await page.getByRole("button", { name: "Close review", exact: true }).click();
+  await expect(page.locator("iframe")).toHaveCount(0);
+  expect(await page.evaluate(() => (window as any).__voice.capturing())).toBe(
+    false,
+  );
+  await page.getByRole("button", { name: "Type instead" }).click();
+  await expect(page.getByRole("textbox", { name: "Your message" })).toHaveValue(
+    "Keep this thought",
+  );
+  await say(page, "Focus MIC-062");
+  expect(
+    await page.evaluate(() => sessionStorage.getItem("along.sessionId")),
+  ).toBe(sessionId);
+});
+
+test("a related review is labelled and never changes the product being shopped", async ({
+  page,
+}) => {
+  await page.route("https://www.youtube.com/embed/**", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: "<title>Review fixture</title><p>Video fixture</p>",
+    }),
+  );
+  await textMode(page);
+  await say(page, "Show catalog MIC-040");
+  await page
+    .getByRole("button", { name: "Watch related review", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toContainText(
+    "Related model review · RØDE Wireless PRO",
+  );
+  await page.getByRole("button", { name: "Close review", exact: true }).click();
+  await expect(
+    page.getByRole("heading", {
+      name: "Wireless ME (single TX kit)",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(page.locator(".voice-status")).toContainText("Paused");
+});
+
+test("an agent-requested review loads its player without a review-button click", async ({
+  page,
+}) => {
+  await page.route("https://www.youtube.com/embed/**", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: "<!doctype html><title>Automatic review fixture</title><button>Play automatic review</button>",
+    }),
+  );
+  await page.route("**/api/session", async (route) => {
+    const request = route.request().postDataJSON();
+    const response = await route.fetch();
+    if (request.action !== "input") return route.fulfill({ response });
+    const snapshot = await response.json();
+    await route.fulfill({
+      response,
+      json: {
+        ...snapshot,
+        snapshot: {
+          ...snapshot.snapshot,
+          productVideoRequest: {
+            id: "rode-wireless-pro-review",
+            productId: "MIC-062",
+            requestedProductId: "MIC-040",
+            destination: "inline",
+            requestId: "automatic-review-check",
+          },
+        },
+      },
+    });
+  });
+  await textMode(page);
+  await page
+    .getByRole("textbox", { name: "Your message" })
+    .fill("Show catalog MIC-040");
+  await page.getByRole("button", { name: "Send message" }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await expect(
+    page
+      .frameLocator("dialog iframe")
+      .getByRole("button", { name: "Play automatic review" }),
+  ).toBeVisible();
+  await expect(page.locator(".voice-status")).toContainText("Paused");
+  await page.getByRole("button", { name: "Close review", exact: true }).click();
+  await expect(
+    page.getByRole("heading", {
+      name: "Wireless ME (single TX kit)",
+      exact: true,
+    }),
+  ).toBeVisible();
+});
+
+test("a stalled video offers a working play recovery without losing the conversation", async ({
+  page,
+}) => {
+  let loads = 0;
+  await page.route("https://www.youtube.com/embed/**", (route) => {
+    loads++;
+    return route.fulfill({
+      contentType: "text/html",
+      body:
+        loads === 1
+          ? "<title>Stalled player</title>"
+          : '<title>Recovered player</title><button>Recovered video</button><script>parent.postMessage(JSON.stringify({event:"onReady"}),"*")</script>',
+    });
+  });
+  await textMode(page);
+  await say(page, "Show catalog MIC-062");
+  await page.getByRole("button", { name: "Watch review", exact: true }).click();
+  await page.getByRole("button", { name: "Play review", exact: true }).click();
+  await expect(
+    page
+      .frameLocator("dialog iframe")
+      .getByRole("button", { name: "Recovered video" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Play review", exact: true }),
+  ).toHaveCount(0);
+  await expect(page.locator(".voice-status")).toContainText("Paused");
+  expect(loads).toBe(2);
+  await page.getByRole("button", { name: "Close review", exact: true }).click();
+  await expect(
+    page.getByRole("heading", {
+      name: "Wireless PRO (2 TX + RX + 2 Lavalier II mics)",
+      exact: true,
+    }),
+  ).toBeVisible();
 });

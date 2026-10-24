@@ -179,7 +179,7 @@ export default function ContextPage() {
           )}
           <p role="status">{message}</p>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            <a href="/" style={control}>
+            <a href="/?fresh=1" style={control}>
               Start shopping with these preferences
             </a>
             <button

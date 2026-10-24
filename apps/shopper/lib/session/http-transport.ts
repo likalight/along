@@ -30,6 +30,7 @@ export const httpTransport: SessionTransport = {
       sessionId,
       ...(!sessionId ? { reviewedContext: readLocalPreferences() } : {}),
     }),
+  discovery: (input, handoffId) => post("discovery", input, { handoffId }),
   send: (input, signal, voiceEvidence) =>
     post("input", input, voiceEvidence ? { voiceEvidence } : {}, signal),
   activity: (input, signal) => post("activity", input, {}, signal),

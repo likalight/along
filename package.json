@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "dev": "npm run dev -w @coupang/web",
-    "build": "npm run sync:catalog && npm run build -w @concierge/backend && npm run build -w @coupang/contract && npm run build -w @coupang/agent && npm run build -w @coupang/web && npm run build -w @along/shopper",
+    "build": "npm run sync:catalog && npm run build -w @concierge/backend && npm run build -w @coupang/contract && npm run build -w @coupang/agent && npm run build -w @coupang/web && npm run build -w @along/shopper && npm run build:extension",
     "test": "npm run test -w @coupang/agent",
     "typecheck": "npm run typecheck -w @coupang/contract && npm run typecheck -w @coupang/agent && npm run typecheck -w @coupang/web && npm run typecheck -w @along/shopper",
     "sync:catalog": "node scripts/sync-catalog.mjs",
@@ -17,7 +17,12 @@
     "verify:catalog-media": "node scripts/catalog-media.mjs",
     "dev:shopper": "npm run dev -w @along/shopper",
     "test:e2e": "npm run test:e2e -w @along/shopper",
-    "test:canvas": "npm run test:canvas -w @along/shopper"
+    "test:canvas": "npm run test:canvas -w @along/shopper",
+    "build:extension": "npm run build -w @along/extension",
+    "test:extension": "npm run test -w @along/extension && npm run check -w @along/extension",
+    "test:extension:media": "node --test apps/extension/test/media.browser.mjs",
+    "test:extension:e2e": "npm exec -w @along/shopper -- playwright test --config playwright.extension.config.ts",
+    "demo": "node scripts/demo.mjs"
   },
   "engines": {
     "node": ">=22.18"

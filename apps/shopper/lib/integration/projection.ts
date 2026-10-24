@@ -220,6 +220,14 @@ export function project(id: string): Session {
       : undefined;
   return {
     ...s,
+    productVideoRequest:
+      !s.discoveryReference &&
+      !summary &&
+      !c.receipt &&
+      c.turn?.status === "active"
+        ? getRuntime().orch.getProductVideoRequest(id, c.turn.id)
+        : undefined,
+    conversationMode: c.presentationMode,
     narrationSegments: acceptedSegments,
     focusedProductId:
       s.focusedProductId ??

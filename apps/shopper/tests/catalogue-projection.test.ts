@@ -13,16 +13,16 @@ import { consumerDetails } from "@/lib/canvas/consumer-details";
 
 describe("expanded catalogue presentation", () => {
   it("projects the full seeded pool, preserving canonical media and separately labelled demo reviews", () => {
-    expect(canvasData.products).toHaveLength(148);
+    expect(canvasData.products).toHaveLength(200);
     expect(
       canvasData.products.filter((p) => p.category === "audio"),
     ).toHaveLength(100);
     expect(
       canvasData.products.filter((p) => p.category === "bags"),
-    ).toHaveLength(24);
+    ).toHaveLength(50);
     expect(
       canvasData.products.filter((p) => p.category === "bedsheets"),
-    ).toHaveLength(24);
+    ).toHaveLength(50);
     for (const product of canvasData.products) {
       const source = agreedCatalog.products.find(
         (row: { id: string }) => row.id === product.id,
@@ -123,7 +123,7 @@ describe("expanded catalogue presentation", () => {
     const quotes = vi.spyOn(store, "quotes");
     try {
       const projected = project(session.sessionId);
-      expect(projected.catalog?.products).toHaveLength(148);
+      expect(projected.catalog?.products).toHaveLength(200);
       expect(quotes).not.toHaveBeenCalled();
     } finally {
       quotes.mockRestore();

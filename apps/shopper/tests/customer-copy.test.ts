@@ -45,6 +45,8 @@ describe("customer-facing labels without changing accepted source data", () => {
   });
 
   it("preserves unresolved compatibility, stock and recall risks", () => {
+    expect(customerCopy("Demo color, seller, price and delivery are authored fixtures, not verified retail offers."))
+      .toBe("Colour availability, seller pricing and delivery still need verification.");
     const recalled = agreedCatalog.products.find(
       (product: { limitations: string[] }) =>
         product.limitations.some((text) => /battery fire risk/i.test(text)),

@@ -9,10 +9,20 @@ import type {
 } from "./contract";
 import type { SpeechAdapter, Playback } from "@/lib/voice/adapter";
 import { TransportError } from "./http-transport";
-import { LiveProductFocus } from "./live-product-focus";
+import {
+  LiveProductFocus,
+  spokenNavigation,
+  requestsChromeReview,
+} from "./live-product-focus";
 export type ClientState = {
   snapshot: Session | null;
   narrationProductId: string | null;
+  outputMuted: boolean;
+  voiceReviewRequest: {
+    productId: string;
+    requestId: string;
+    destination: "inline" | "chrome";
+  } | null;
   status: VoiceStatus;
   capturing: boolean;
   mode: "text" | "voice" | null;
@@ -26,10 +36,24 @@ export type ClientState = {
   liveCaption: string;
   livePending: boolean;
 };
+/** Queued references must not replace a draft, voice task or order review. */
+export function canAutoImportDiscovery(state: ClientState, hasDraft: boolean) {
+  return (
+    state.connected &&
+    !!state.snapshot &&
+    !hasDraft &&
+    !state.capturing &&
+    !state.livePending &&
+    state.status === "ready" &&
+    !["summary", "recovery"].includes(state.snapshot.view)
+  );
+}
 export class SessionController {
   private state: ClientState = {
     snapshot: null,
     narrationProductId: null,
+    outputMuted: false,
+    voiceReviewRequest: null,
     status: "ready",
     capturing: false,
     mode: null,
@@ -48,10 +72,16 @@ export class SessionController {
   private pending: AbortController | null = null;
   private identity: Identity | null = null;
   private disposed = false;
+  private voiceActivated = false;
+  private voicePauseGeneration = 0;
   private cancellation: Promise<unknown> = Promise.resolve();
   private mediaEvents: Promise<unknown> = Promise.resolve();
   private playback: Playback | null = null;
   private liveFocus = new LiveProductFocus();
+  private userNavigationKey: string | null = null;
+  private lastPresentedProductId: string | null = null;
+  private userReviewHandled = false;
+  private pinnedPresentation: string | null = null;
   private activityTimer: ReturnType<typeof setTimeout> | null = null;
   private delayTimer: ReturnType<typeof setTimeout> | null = null;
   private activityAbort: AbortController | null = null;
@@ -69,12 +99,17 @@ export class SessionController {
     this.speech.dispose();
     this.speech = adapter;
     this.speech.setVoice?.(this.voice);
+    this.speech.setOutputMuted?.(this.state.outputMuted);
     this.speechKind = kind;
   }
   setVoice(voice: "marin" | "cedar" | "coral") {
     this.voice = voice;
     this.speech.setVoice?.(voice);
   }
+  setOutputMuted = (muted: boolean) => {
+    this.speech.setOutputMuted?.(muted);
+    this.update({ outputMuted: muted });
+  };
   private stopActivity() {
     if (this.activityTimer) clearTimeout(this.activityTimer);
     if (this.delayTimer) clearTimeout(this.delayTimer);
@@ -124,14 +159,11 @@ export class SessionController {
   };
   private update(patch: Partial<ClientState>) {
     if (this.disposed) return;
+    if (patch.narrationProductId)
+      this.lastPresentedProductId = patch.narrationProductId;
     this.state = {
       ...this.state,
       ...patch,
-      ...(patch.status &&
-      patch.status !== "speaking" &&
-      !(this.speech.fullDuplex && patch.status === "listening")
-        ? { narrationProductId: null }
-        : {}),
     };
     this.listeners.forEach((l) => l());
   }
@@ -149,21 +181,55 @@ export class SessionController {
       !current ||
       snapshot.epoch !== current.epoch ||
       snapshot.revision !== current.revision;
-    if (changed && this.speech.fullDuplex) this.liveFocus.clear();
+    const canvasChanged =
+      changed &&
+      (!current ||
+        snapshot.epoch !== current.epoch ||
+        snapshot.view !== current.view ||
+        snapshot.focusedProductId !== current.focusedProductId ||
+        snapshot.displayOrder.join("|") !== current.displayOrder.join("|"));
+    const presentationChanged =
+      canvasChanged &&
+      (!current ||
+        snapshot.epoch !== current.epoch ||
+        snapshot.focusedProductId !== current.focusedProductId ||
+        snapshot.displayOrder.join("|") !== current.displayOrder.join("|"));
+    const firstProductsArrived =
+      canvasChanged &&
+      current?.displayOrder.length === 0 &&
+      snapshot.displayOrder.length > 0 &&
+      snapshot.epoch === current.epoch;
+    if (canvasChanged && !firstProductsArrived && this.speech.fullDuplex) {
+      this.liveFocus.clear();
+      if (presentationChanged) {
+        this.pinnedPresentation = null;
+        this.lastPresentedProductId = snapshot.focusedProductId;
+      }
+    }
     this.update({
       snapshot,
-      ...(changed && this.speech.fullDuplex
-        ? { narrationProductId: null }
+      ...(presentationChanged && this.speech.fullDuplex
+        ? {
+            narrationProductId:
+              firstProductsArrived && this.state.status === "speaking"
+                ? this.liveFocus.reconcile(snapshot)
+                : null,
+          }
         : {}),
     });
     return true;
   }
-  async connect() {
+  async connect(sessionId?: string) {
     const generation = this.generation;
     try {
-      const snapshot = await this.transport.connect();
+      const snapshot = await this.transport.connect(sessionId);
       if (generation === this.generation && this.acceptSnapshot(snapshot))
-        this.update({ connected: true });
+        this.update({
+          connected: true,
+          ...(sessionId && snapshot.conversationMode
+            ? { mode: snapshot.conversationMode }
+            : {}),
+        });
     } catch (e) {
       if (generation === this.generation) this.fail(e);
     }
@@ -183,6 +249,80 @@ export class SessionController {
           turnId: crypto.randomUUID(),
           revision: s.revision,
         };
+  }
+  /** A user-selected extension reference joins this conversation, never as executable page text. */
+  async receiveDiscovery(handoffId: string): Promise<boolean> {
+    if (!this.state.snapshot || !this.transport.discovery) return false;
+    const paused = this.state.status === "paused";
+    const voicePauseGeneration = this.voicePauseGeneration;
+    const resumeVoice =
+      this.state.mode === "voice" &&
+      (this.state.capturing ||
+        (this.voiceActivated &&
+          ["speaking", "thinking"].includes(this.state.status)));
+    // An explicitly imported reference supersedes the task, not just its speech.
+    // Live barge-in deliberately leaves delegated work running, so interrupt()
+    // would allow an older recommendation to overwrite this new reference.
+    this.cancelTurn();
+    const generation = this.generation;
+    this.update({ status: "thinking", error: null, liveCaption: "" });
+    try {
+      await this.speech.prepareTurn?.();
+      await this.cancellation;
+      await this.mediaEvents;
+      if (generation !== this.generation) return false;
+      const latest = await this.transport.connect(
+        this.state.snapshot.sessionId,
+      );
+      if (generation !== this.generation) return false;
+      if (!this.acceptSnapshot(latest))
+        throw new Error(
+          "The conversation changed. Reconnect and try the discovery again.",
+        );
+      this.update({ livePending: false });
+      const result = await this.transport.discovery(
+        this.currentIdentity(),
+        handoffId,
+      );
+      if (generation !== this.generation) return false;
+      if (!this.acceptSnapshot(result.snapshot))
+        throw new Error(
+          "This discovery belongs to another conversation or has expired.",
+        );
+      this.identity = {
+        sessionId: result.snapshot.sessionId,
+        epoch: result.snapshot.epoch,
+        revision: result.snapshot.revision,
+        turnId: result.turnId,
+      };
+      this.update({
+        status:
+          paused || voicePauseGeneration !== this.voicePauseGeneration
+            ? "paused"
+            : "ready",
+        error: null,
+      });
+      if (this.speech.fullDuplex) {
+        // The existing server-side call receives the reference and its limits;
+        // never synthesize a second voice response or new approval evidence.
+        await this.speech.sync?.();
+        if (generation !== this.generation) return false;
+        if (resumeVoice && voicePauseGeneration === this.voicePauseGeneration)
+          await this.listenLive();
+      } else if (
+        resumeVoice &&
+        voicePauseGeneration === this.voicePauseGeneration
+      )
+        this.narrate(result.snapshot);
+      return true;
+    } catch (error) {
+      if (generation === this.generation) {
+        if (error instanceof TransportError && error.snapshot)
+          this.acceptSnapshot(error.snapshot);
+        this.fail(error);
+      }
+      return false;
+    }
   }
   private matches(i: Playback) {
     const s = this.state.snapshot;
@@ -222,19 +362,25 @@ export class SessionController {
       this.speech.cancel();
       this.update({
         status: this.state.capturing ? "listening" : "paused",
-        narrationProductId: null,
       });
       return;
     }
     this.cancelTurn();
   };
   pauseListening = () => {
+    this.voicePauseGeneration++;
     this.liveFocus.clear(true);
     this.speech.stop();
     this.update({ capturing: false, status: "paused" });
   };
+  /** External video never shares audio capture or narration with the shopper. */
+  pauseForExternalVideo = () => {
+    this.speech.cancel();
+    this.pauseListening();
+  };
   /** Release microphone and provider resources when the mounted UI goes away. */
   closeVoice = () => {
+    this.voicePauseGeneration++;
     this.liveFocus.clear(true);
     this.speech.dispose();
     this.update({ capturing: false, status: "paused" });
@@ -392,6 +538,7 @@ export class SessionController {
             this.update({ capturing: false, status: "paused" });
         },
       });
+      this.voiceActivated = true;
     } catch (e) {
       if (generation === this.generation) this.fail(e);
     }
@@ -432,20 +579,67 @@ export class SessionController {
         playbackResumed: () => {
           if (!current()) return;
           this.liveFocus.beginOutput();
-          this.update({ narrationProductId: null });
+          // A fresh audio window does not mean a new product. Hold the current card.
         },
         caption: (speaker, text) => {
           if (!current()) return;
           if (speaker === "user") {
+            if (!this.state.capturing) return;
             this.liveFocus.clear();
-            this.update({ requestText: text, narrationProductId: null });
+            const snapshot = this.state.snapshot;
+            const navigation =
+              snapshot &&
+              spokenNavigation(
+                text,
+                snapshot,
+                this.state.narrationProductId ?? this.lastPresentedProductId,
+              );
+            const newNavigation =
+              navigation && navigation.key !== this.userNavigationKey;
+            if (newNavigation) {
+              this.userNavigationKey = navigation.key;
+              this.pinnedPresentation = navigation.productId;
+            }
+            const review =
+              snapshot &&
+              !this.state.livePending &&
+              !snapshot.summary &&
+              !snapshot.receipt &&
+              !snapshot.discoveryReference &&
+              requestsChromeReview(text) &&
+              !this.userReviewHandled;
+            const productId =
+              this.state.narrationProductId ??
+              this.lastPresentedProductId ??
+              snapshot?.focusedProductId ??
+              snapshot?.displayOrder[0];
+            if (review && productId) this.userReviewHandled = true;
+            this.update({
+              requestText: text,
+              narrationProductId: newNavigation
+                ? navigation.productId
+                : this.state.narrationProductId,
+              ...(review && productId
+                ? {
+                    voiceReviewRequest: {
+                      productId,
+                      requestId: crypto.randomUUID(),
+                      destination: "chrome",
+                    },
+                  }
+                : {}),
+            });
           } else {
+            this.userNavigationKey = null;
+            this.userReviewHandled = false;
             const productId = this.liveFocus.accept(text, this.state.snapshot);
             this.update({
               liveCaption: text,
               narrationProductId:
                 this.state.status === "speaking"
-                  ? productId
+                  ? (this.pinnedPresentation ??
+                    productId ??
+                    this.state.narrationProductId)
                   : this.state.narrationProductId,
             });
           }
@@ -454,7 +648,9 @@ export class SessionController {
           if (current())
             this.update({
               narrationProductId: active
-                ? this.liveFocus.productId
+                ? (this.pinnedPresentation ??
+                  this.liveFocus.productId ??
+                  this.state.narrationProductId)
                 : this.state.narrationProductId,
               status: active
                 ? "speaking"
@@ -479,6 +675,7 @@ export class SessionController {
         },
       });
       starting = false;
+      if (current()) this.voiceActivated = true;
       if (current() && this.getSnapshot().status === "reconnecting")
         this.update({ status: this.state.capturing ? "listening" : "paused" });
     } catch (error) {

@@ -1,4 +1,5 @@
 export * from "./types.js";
+export * from "./discovery.js";
 
 /** Voice adapter choice for this workstream — providers remain operationally open in #2. */
 export const VOICE_ADAPTER = {
@@ -12,3 +13,5 @@ export const VOICE_ADAPTER = {
 } as const;
 
 export {agreedCatalog} from "./catalog.generated.js";
+
+export * from "./product-videos.js";

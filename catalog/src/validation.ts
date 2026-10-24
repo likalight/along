@@ -29,11 +29,11 @@ export function validateCatalog(data: Catalog): void {
   const products = unique(data.products, "PRODUCT"), offers = unique(data.offers, "OFFER");
   const evidence = unique(data.evidence, "EVIDENCE"), sellers = unique(data.sellers, "SELLER");
   unique(data.scenarios, "SCENARIO"); unique(data.imageFixtures, "IMAGE");
-  requireValue(data.products.length === 148, "EXPECTED_148_ACTIVE_PRODUCTS");
+  requireValue(data.products.length === 200, "EXPECTED_200_ACTIVE_PRODUCTS");
   requireValue(data.products.filter(p => p.category === "audio-accessories").length === 100 &&
     activeAudioIds.every(id => products.has(id)) &&
-    data.products.filter(p => p.category === "everyday-bags").length === 24 &&
-    data.products.filter(p => p.category === "bedsheet-sets").length === 24, "INVALID_CATEGORY_COUNTS");
+    data.products.filter(p => p.category === "everyday-bags").length === 50 &&
+    data.products.filter(p => p.category === "bedsheet-sets").length === 50, "INVALID_CATEGORY_COUNTS");
   requireValue(new Set(data.products.map(p => p.variantId)).size === data.products.length, "DUPLICATE_VARIANT_ID");
   const references = (ids: string[], type: "product" | "seller", subjectId: string) => {
     requireValue(ids.length > 0 && new Set(ids).size === ids.length, "MISSING_OR_DUPLICATE_EVIDENCE");

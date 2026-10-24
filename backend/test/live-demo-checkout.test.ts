@@ -87,6 +87,25 @@ test("raw JSON cannot smuggle server interpretation into Live completion", () =>
   }
 });
 
+test("a discovery handoff invalidates an earlier semantic approval proof in both checkout modes", () => {
+  for (const liveMode of [false, true]) {
+    const { store, s, input } = review();
+    if (liveMode) store.enableLiveDemoCheckout(s.id);
+    const after = store.importReference(s.id, {
+      epoch: s.epoch, baseRevision: s.revision, eventId: randomUUID(),
+      text: "External product reference; exact listing and seller remain unverified.",
+    });
+    assert.deepEqual(after.constraints, s.constraints);
+    assert.equal(after.summary, null);
+    assert.equal(after.turn!.approvalWindow, null);
+    assert.throws(() => store.completeLiveDemo(s.id,
+      { ...input, expectedRevision: after.revision }, interpretedApproval(input)),
+    code(liveMode ? "STALE_SUMMARY" : "STALE_TURN"));
+    assert.deepEqual(store.get(s.id), after);
+    assert.equal(store.get(s.id).receipt, null);
+  }
+});
+
 test("semantic approval cannot bypass displayed review, current quote or proxy-offer guards", () => {
   const undisplayed = review(false);
   assert.throws(() => undisplayed.store.completeLiveDemo(undisplayed.s.id, undisplayed.input,

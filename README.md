@@ -28,6 +28,10 @@ Shopping rarely follows a straight line. A review changes your mind, your budget
 
 Built for the Coupang challenge. The shopper interface, authoritative session backend, open-ended text shopping and GPT-Live voice conversation run today. A server-side OpenAI API key is required for conversational shopping. See [project status](#project-status) for the current boundaries.
 
+## Unified Mac + Chrome demo
+
+For the judging walkthrough, build once with `npm run build`, then run `npm run demo`. Open [Along setup](http://127.0.0.1:4339/setup) in desktop Chrome. This uses the Mac companion’s saved preferences and the Chrome extension in one shopping conversation. See the [seven-minute demo and permission checklist](docs/unified-demo.md).
+
 ## Quickstart
 
 Clone the repository, then choose Docker or native Node.js:
@@ -81,7 +85,15 @@ No special confirmation word is required. A short assent only authorizes the cur
 | A bag for work and gym | “I like this shape. I need room for work and gym clothes.” | Laptop fit, capacity, shoe storage, total price, and delivery. |
 | Bedsheets for a warm room | “Help me choose sheets for my bed.” | Actual mattress width, length and depth, composition, care, and included pieces. |
 
-The open-ended agent chooses validated shopping tools within bounded execution limits. Simple UI commands and checkout approval retain direct server handlers. Prepared illustrations and supported product links provide context; arbitrary website crawling and general image recognition are not implemented. See the [shopping harness](./apps/shopper/docs/open-ended-harness.md) for routing and guardrails.
+The open-ended agent chooses validated shopping tools within bounded execution limits. Simple UI commands and checkout approval retain direct server handlers. Prepared illustrations and supported product links provide context; the optional Chrome companion adds bounded visual discovery on supported public pages. See the [shopping harness](./apps/shopper/docs/open-ended-harness.md) for routing and guardrails.
+
+See the [judging evidence and seven-minute demo](./docs/judging-demo.md) for the challenge answers and an honest live-platform validation matrix.
+
+### Discover while browsing
+
+The [Along Chrome companion](./docs/extension.md) can notice products on enabled Amazon, TikTok, Instagram and YouTube desktop pages, show a small nudge, and open similar candidates in a side panel. Choose **Discuss with Along** to continue your existing conversation; drafts, pauses and the purchase-approval boundary are preserved.
+
+Run `npm run build:extension`, then load `apps/extension/dist/along` through Chrome's **Load unpacked** control. Site access requires consent. **Demo mode is an explicit opt-in** with authored prices and Coupang search links. Set `ALONG_DISCOVERY_PROVIDER=search` with a server-side OpenAI key for real recognition and ordinary Coupang search links, without Partners credentials. Optional web search adds source-backed public product links with no price or stock claims. Direct Partners results still require approved credentials. Video and main post-photo interpretation require separate permission; recognition does not promise exact product identity. See the [setup, permissions and provider limitations](./docs/extension.md) before enabling it.
 
 ## What Along does
 
@@ -130,10 +142,12 @@ An OpenAI API key with access to the configured models is required for live text
 | `OPENAI_API_KEY` | Next.js server / Compose | Enables the Responses API shopping harness and GPT-Live voice connection. Keep it server-side. |
 | `ALONG_AGENT_MODEL`, `ALONG_AGENT_REASONING_EFFORT`, `ALONG_AGENT_SERVICE_TIER` | Next.js server | Optional model-routing overrides for operator testing; see [model routing](./apps/shopper/docs/live-voice.md#model-routing). |
 | `ALONG_PORT` | Docker Compose | Published host port; defaults to `3000`. The container still listens on port 3000. |
-| `PLAYWRIGHT_PORT` | Browser tests | Isolated test-server port; defaults to `3000`. |
+| `PLAYWRIGHT_PORT` | Browser tests | Isolated test-server port; defaults to `3000` for session tests and `4324` for the extension. |
 | `CHROME_PATH` | Browser tests | Optional Chrome executable path instead of Playwright's installed Chromium. |
 
 For Compose, copy [`.env.example`](./.env.example) to `.env` to override defaults (`cp .env.example .env`, or `Copy-Item .env.example .env` in PowerShell). For native development, provide server variables through the process environment or `apps/shopper/.env.local`. Keep keys server-side and out of version control.
+
+Discovery is disabled by default. Its server flags, Coupang approval requirements and optional vision settings are documented in the [extension guide](./docs/extension.md#live-provider-configuration).
 
 ### Voice status
 
@@ -162,9 +176,11 @@ npm run typecheck
 npm test -w @concierge/backend
 npm test -w @coupang/agent
 npm test -w @along/shopper
+npm run test:extension
 npx playwright install chromium
 npm run test:e2e
 npm run test:canvas
+npm run test:extension:e2e
 ```
 
 Root `npm test` runs only agent tests. Playwright starts its own development server on a free port (`PLAYWRIGHT_PORT`, default 3000), using `.next-e2e` build output. It clears `OPENAI_API_KEY` and explicitly selects the offline fixture agent so browser journeys and speech mocks do not call paid providers. It never reuses a running live demo; production does not accept fixture mode. On Linux CI, browser installation also uses `--with-deps`.
@@ -181,16 +197,16 @@ When catalog source data changes, regenerate it with the catalog verification co
 
 ## Catalog and provenance
 
-The catalog contains **148 active products and 296 synthetic seller offers**:
+The catalog contains **200 active products and 400 synthetic seller offers**:
 
 | Category | Active products |
 | --- | ---: |
 | Audio configurations | 100 |
-| Everyday bags | 24 |
-| Bedsheet sets | 24 |
-| **Total** | **148** |
+| Everyday bags | 50 |
+| Bedsheet sets | 50 |
+| **Total** | **200** |
 
-The full 100-record microphone research is also retained as an archive. The active catalog includes 973 evidence records, three scenario sequences, supported source links, product photographs and labelled illustration fallbacks.
+The full 100-record microphone research is also retained as an archive. The active catalog includes 1,234 evidence records, three scenario sequences, supported source links, 148 source-attributed product photographs and 52 labelled illustration fallbacks. Your portion contains 50 bags and 50 bedding sets, alongside the 100 audio configurations. The catalog also includes 800 explicitly authored demo reviews.
 
 | Data | Treatment |
 | --- | --- |
@@ -200,7 +216,7 @@ The full 100-record microphone research is also retained as an archive. The acti
 | Café/office fit scores | Authored hypotheses, separate from customer ratings and measured performance. |
 | Images and video | Product photographs retain manufacturer or retailer source metadata; illustration fallbacks remain proxy media. Uncurated product videos remain missing. |
 
-All money is **USD in integer cents**. Reference item prices are separate from payable totals. Unknown laptop fit cannot satisfy a fit requirement, and unknown essential bedding details block checkout eligibility.
+Catalog money is **USD in integer cents**. Reference item prices are separate from payable totals. Unknown laptop fit cannot satisfy a fit requirement, and unknown essential bedding details block checkout eligibility. External live discovery prices, when configured, are KRW snapshots and are not complete catalog offers.
 
 The scenario clock is frozen at **24 October 2026, 10:00, Asia/Singapore**. Delivery dates are reproducible fixture inputs, not current shipping promises.
 
@@ -209,6 +225,7 @@ The scenario clock is frozen at **24 October 2026, 10:00, Asia/Singapore**. Deli
 | Path | Responsibility |
 | --- | --- |
 | [`apps/shopper/`](./apps/shopper/) | Shopper UI, session API, attachments and speech adapters. |
+| [`apps/extension/`](./apps/extension/) | Opt-in Chrome companion, automatic page observation and side panel. |
 | [`apps/web/`](./apps/web/) | Diagnostic harness for backend/agent integration. |
 | [`packages/agent/`](./packages/agent/) | Conversation routing, proposals, voice boundary and authoritative session adapter. |
 | [`packages/contract/`](./packages/contract/) | Shared schemas, types and generated catalog module. |
@@ -218,6 +235,7 @@ The scenario clock is frozen at **24 October 2026, 10:00, Asia/Singapore**. Deli
 | [`catalog/data/microphones-archive.json`](./catalog/data/microphones-archive.json) | Full archived microphone research. |
 | [`scripts/sync-catalog.mjs`](./scripts/sync-catalog.mjs) | Regenerates runtime adapters and copies catalog media assets. |
 | [`docs/docker-demo.md`](./docs/docker-demo.md) | Container setup and device-access instructions. |
+| [`docs/extension.md`](./docs/extension.md) | Extension setup, permissions, provider gates and deployment boundaries. |
 
 ## Project status
 
@@ -229,11 +247,12 @@ Along is a hackathon prototype. This README describes the code on main; historic
 | Authoritative session backend | In-memory, session-scoped access with a two-hour TTL; restarting the process loses sessions. |
 | Catalog and provenance checks | Curated fixture data; no live retailer ingestion or inventory guarantees. |
 | Image and link references | Validated uploads, prepared illustrations and supported source URLs; no general vision or unrestricted fetching. |
+| Chrome discovery companion | Fixture demo, AI recognition/search links and optional source-backed public listing discovery; supported video/photo capture, no exact identity or current marketplace-data guarantee. |
 | GPT-Live conversation and delegated shopping | WebRTC audio and server sideband are integrated; interruption quality needs human acoustic testing. Live demo completion remains separate from strict verified voice approval. |
 | Natural checkout approval | Clear purchase requests and context-bound assent complete the current reviewed order; rejection preserves the review. |
 | Docker Compose demo | One application process; no database or shared multi-instance session storage. |
 
-Upcoming work includes further live voice rehearsal and latency tuning, image understanding, durable sessions, and broader catalog ingestion. Real checkout, payment processing and mailbox integrations are outside this demo. Track work in [GitHub Issues](https://github.com/likalight/along/issues).
+Upcoming work includes further live voice rehearsal and latency tuning, broader discovery-platform validation, approved retailer data, and durable sessions. Real checkout, payment processing and mailbox integrations are outside this demo. Track work in [GitHub Issues](https://github.com/likalight/along/issues).
 
 ## Contributing
 

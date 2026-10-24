@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import type { Evidence, Product } from "./types.ts";
 import { emptyMetrics } from "./types.ts";
+import { personalIllustrations } from "./personal-nontech.ts";
 type SourcePhoto = { sourceUrl: string; imageUrl: string; alt: string; source: string; checkedOn: string };
 
 export function attachSourcePhotos(products: Product[]): Evidence[] {
@@ -17,6 +18,11 @@ export function attachSourcePhotos(products: Product[]): Evidence[] {
   const evidence: Evidence[] = [];
   for (const product of products) {
     const photo = photos[product.id];
+    // Only the explicitly imported additions may retain their disclosed generic illustration.
+    // Missing photographs for the existing catalog still fail instead of silently degrading.
+    if (!photo && personalIllustrations.get(product.id) === product.image.url &&
+      product.image.classification === "proxy" && /illustration/i.test(product.image.source) &&
+      !product.image.originalUrl && !product.image.sourceUrl) continue;
     if (!photo) throw new Error(`MISSING_SOURCE_PHOTO:${product.id}`);
     const representative = product.provenance?.kind === "synthetic";
     product.image = { url: `/catalog/images/products/${product.id}.webp`, alt: photo.alt,

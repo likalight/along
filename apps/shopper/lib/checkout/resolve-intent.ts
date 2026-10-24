@@ -21,6 +21,14 @@ export async function resolveCheckoutIntent(
 ): Promise<CheckoutIntentDecision> {
   const current = getRuntime().store.core.get(sessionId);
   const visible = project(sessionId);
+  // A discovered reference is the visible referent. Retained catalog selection
+  // or receipt state must not turn its discussion into an old order action.
+  if (visible.discoveryReference)
+    return {
+      intent: "continue_shopping",
+      authorization: "none",
+      summaryId: null,
+    };
   const review = current.stage === "summary" ? current.summary : null;
   const stage: CheckoutIntentContext["stage"] = current.receipt
     ? "complete"

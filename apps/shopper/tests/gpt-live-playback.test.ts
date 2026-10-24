@@ -707,3 +707,20 @@ describe("GPT-Live local interruption and playback recovery", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 });
+
+it("speaker mute survives media ticks and resume without disabling the microphone", async () => {
+  const h = await harness();
+  h.adapter.setOutputMuted(true);
+  h.output.level = 0.1;
+  await vi.advanceTimersByTimeAsync(100);
+  expect(h.audio.muted).toBe(true);
+  expect(h.track.enabled).toBe(true);
+  h.adapter.stop();
+  await h.adapter.start(h.cb);
+  await vi.advanceTimersByTimeAsync(100);
+  expect(h.audio.muted).toBe(true);
+  expect(h.track.enabled).toBe(true);
+  h.adapter.setOutputMuted(false);
+  expect(h.audio.muted).toBe(false);
+  expect(h.controls).not.toContain("cancel-task");
+});

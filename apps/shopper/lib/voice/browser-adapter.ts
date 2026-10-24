@@ -20,6 +20,11 @@ export class BrowserSpeechAdapter implements SpeechAdapter {
   private recognition: Recognition | null = null;
   private stream: MediaStream | null = null;
   private generation = 0;
+  private outputMuted = false;
+  setOutputMuted(muted: boolean) {
+    this.outputMuted = muted;
+    if (muted) this.cancel();
+  }
   private playback: {
     identity: Playback;
     emit: Parameters<SpeechAdapter["speak"]>[2];
@@ -108,6 +113,10 @@ export class BrowserSpeechAdapter implements SpeechAdapter {
     emit: Parameters<SpeechAdapter["speak"]>[2],
   ) {
     this.cancel();
+    if (this.outputMuted) {
+      emit("audio.interrupted", identity);
+      return;
+    }
     this.stop(); // Half-duplex fallback: assistant audio cannot be recognised as a shopper command.
     if (!("speechSynthesis" in window)) {
       throw new Error(
