@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   accept,
   addAsset,
@@ -7,9 +7,15 @@ import {
   Conflict,
   lifecycle,
   setMode,
+  removeAsset,
 } from "@/lib/session/store";
 import { preparedImage } from "@/lib/session/fixtures";
-import type { Identity, Input, Session } from "@/lib/session/contract";
+import type {
+  Identity,
+  Input,
+  Session,
+  Lifecycle,
+} from "@/lib/session/contract";
 let sequence = 0;
 function input(
   s: Session,
@@ -42,7 +48,20 @@ function bagSummary(mode: "voice" | "text" = "text") {
   s = accept(input(s, "a work bag", mode)).snapshot;
   const turn = input(s, "choose faster offer", mode),
     event = accept(turn);
-  return { s: event.snapshot, turn };
+  s = display(event.snapshot);
+  return { s, turn };
+}
+function display(s: Session) {
+  return lifecycle({
+    ...identity(s),
+    playbackId: "display",
+    summaryId: s.summaryId!,
+    summaryRevision: s.summary!.revision,
+    type: "summary.displayed",
+  });
+}
+function play(event: Lifecycle) {
+  return lifecycle({ ...event, revision: connect(event.sessionId).revision });
 }
 describe("authoritative fixture session", () => {
   it("uses the same accepted-state path for voice and text across the complete journey", () => {
@@ -94,14 +113,15 @@ describe("authoritative fixture session", () => {
       ...identity(s, turn.turnId),
       playbackId: "play-1",
       summaryId: s.summaryId!,
+      summaryRevision: s.summary!.revision,
     };
-    lifecycle({ ...audio, type: "audio.started" });
-    lifecycle({ ...audio, playbackId: "old", type: "audio.completed" });
+    play({ ...audio, type: "audio.started" });
+    play({ ...audio, playbackId: "old", type: "audio.completed" });
     expect(connect(s.sessionId).approvalStatus).toBe("presenting");
-    lifecycle({ ...audio, type: "audio.completed" });
+    play({ ...audio, type: "audio.completed" });
     expect(connect(s.sessionId).approvalStatus).toBe("eligible");
     const confirmed = accept(
-      input(s, "confirm simulated purchase", "voice"),
+      input(connect(s.sessionId), "confirm simulated purchase", "voice"),
     ).snapshot;
     expect(confirmed.receipt?.simulated).toBe(true);
   });
@@ -111,8 +131,9 @@ describe("authoritative fixture session", () => {
       ...identity(s, turn.turnId),
       playbackId: "p",
       summaryId: s.summaryId!,
+      summaryRevision: s.summary!.revision,
     };
-    lifecycle({ ...audio, type: "audio.started" });
+    play({ ...audio, type: "audio.started" });
     cancel(identity(s, turn.turnId));
     lifecycle({ ...audio, type: "audio.completed" });
     expect(() =>
@@ -121,13 +142,18 @@ describe("authoritative fixture session", () => {
   });
   it("requires full current summary redisplay when explicitly choosing text confirmation", () => {
     const { s, turn } = bagSummary("voice");
-    const switched = setMode(identity(s, turn.turnId), "text");
+    let switched = setMode(identity(s, turn.turnId), "text");
     expect(switched.summary?.presentationMode).toBe("text");
     expect(switched.summary?.revision).toBe(switched.revision);
     expect(switched.message).toContain("Total USD 99.00");
+    expect(switched.approvalStatus).toBe("presenting");
     expect(() => accept(input(s, "confirm simulated purchase"))).toThrow(
       Conflict,
     );
+    expect(() => accept(input(switched, "confirm simulated purchase"))).toThrow(
+      Conflict,
+    );
+    switched = display(switched);
     expect(
       accept(input(switched, "confirm simulated purchase")).snapshot.view,
     ).toBe("receipt");
@@ -135,7 +161,7 @@ describe("authoritative fixture session", () => {
   it("does not treat vague assent, photo/link text or audio failure as approval", () => {
     for (const modality of ["image", "link"] as const) {
       const { s } = bagSummary();
-      const asset = addAsset(s.sessionId, preparedImage);
+      const asset = addAsset(s.sessionId, { ...preparedImage, kind: modality });
       const i = {
         ...input(s, "confirm simulated purchase"),
         modality,
@@ -165,9 +191,10 @@ describe("authoritative fixture session", () => {
       ...identity(s, turn.turnId),
       playbackId: "p",
       summaryId: s.summaryId!,
+      summaryRevision: s.summary!.revision,
     };
-    lifecycle({ ...audio, type: "audio.started" });
-    lifecycle({ ...audio, type: "audio.completed" });
+    play({ ...audio, type: "audio.started" });
+    play({ ...audio, type: "audio.completed" });
     cancel(identity(s, turn.turnId));
     expect(
       accept(input(connect(s.sessionId), "confirm simulated purchase", "voice"))
@@ -190,5 +217,143 @@ describe("authoritative fixture session", () => {
     const { s } = bagSummary();
     expect(connect(s.sessionId)).toEqual(s);
     expect(connect(s.sessionId).receipt).toBeNull();
+  });
+  it("rejects changed-payload event reuse and turn reuse without changing the current snapshot", () => {
+    const start = connect(),
+      i = input(start, "bag");
+    const accepted = accept(i).snapshot;
+    expect(() => accept({ ...i, text: "bedsheets" })).toThrow(Conflict);
+    expect(() =>
+      accept({ ...input(accepted, "best value"), turnId: i.turnId }),
+    ).toThrow(Conflict);
+    expect(connect(start.sessionId)).toEqual(accepted);
+  });
+  it("rejects stale mode mutations and mismatched visible order", () => {
+    const start = connect();
+    let s = accept(input(start, "bag")).snapshot;
+    s = accept(input(s, "show options")).snapshot;
+    expect(() => setMode(identity(start), "voice")).toThrow(Conflict);
+    expect(() =>
+      accept({
+        ...input(s, "second"),
+        visibleProductIds: [...s.displayOrder].reverse(),
+      }),
+    ).toThrow(Conflict);
+    expect(connect(s.sessionId)).toEqual(s);
+  });
+  it("resolves ordinal references only against displayed product identities and clarifies absent/ambiguous options", () => {
+    let s = connect();
+    s = accept(input(s, "bag")).snapshot;
+    s = accept(input(s, "show options")).snapshot;
+    const secondId = s.displayOrder[1];
+    s = accept(input(s, "show second")).snapshot;
+    expect(s.focusedProductId).toBe(secondId);
+    expect(() => accept(input(s, "show second"))).toThrow(
+      "current displayed choices",
+    );
+    expect(() => accept(input(s, "first and second"))).toThrow(
+      "current displayed choices",
+    );
+    expect(connect(s.sessionId)).toEqual(s);
+    s = accept(input(s, "show first")).snapshot;
+    expect(s.focusedProductId).toBe(secondId);
+  });
+  it("requires rendered summary acknowledgement and exact summary revision independently of audio", () => {
+    let s = connect();
+    s = setMode(identity(s), "voice");
+    s = accept(input(s, "bag", "voice")).snapshot;
+    const turn = input(s, "choose faster offer", "voice");
+    s = accept(turn).snapshot;
+    const audio = {
+      ...identity(s, turn.turnId),
+      playbackId: "p",
+      summaryId: s.summaryId!,
+      summaryRevision: s.summary!.revision,
+    };
+    s = play({ ...audio, type: "audio.started" });
+    s = play({ ...audio, type: "audio.completed" });
+    expect(s.approvalStatus).toBe("presenting");
+    expect(() =>
+      accept(input(s, "confirm simulated purchase", "voice")),
+    ).toThrow(Conflict);
+    const wrong = lifecycle({
+      ...identity(s),
+      playbackId: "display",
+      type: "summary.displayed",
+      summaryId: s.summaryId!,
+      summaryRevision: s.summary!.revision - 1,
+    });
+    expect(wrong).toEqual(s);
+    s = display(s);
+    expect(s.approvalStatus).toBe("eligible");
+    expect(
+      accept(input(s, "confirm simulated purchase", "voice")).snapshot.receipt
+        ?.simulated,
+    ).toBe(true);
+  });
+  it("cannot revive interrupted audio with a new start or stale completion", () => {
+    const { s, turn } = bagSummary("voice");
+    const audio = {
+      ...identity(s, turn.turnId),
+      playbackId: "p",
+      summaryId: s.summaryId!,
+      summaryRevision: s.summary!.revision,
+    };
+    play({ ...audio, type: "audio.started" });
+    const interrupted = play({ ...audio, type: "audio.interrupted" });
+    expect(interrupted.approvalStatus).toBe("not_prepared");
+    expect(play({ ...audio, type: "audio.started" })).toEqual(interrupted);
+    expect(play({ ...audio, type: "audio.completed" })).toEqual(interrupted);
+  });
+  it("spoken stop invalidates a typed summary and late approval cannot commit", () => {
+    const { s } = bagSummary("text");
+    const changed = setMode(identity(s), "voice");
+    const stopped = accept(input(changed, "Stop!", "voice")).snapshot;
+    expect(stopped.view).toBe("recovery");
+    expect(stopped.summary).toBeNull();
+    expect(() => accept(input(s, "confirm simulated purchase"))).toThrow(
+      Conflict,
+    );
+    expect(connect(s.sessionId).receipt).toBeNull();
+  });
+  it("completed receipts remain immutable through later inputs, mode and audio callbacks", () => {
+    const { s } = bagSummary();
+    const i = input(s, "confirm simulated purchase"),
+      accepted = accept(i).snapshot;
+    expect(() => accept(input(accepted, "show options"))).toThrow(Conflict);
+    expect(setMode(identity(accepted), "voice")).toEqual(accepted);
+    const audio = {
+      ...identity(accepted, i.turnId),
+      playbackId: "receipt-audio",
+      summaryId: accepted.summaryId!,
+      summaryRevision: accepted.summary!.revision,
+    };
+    expect(lifecycle({ ...audio, type: "audio.started" })).toEqual(accepted);
+    expect(lifecycle({ ...audio, type: "audio.completed" })).toEqual(accepted);
+    accepted.receipt!.acceptedOrder.totalMinor = 1;
+    expect(connect(s.sessionId).receipt!.acceptedOrder.totalMinor).toBe(9900);
+  });
+  it("removes pending assets, frees accepted asset capacity and expires assets with their session", () => {
+    let s = connect();
+    const pending = addAsset(s.sessionId, preparedImage);
+    expect(removeAsset(s.sessionId, pending.id)).toBe(true);
+    const asset = addAsset(s.sessionId, preparedImage);
+    s = accept({
+      ...input(s, ""),
+      modality: "image",
+      attachmentId: asset.id,
+    }).snapshot;
+    expect(removeAsset(s.sessionId, asset.id)).toBe(false);
+    s = accept(input(s, `Remove reference ${asset.id}`)).snapshot;
+    expect(() =>
+      accept({ ...input(s, ""), modality: "image", attachmentId: asset.id }),
+    ).toThrow("Unknown attachment");
+    const now = Date.now();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(now + 3_600_001);
+    try {
+      expect(() => connect(s.sessionId)).toThrow("expired");
+    } finally {
+      clock.mockRestore();
+    }
   });
 });

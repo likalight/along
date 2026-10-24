@@ -1,61 +1,108 @@
 import { NextResponse } from "next/server";
-import { addAsset } from "@/lib/session/store";
+import { addAsset, removeAsset } from "@/lib/session/store";
 import { preparedImage, supportedLinks } from "@/lib/session/fixtures";
+import { MAX_IMAGE_BYTES } from "@/lib/attachments/limits";
+import {
+  AttachmentError,
+  readBoundedBody,
+  validateImage,
+} from "@/lib/attachments/validation";
 export const runtime = "nodejs";
-const MAX = 5 * 1024 * 1024;
+const response = (body: unknown, status = 200) =>
+  NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
+function originAllowed(request: Request) {
+  const origin = request.headers.get("origin");
+  if (!origin) return;
+  const target = new URL(request.url);
+  const authority = request.headers.get("host");
+  let expectedOrigin = target.origin;
+  if (authority && authority !== target.host) {
+    // Next dev normalizes Request.url to localhost even when the browser used
+    // 127.0.0.1. Trust the browser-facing Host only for same-port loopback aliases.
+    const external = new URL(`${target.protocol}//${authority}`);
+    const loopback = new Set(["localhost", "127.0.0.1", "[::1]"]);
+    if (
+      !loopback.has(target.hostname) ||
+      !loopback.has(external.hostname) ||
+      external.port !== target.port ||
+      external.host !== authority
+    )
+      throw new AttachmentError("Cross-origin requests are unavailable.", 403);
+    expectedOrigin = external.origin;
+  }
+  if (origin !== expectedOrigin)
+    throw new AttachmentError("Cross-origin requests are unavailable.", 403);
+}
+function sessionIdentity(value: unknown): asserts value is string {
+  if (typeof value !== "string" || !/^[a-zA-Z0-9_-]{1,100}$/.test(value))
+    throw new AttachmentError("Start a session before adding a reference.");
+}
+function failure(error: unknown) {
+  return response(
+    {
+      error:
+        error instanceof Error ? error.message : "Upload failed. Try again.",
+    },
+    error instanceof AttachmentError ? error.status : 400,
+  );
+}
 export async function POST(request: Request) {
   try {
-    if (
-      request.headers.get("origin") &&
-      request.headers.get("origin") !==
-        `${new URL(request.headers.get("origin")!).protocol}//${request.headers.get("host")}`
-    )
-      return NextResponse.json(
-        { error: "Cross-origin requests are unavailable." },
-        { status: 403 },
+    originAllowed(request);
+    const contentType = request.headers.get("content-type") ?? "";
+    if (contentType.split(";")[0] === "application/json") {
+      const body = JSON.parse(
+        new TextDecoder().decode(await readBoundedBody(request, 8192)),
       );
-    if (Number(request.headers.get("content-length") ?? 0) > MAX + 8192)
-      throw new Error("Choose an image of 5 MB or less.");
-    if (request.headers.get("content-type")?.includes("application/json")) {
-      const { sessionId, kind, url } = await request.json();
+      if (
+        !body ||
+        typeof body !== "object" ||
+        Array.isArray(body) ||
+        !["prepared", "link"].includes(body.kind)
+      )
+        throw new AttachmentError(
+          "Choose a prepared image or a supported link.",
+        );
+      const { sessionId, kind, url } = body;
+      sessionIdentity(sessionId);
       if (kind === "prepared")
-        return NextResponse.json(addAsset(sessionId, preparedImage));
+        return response(addAsset(sessionId, preparedImage));
       const asset =
         typeof url === "string" && Object.hasOwn(supportedLinks, url)
           ? supportedLinks[url as keyof typeof supportedLinks]
           : undefined;
       if (!asset)
-        return NextResponse.json(
+        return response(
           {
             error:
               "Unavailable in this demo. Use https://demo.example/bags/navy or a photo.",
           },
-          { status: 422 },
+          422,
         );
-      return NextResponse.json(addAsset(sessionId, asset));
+      return response(addAsset(sessionId, asset));
     }
-    const form = await request.formData(),
+    if (
+      Number(request.headers.get("content-length") ?? 0) >
+      MAX_IMAGE_BYTES + 8192
+    )
+      throw new AttachmentError("Choose an image of 5 MB or less.", 413);
+    if (!contentType.startsWith("multipart/form-data;"))
+      throw new AttachmentError(
+        "Use a photo upload or a JSON reference request.",
+        415,
+      );
+    const bytes = await readBoundedBody(request, MAX_IMAGE_BYTES + 8192);
+    const form = await new Response(bytes, {
+        headers: { "Content-Type": contentType },
+      }).formData(),
       file = form.get("file"),
       sessionId = form.get("sessionId");
     if (!(file instanceof File) || typeof sessionId !== "string")
       throw new Error("Select a photo and start a session.");
-    if (file.size === 0 || file.size > MAX)
-      throw new Error("Choose a non-empty image of 5 MB or less.");
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type))
-      throw new Error("Use a JPG, PNG or WebP image.");
+    sessionIdentity(sessionId);
     const data = Buffer.from(await file.arrayBuffer());
-    const valid =
-      file.type === "image/jpeg"
-        ? data[0] === 255 && data[1] === 216 && data[2] === 255
-        : file.type === "image/png"
-          ? data
-              .subarray(0, 8)
-              .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
-          : data.subarray(0, 4).toString() === "RIFF" &&
-            data.subarray(8, 12).toString() === "WEBP";
-    if (!valid)
-      throw new Error("The file contents do not match its image type.");
-    return NextResponse.json(
+    validateImage(data, file.type);
+    return response(
       addAsset(sessionId, {
         kind: "image",
         name: file.name.slice(0, 120),
@@ -65,12 +112,26 @@ export async function POST(request: Request) {
       }),
     );
   } catch (error) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error ? error.message : "Upload failed. Try again.",
-      },
-      { status: 400 },
+    return failure(error);
+  }
+}
+export async function DELETE(request: Request) {
+  try {
+    originAllowed(request);
+    if (
+      request.headers.get("content-type")?.split(";")[0] !== "application/json"
+    )
+      throw new AttachmentError("Use a JSON reference request.", 415);
+    const body = JSON.parse(
+      new TextDecoder().decode(await readBoundedBody(request, 8192)),
     );
+    sessionIdentity(body?.sessionId);
+    if (typeof body.attachmentId !== "string" || body.attachmentId.length > 100)
+      throw new AttachmentError("Choose a reference to remove.");
+    return response({
+      removed: removeAsset(body.sessionId, body.attachmentId),
+    });
+  } catch (error) {
+    return failure(error);
   }
 }

@@ -6,3 +6,13 @@ components/ui/elevenlabs-LICENSE.md
 public
 playwright-report
 test-results
+
+# Preserve the existing project README editorial formatting.
+README.md
+
+# Independently verified packages retain their own formatting and workflows.
+backend
+catalog
+.github/workflows/backend.yml
+.github/workflows/catalog.yml
+next-env.d.ts

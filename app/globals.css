@@ -252,6 +252,7 @@ h1 {
 }
 .primary-controls {
   display: flex;
+  flex-wrap: wrap;
   gap: 18px;
   align-items: center;
   justify-content: center;
@@ -428,6 +429,7 @@ h1 {
   font-size: 11px;
   color: var(--muted);
   margin: 6px 0;
+  overflow-wrap: anywhere;
 }
 .attachment-list .icon-button {
   background: none;
@@ -751,6 +753,7 @@ footer {
 .transcript p {
   margin: 0;
   white-space: pre-line;
+  overflow-wrap: anywhere;
 }
 .sr-only {
   position: absolute;
@@ -861,7 +864,7 @@ footer {
     margin-top: 26px;
   }
   .primary-controls {
-    gap: 19px;
+    gap: 8px 19px;
   }
   .primary-button {
     font-size: 12px;
@@ -875,6 +878,23 @@ footer {
   }
   .attachment-actions button {
     font-size: 10px;
+    min-height: 44px;
+  }
+  .text-button,
+  .send-button,
+  .attachment-list button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .attachment-list li {
+    flex-wrap: wrap;
+  }
+  .attachment-list li > div {
+    flex-basis: 120px;
+  }
+  .composer input,
+  .input-row input {
+    font-size: 16px;
   }
   footer {
     gap: 15px;
