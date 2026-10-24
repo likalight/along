@@ -33,3 +33,6 @@ cpSync(
   new URL("../backend/public/catalog/images", import.meta.url),
   { recursive: true },
 );
+
+mkdirSync(new URL("../apps/shopper/public/catalog", import.meta.url), {recursive:true});
+cpSync(new URL("../catalog/public/catalog/images", import.meta.url),new URL("../apps/shopper/public/catalog/images", import.meta.url),{recursive:true});
