@@ -1,6 +1,7 @@
 /** Server-only deterministic rehearsal adapter. Replace with #6/#7 acceptance, not an agent in the browser. */
 import { randomUUID } from "node:crypto";
 import { fixtureData } from "./fixtures";
+import { deliveredTotal } from "./contracts";
 import type {
   AcceptedEvent,
   Annotation,
@@ -116,8 +117,8 @@ function eligible(s: Snapshot): Product[] {
         p.variantId.startsWith("Navy")) &&
       (s.category !== "bedsheets" ||
         (p.specs.Dimensions === s.hardConstraints.dimensions &&
-          Number.parseInt(p.specs["Mattress depth"]) >=
-            Number.parseInt(s.hardConstraints.depth))),
+          Number.parseFloat(p.specs["Mattress depth"]) >=
+            Number.parseFloat(s.hardConstraints.depth))),
   );
 }
 function shortlist(s: Snapshot, closer = false) {
@@ -165,10 +166,15 @@ function shortlist(s: Snapshot, closer = false) {
     s.category === "bags" && !closer
       ? "A little closer. A little unexpected."
       : "A shortlist shaped around you.";
-  s.canvas.message =
-    s.category === "bags" && !closer
-      ? "Two close matches, then three related discoveries. Tell me what speaks to you."
-      : `${ids.length} option${ids.length === 1 ? "" : "s"} within your current constraints. ${ids.length < 3 ? "Fewer than three are eligible; I won’t fill the gaps with unsuitable products." : "Explore the reasons and the trade-offs."}`;
+  if (s.category === "bags" && !closer) {
+    const closeCount = Math.min(ids.length, 2);
+    const relatedCount = Math.max(ids.length - closeCount, 0);
+    s.canvas.message = ids.length
+      ? `${closeCount} close match${closeCount === 1 ? "" : "es"}${relatedCount ? ` and ${relatedCount} related discover${relatedCount === 1 ? "y" : "ies"}` : ""}. ${ids.length < 5 ? "Fewer than five are eligible under your current constraints; I won’t fill the gaps with unsuitable products." : "Tell me what speaks to you."}`
+      : "No options fit your current constraints. I won’t fill the gaps with unsuitable products; adjust a constraint to explore again.";
+  } else {
+    s.canvas.message = `${ids.length} option${ids.length === 1 ? "" : "s"} within your current constraints. ${ids.length < 3 ? "Fewer than three are eligible; I won’t fill the gaps with unsuitable products." : "Explore the reasons and the trade-offs."}`;
+  }
   if (s.category === "audio")
     s.canvas.message +=
       " Reference prices only; stock, host compatibility and setup costs still need checking. Ranking is a demo hypothesis, not measured dictation performance.";
@@ -195,22 +201,36 @@ function shortlist(s: Snapshot, closer = false) {
     }),
   );
 }
-function resolveIds(text: string, s: Snapshot, visible: string[]): string[] {
+function resolveIds(
+  text: string,
+  s: Snapshot,
+  visible: string[],
+): { ids: string[]; clarification?: string } {
   if (
     s.view === "evidence" &&
     /(?:play|stop).*video/.test(text) &&
     s.focusedProductId
   )
-    return [s.focusedProductId];
+    return { ids: [s.focusedProductId] };
   const explicit = visible.filter((id) => text.includes(id.toLowerCase()));
-  if (explicit.length) return explicit;
-  if (/first two|top two/.test(text)) return visible.slice(0, 2);
-  if (/all|these/.test(text)) return visible;
+  if (explicit.length) return { ids: explicit };
+  if (/first two|top two/.test(text)) return { ids: visible.slice(0, 2) };
+  if (/all|these/.test(text)) return { ids: visible };
+  if (/\bmiddle\b/.test(text)) {
+    return visible.length % 2 === 1
+      ? { ids: [visible[Math.floor(visible.length / 2)]] }
+      : {
+          ids: [],
+          clarification: visible.length
+            ? `There is no single middle card among these ${visible.length} options. Please use the visible card number or product ID.`
+            : "There are no visible cards to select. Explore options first, then use a card number or product ID.",
+        };
+  }
   if (/\bright\b/.test(text) && visible.length)
-    return [visible[visible.length - 1]];
+    return { ids: [visible[visible.length - 1]] };
   const ordinals = [
     "first|1|top recommendation|gold|left",
-    "second|2|silver|middle",
+    "second|2|silver",
     "third|3|bronze",
     "fourth|4",
     "fifth|5",
@@ -220,8 +240,8 @@ function resolveIds(text: string, s: Snapshot, visible: string[]): string[] {
       ? [visible[i]]
       : [],
   );
-  if (matched.length) return matched;
-  return s.focusedProductId ? [s.focusedProductId] : [];
+  if (matched.length) return { ids: matched };
+  return { ids: s.focusedProductId ? [s.focusedProductId] : [] };
 }
 export function applyDemo(input: DemoInput): {
   status: number;
@@ -260,13 +280,15 @@ export function applyDemo(input: DemoInput): {
   const t = input.text.trim().toLowerCase();
   s.canvas.message =
     "I didn’t catch a supported choice. Try “explore options”, “compare the first two”, “reviews for the first”, “save the first”, or “offers for the first”.";
-  const ids = resolveIds(t, s, input.visibleProductIds);
+  const { ids, clarification } = resolveIds(t, s, input.visibleProductIds);
   const productId = ids[0];
   const product = fixtureData.products.find((p) => p.id === productId);
   const budget = t.match(
     /(?:under|budget(?: is| of| to)?|maximum|max)\s*(?:usd\s*|\$)?(\d+(?:\.\d{1,2})?)/,
   );
-  if (budget) {
+  if (clarification) {
+    s.canvas.message = clarification;
+  } else if (budget) {
     s.hardConstraints.budgetMinor = String(Math.round(Number(budget[1]) * 100));
     s.view = "understanding";
     s.displayOrder = [];
@@ -278,14 +300,26 @@ export function applyDemo(input: DemoInput): {
     s.preferences = [...new Set([...s.preferences, "Softer shape"])];
     shortlist(s, true);
   } else if (/colour|color/.test(t)) {
-    s.preferences = [
-      ...s.preferences.filter((p) => !p.toLowerCase().includes("colour")),
-      /navy|blue/.test(t) ? "Navy colour" : "Colour flexible",
-    ];
-    s.canvas.message =
-      "Colour preference updated. Your budget and reference are preserved.";
-    s.view = "understanding";
-    s.displayOrder = [];
+    const colour = /\bnavy\b/.test(t)
+      ? "Navy colour"
+      : /\bflexible\b|\bany colo[u]?r\b|\beither colo[u]?r\b|\bno colo[u]?r preference\b/.test(
+            t,
+          )
+        ? "Colour flexible"
+        : null;
+    if (colour) {
+      s.preferences = [
+        ...s.preferences.filter((p) => !p.toLowerCase().includes("colour")),
+        colour,
+      ];
+      s.canvas.message =
+        "Colour preference updated. Your budget and reference are preserved.";
+      s.view = "understanding";
+      s.displayOrder = [];
+    } else {
+      s.canvas.message =
+        "This rehearsal supports “navy colour” or an explicit “colour flexible” choice. Your existing colour preference is unchanged; please clarify.";
+    }
   } else if (/usb-a|usb-c/.test(t)) {
     s.hardConstraints.connection = t.includes("usb-a") ? "USB-A" : "USB-C";
     s.canvas.message =
@@ -293,18 +327,39 @@ export function applyDemo(input: DemoInput): {
     s.view = "understanding";
     s.displayOrder = [];
   } else if (/(?:dimensions|size)\s*\d/.test(t)) {
-    const m = t.match(/(\d+)\s*[x×]\s*(\d+)/);
-    if (m) s.hardConstraints.dimensions = `${m[1]} × ${m[2]} cm`;
-    s.view = "understanding";
-    s.displayOrder = [];
-    s.canvas.message =
-      "Bed dimensions updated. Say “explore options” to check matching sets.";
+    const m = t.match(
+      /(?:dimensions|size)\s*(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)\s*([a-z"'″′]+)?/,
+    );
+    if (
+      m &&
+      (!m[3] || /^(?:cm|centimet(?:er|re)s?)$/.test(m[3])) &&
+      Number(m[1]) > 0 &&
+      Number(m[2]) > 0
+    ) {
+      s.hardConstraints.dimensions = `${Number(m[1])} × ${Number(m[2])} cm`;
+      s.view = "understanding";
+      s.displayOrder = [];
+      s.canvas.message =
+        "Bed dimensions updated. Say “explore options” to check matching sets.";
+    } else {
+      s.canvas.message =
+        "Please give the mattress width and length in centimetres, such as “dimensions 152 x 203 cm”. Your existing dimensions are unchanged.";
+    }
   } else if (/depth\s*\d/.test(t)) {
-    s.hardConstraints.depth = `${t.match(/depth\s*(\d+)/)![1]} cm`;
-    s.view = "understanding";
-    s.displayOrder = [];
-    s.canvas.message =
-      "Mattress depth updated. I’ll exclude pockets that are too shallow.";
+    const m = t.match(/depth\s*(\d+(?:\.\d+)?)\s*([a-z"'″′]+)?/)!;
+    if (
+      (!m[2] || /^(?:cm|centimet(?:er|re)s?)$/.test(m[2])) &&
+      Number(m[1]) > 0
+    ) {
+      s.hardConstraints.depth = `${Number(m[1])} cm`;
+      s.view = "understanding";
+      s.displayOrder = [];
+      s.canvas.message =
+        "Mattress depth updated. I’ll exclude pockets that are too shallow.";
+    } else {
+      s.canvas.message =
+        "Please give the mattress depth in centimetres, such as “depth 40 cm”. Your existing depth is unchanged.";
+    }
   } else if (/tomorrow|deadline/.test(t)) {
     s.hardConstraints.deadlineDays = "1";
     s.canvas.message =
@@ -362,13 +417,35 @@ export function applyDemo(input: DemoInput): {
     s.canvas.message =
       "Compare the exact variant, delivered total and timing. Seller evidence is separate from product reviews.";
   } else if (
-    /choose.*(?:cheap|fast|earlier|lower)/.test(t) &&
+    /(?:choose|select).*?(?:offer|cheap|fast|earlier|lower)/.test(t) &&
     s.view === "offers" &&
     s.focusedProductId
   ) {
-    s.selectedOfferId = `${s.focusedProductId}-${/fast|earlier/.test(t) ? "fast" : "cheap"}`;
-    s.canvas.message =
-      "Offer selected for comparison only. Checkout and approval belong to the session backend; this rehearsal cannot place an order.";
+    const exactId = t.match(/\b(?:choose|select) offer\s+(\S+)/)?.[1];
+    const offerId =
+      exactId ??
+      `${s.focusedProductId}-${/fast|earlier/.test(t) ? "fast" : "cheap"}`.toLowerCase();
+    const focused = fixtureData.products.find(
+      (p) => p.id === s.focusedProductId,
+    );
+    const offer = fixtureData.offers.find(
+      (o) =>
+        o.id.toLowerCase() === offerId &&
+        o.productId === s.focusedProductId &&
+        o.variantId === focused?.variantId,
+    );
+    if (
+      !offer ||
+      offer.availability !== "in_stock" ||
+      deliveredTotal(offer) === null
+    ) {
+      s.canvas.message =
+        "This offer cannot be selected until its availability and complete delivered setup total are known. Choose a fully priced offer for the focused variant.";
+    } else {
+      s.selectedOfferId = offer.id;
+      s.canvas.message =
+        "Offer selected for comparison only. Checkout and approval belong to the session backend; this rehearsal cannot place an order.";
+    }
   } else if (
     /show|focus|option/.test(t) &&
     !/more|shortlist|back/.test(t) &&

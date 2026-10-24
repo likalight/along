@@ -202,8 +202,75 @@ export async function POST(request: Request) {
     if (/^show offers$/i.test(text) && focus) text = `Show offers for ${focus}`;
     if (/^(compare|compare them)$/i.test(text)) text = "Compare the first two";
     if (/^save for later$/i.test(text) && focus) text = `Save ${focus}`;
+    // Natural-language offer pick from the focused product's quote set.
+    if (
+      /^(choose|select)\s+(faster|cheaper|earlier|lower[- ]cost)\s+offer$/i.test(
+        text,
+      ) &&
+      focus
+    ) {
+      const quotes = store
+        .quotes(sessionId, focus)
+        .filter((q) => q.eligible && q.offer);
+      const faster = /faster|earlier/i.test(text);
+      const offerTotal = (q: (typeof quotes)[number]): number => {
+        const o = q.offer as {
+          unitPrice?: number | null;
+          shipping?: number | null;
+          setupCost?: number | null;
+          otherFees?: number | null;
+          totalMinor?: number | null;
+        };
+        if (typeof o.totalMinor === "number") return o.totalMinor;
+        const parts = [o.unitPrice, o.shipping, o.setupCost, o.otherFees];
+        let sum = 0;
+        for (const part of parts) {
+          if (typeof part !== "number" || part < 0)
+            return Number.POSITIVE_INFINITY;
+          sum += part;
+        }
+        return sum;
+      };
+      const deliveryRank = (q: (typeof quotes)[number]): number => {
+        const o = q.offer as {
+          deliveryDays?: number | null;
+          deliveryWindow?: { latest?: string };
+        };
+        if (typeof o.deliveryDays === "number") return o.deliveryDays;
+        const latest = o.deliveryWindow?.latest;
+        const t = latest ? Date.parse(latest) : Number.NaN;
+        return Number.isFinite(t) ? t : Number.POSITIVE_INFINITY;
+      };
+      const ranked = [...quotes].sort((a, b) => {
+        if (faster)
+          return (
+            deliveryRank(a) - deliveryRank(b) || offerTotal(a) - offerTotal(b)
+          );
+        return offerTotal(a) - offerTotal(b);
+      });
+      const picked = ranked[0];
+      if (picked?.offer?.id) text = `Select offer ${picked.offer.id}`;
+    }
+    const removeReference = text.match(
+      /^Remove reference ([A-Za-z0-9._:-]+)$/i,
+    );
+    if (removeReference) {
+      store.ingestInput({ ...input, text });
+      store.removeAttachment(sessionId, removeReference[1]);
+      messages.set(sessionId, "Removed that reference.");
+      const removed = project(sessionId);
+      return NextResponse.json({
+        sessionId,
+        epoch: removed.epoch,
+        turnId: input.turnId,
+        eventId: input.eventId,
+        revision: removed.revision,
+        type: "session.updated",
+        snapshot: removed,
+      });
+    }
     const exact = text.match(
-      /^(Focus|Save|Remove|Show offers for|Show reviews for|Select offer) ([A-Z0-9-]+)$/i,
+      /^(Focus|Save|Remove|Show offers for|Show reviews for|(?:Select|Choose) offer) ([A-Z0-9-]+)$/i,
     );
     const simple =
       /^(Compare the first two|Back to shortlist|Restore shortlist|Show saved choices|Review summary|Prepare summary)$/i.test(

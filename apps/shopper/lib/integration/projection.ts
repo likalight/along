@@ -39,17 +39,32 @@ export const canvasData: CanvasData = {
     sourceUrl: e.sourceUrl ?? null,
     media: undefined,
   })),
-  offers: catalog.offers.map((o: any) => ({
-    ...o,
-    otherFeesMinor: o.otherFeesMinor + o.taxMinor,
-    deliveryWindow: {
-      latestOffsetDays: Math.round(
-        (Date.parse(o.deliveryWindow.latest.slice(0, 10)) -
-          Date.parse(catalog.scenarioNow.slice(0, 10))) /
-          86400000,
-      ),
-    },
-  })),
+  offers: catalog.offers.map((o: any) => {
+    const setup = Array.isArray(o.setupHardware) ? o.setupHardware : [];
+    const setupPriced = setup.every(
+      (h: { priceMinor?: number | null }) =>
+        typeof h?.priceMinor === "number" && h.priceMinor >= 0,
+    );
+    return {
+      ...o,
+      otherFeesMinor: o.otherFeesMinor + o.taxMinor,
+      // Empty setupHardware → 0; unknown/unpriced audio adapters stay null.
+      requiredSetupMinor: setup.length === 0 || setupPriced
+        ? setup.reduce(
+            (sum: number, h: { priceMinor?: number | null }) =>
+              sum + (h.priceMinor ?? 0),
+            0,
+          )
+        : null,
+      deliveryWindow: {
+        latestOffsetDays: Math.round(
+          (Date.parse(o.deliveryWindow.latest.slice(0, 10)) -
+            Date.parse(catalog.scenarioNow.slice(0, 10))) /
+            86400000,
+        ),
+      },
+    };
+  }),
 };
 export const messages = new Map<string, string>();
 

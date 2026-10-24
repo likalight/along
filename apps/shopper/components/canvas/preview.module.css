@@ -221,6 +221,7 @@
   .scenario button {
     font-size: 9px;
     padding: 6px 10px;
+    min-height: 44px;
   }
   .revision {
     font-size: 7px;
@@ -237,8 +238,12 @@
     padding: 0 10px;
   }
   .dock input {
-    font-size: 10px;
+    font-size: 16px;
     padding: 9px;
+  }
+  .dock button {
+    width: 44px;
+    height: 44px;
   }
   .orb {
     width: 43px;

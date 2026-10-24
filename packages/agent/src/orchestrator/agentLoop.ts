@@ -181,12 +181,17 @@ export async function agentLoop(opts: {
     }
     case "solution_type": {
       const st = parseSolutionType(input.text ?? "");
+      // Provisional host for café demo quotes — shopper can revise (USB-A/C).
+      // Without it every mic stays HOST_CONNECTION_REQUIRED and offers never checkout.
+      const host =
+        parseCompatibility(input.text ?? "").hostConnection ?? "usb-c";
       push({
         ...baseProposal(input, "set"),
         action: "set_constraints",
         payload: {
           preferences: { solutionType: st },
           needs: ["café dictation mic"],
+          hardConstraints: { compatibility: { hostConnection: host } },
         },
         evidenceIds: [],
       });

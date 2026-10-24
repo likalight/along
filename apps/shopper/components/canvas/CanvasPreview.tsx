@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { ArrowUp, ArrowUpRight, LoaderCircle } from "lucide-react";
-import { ProductCanvas } from "./ProductCanvas";
+import { ProductCanvas, type PlaybackRequest } from "./ProductCanvas";
 import { fixtureData } from "@/lib/canvas/fixtures";
 import {
   acceptEvent,
@@ -22,16 +22,27 @@ export function CanvasPreview() {
     requestId: string;
     evidenceId: string;
     action: "play" | "stop";
+    takeaway?: string;
   } | null>(null);
   const [mediaStatus, setMediaStatus] = useState("");
   const [lastTurn, setLastTurn] = useState("");
   const controller = useRef<AbortController | null>(null);
   const serial = useRef(0);
+  const accepted = useRef<Snapshot | null>(null);
+  const pendingRequest = useRef(false);
+  const activeMedia = useRef<MediaEvent | null>(null);
+  const requestedMedia = useRef<(PlaybackRequest & { played: boolean }) | null>(
+    null,
+  );
+  const currentTurn = useRef("");
   async function create(category: Category) {
     const request = ++serial.current;
     controller.current?.abort();
     const abort = new AbortController();
     controller.current = abort;
+    pendingRequest.current = true;
+    activeMedia.current = null;
+    requestedMedia.current = null;
     setBusy(true);
     setError("");
     setMediaRequest(null);
@@ -45,29 +56,52 @@ export function CanvasPreview() {
       });
       if (!response.ok) throw Error("Could not start rehearsal.");
       const body = await response.json();
-      if (request === serial.current) setSnapshot(body.snapshot);
+      if (request === serial.current) {
+        accepted.current = body.snapshot;
+        currentTurn.current = "";
+        setLastTurn("");
+        setSnapshot(body.snapshot);
+      }
     } catch (e) {
       if (request === serial.current && !abort.signal.aborted)
         setError(e instanceof Error ? e.message : "Connection failed");
     } finally {
-      if (request === serial.current) setBusy(false);
+      if (request === serial.current) {
+        pendingRequest.current = false;
+        setBusy(false);
+      }
     }
   }
   useEffect(() => {
     void create("audio");
-    return () => controller.current?.abort();
+    return () => {
+      serial.current++;
+      pendingRequest.current = true;
+      activeMedia.current = null;
+      requestedMedia.current = null;
+      controller.current?.abort();
+    };
   }, []);
   async function send(intent: ShopperIntent) {
     if (!snapshot || busy) return;
+    const stopped =
+      /\bstop\b/i.test(intent.text) && requestedMedia.current?.played
+        ? requestedMedia.current
+        : null;
     controller.current?.abort();
     const abort = new AbortController();
     controller.current = abort;
     const request = ++serial.current;
     const turnId = crypto.randomUUID();
+    currentTurn.current = turnId;
+    pendingRequest.current = true;
+    activeMedia.current = null;
+    requestedMedia.current = null;
     setLastTurn(turnId);
     setBusy(true);
     setError("");
     setMediaRequest(null);
+    setMediaStatus("");
     // A fresh shopper turn cancels narration and stale video before processing references.
     window.speechSynthesis?.cancel();
     try {
@@ -87,10 +121,25 @@ export function CanvasPreview() {
       const body = await response.json();
       if (request !== serial.current) return;
       if (!response.ok) {
-        if (body.snapshot) setSnapshot(body.snapshot);
+        if (
+          body.snapshot &&
+          body.snapshot.sessionId === snapshot.sessionId &&
+          body.snapshot.epoch === snapshot.epoch &&
+          body.snapshot.revision >= snapshot.revision
+        ) {
+          accepted.current = body.snapshot;
+          setSnapshot(body.snapshot);
+        }
         throw Error(body.error ?? "Request failed");
       }
       const next = acceptEvent(snapshot, body.event, turnId);
+      if (next === snapshot) {
+        setError(
+          "The response no longer matches this turn. Repeat your request using the current numbered cards.",
+        );
+        return;
+      }
+      accepted.current = next;
       setSnapshot(next);
       if (/\bplay\b/i.test(intent.text) && next.view === "evidence")
         setMediaRequest({
@@ -98,25 +147,103 @@ export function CanvasPreview() {
           evidenceId: `${next.focusedProductId}-video`,
           action: "play",
         });
-      if (/\bstop\b/i.test(intent.text))
-        setMediaRequest({ requestId: turnId, evidenceId: "", action: "stop" });
+      if (/\bstop\b/i.test(intent.text)) {
+        const evidence =
+          stopped &&
+          stopped.sessionId === next.sessionId &&
+          stopped.epoch === next.epoch
+            ? fixtureData.evidence.find(
+                (item) =>
+                  item.id === stopped.evidenceId &&
+                  item.subjectId === next.focusedProductId &&
+                  next.evidenceIds.includes(item.id),
+              )
+            : undefined;
+        const takeaway = evidence?.media?.takeaway;
+        setMediaRequest({
+          requestId: turnId,
+          evidenceId: "",
+          action: "stop",
+          takeaway,
+        });
+        if (takeaway) setMediaStatus(takeaway);
+      }
     } catch (e) {
       if (request === serial.current && !abort.signal.aborted)
         setError(e instanceof Error ? e.message : "Connection failed");
     } finally {
-      if (request === serial.current) setBusy(false);
+      if (request === serial.current) {
+        pendingRequest.current = false;
+        setBusy(false);
+      }
     }
   }
   function media(event: MediaEvent) {
+    const current = accepted.current;
+    if (
+      pendingRequest.current ||
+      !current ||
+      event.sessionId !== current.sessionId ||
+      event.epoch !== current.epoch ||
+      event.revision !== current.revision ||
+      event.turnId !== currentTurn.current
+    )
+      return;
     if (event.type === "video.started") {
+      const requested = requestedMedia.current;
+      if (
+        !requested ||
+        requested.sessionId !== event.sessionId ||
+        requested.epoch !== event.epoch ||
+        requested.revision !== event.revision ||
+        requested.turnId !== event.turnId
+      )
+        return;
+      requested.played = true;
+      activeMedia.current = event;
       window.speechSynthesis?.cancel();
       setMediaStatus("Assistant narration paused · curated video playing");
-    } else
+    } else {
+      const running = activeMedia.current;
+      if (
+        !running ||
+        running.playbackId !== event.playbackId ||
+        running.turnId !== event.turnId ||
+        running.revision !== event.revision
+      )
+        return;
+      activeMedia.current = null;
       setMediaStatus(
         event.reason === "failed"
           ? "Media unavailable. You can continue exploring."
           : (event.takeaway ?? "Video stopped. Ready for your next turn."),
       );
+    }
+  }
+  function playbackRequest(request: PlaybackRequest) {
+    const current = accepted.current;
+    if (
+      pendingRequest.current ||
+      !current ||
+      request.sessionId !== current.sessionId ||
+      request.epoch !== current.epoch ||
+      request.revision !== current.revision ||
+      request.turnId !== currentTurn.current
+    )
+      return;
+    if (request.phase === "cancelled") {
+      requestedMedia.current = null;
+      activeMedia.current = null;
+      setMediaStatus("Video stopped. Ready for your next turn.");
+    } else if (request.phase === "failed") {
+      requestedMedia.current = null;
+      activeMedia.current = null;
+      setMediaStatus("Media unavailable. You can continue exploring.");
+    } else {
+      requestedMedia.current = { ...request, played: false };
+      window.speechSynthesis?.cancel();
+      setMediaStatus("Preparing curated video…");
+    }
   }
   function submit() {
     if (!snapshot || !text.trim() || busy) return;
@@ -165,6 +292,7 @@ export function CanvasPreview() {
           data={fixtureData}
           onIntent={(intent) => void send(intent)}
           onMediaEvent={media}
+          onPlaybackRequest={playbackRequest}
           busy={busy}
           interpretingSpatialReference={busy}
           mediaRequest={mediaRequest}

@@ -239,7 +239,7 @@ export const products: Product[] = [
     category: "bedsheets",
     brand: "Along Studio",
     model: name,
-    variantId: "Queen · 152 × 203 cm · 30 cm pocket",
+    variantId: `Queen · 152 × 203 cm · ${i === 4 ? 40 : 30} cm pocket`,
     title: `${name} sheet set`,
     image: image("bedding", name),
     specs: {
@@ -354,7 +354,12 @@ export const evidence: Evidence[] = products.flatMap((p) => {
         "Review synthesis not available. No customer reviews were invented.",
       rating: m?.[0] ?? null,
       ratingCount: p.id === "MIC-047" ? null : (m?.[1] ?? null),
-      writtenReviewCount: p.id === "MIC-047" ? 43 : null,
+      writtenReviewCount:
+        p.id === "MIC-047"
+          ? 43
+          : m?.[2] === "Rendered customer reviews."
+            ? m[1]
+            : null,
       purchaseCount: null,
       purchaseCountPeriod: null,
       reviewScope: m?.[2] ?? "Not available",
@@ -402,13 +407,16 @@ export const offers: Offer[] = products.flatMap((p) =>
         : p.referencePriceMinor,
     shippingMinor: [500, 1000, null][i],
     otherFeesMinor: i === 2 ? null : 0,
+    requiredSetupMinor: p.category === "audio" ? null : 0,
     availability: "in_stock",
     destination: "DEMO-DESTINATION",
     deliveryWindow: { latestOffsetDays: [3, 1, null][i] },
     returnTerms: "14-day demo returns",
     conditions: [
       "Synthetic fulfillment fixture; no live inventory or delivery check.",
-      "Required host adapters or extra hardware are not priced; verify before checkout.",
+      p.category === "audio"
+        ? "Host compatibility and required adapters, cables or mounts are not yet verified or priced; a complete setup total is unavailable."
+        : "No additional setup hardware is required in this synthetic fixture.",
     ],
     evidenceIds: [`${p.id}-${kind}-seller`],
     classification: "proxy",

@@ -171,9 +171,9 @@ Along is an early hackathon project, not a production marketplace.
 | Product direction and integration contract | Agreed in [issue #2](https://github.com/likalight/along/issues/2). |
 | Catalog, provenance, scenarios, and validation | Implemented in [PR #16](https://github.com/likalight/along/pull/16) and integrated through [PR #15](https://github.com/likalight/along/pull/15). |
 | Session backend and simulated approval | Implemented with voice/text approval, multimodal state, and CI in [PR #15](https://github.com/likalight/along/pull/15). See the [acceptance matrix](./backend/ACCEPTANCE.md). |
-| Shopper interface | Session shell + product canvas integrated in `apps/shopper`, with canonical offers and authenticated backend state. |
-| Live AI/voice integration | Provider adapter still pending; browser speech fallback is not a verified live AI connection. |
-| End-to-end demo rehearsal | Production browser text journey verified through revised constraints and simulated receipt. Live spoken journey remains pending. |
+| Shopper interface | Session shell + product canvas integrated in `apps/shopper` (see [shell](./apps/shopper/docs/session-shell.md) and [canvas](./apps/shopper/docs/product-canvas.md)), with canonical offers and authenticated backend state. |
+| Live AI/voice integration | GPT-Live mint when `OPENAI_API_KEY` is set; otherwise authenticated `not_connected` with labeled browser speech / text fallback. |
+| End-to-end demo rehearsal | Text journey verified through ranked shortlist tiles, offers, and simulated receipt. Live spoken journey requires `OPENAI_API_KEY`. |
 
 The agreed frontend direction is **Next.js App Router + TypeScript**, **Motion for React**, and an **ElevenLabs UI Orb**. The orb is a visual component; it does not establish the selected speech/model provider or a paid service commitment.
 

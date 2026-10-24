@@ -618,4 +618,10 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
   override getAttachment(id: string) {
     return PREPARED_ATTACHMENTS.find((a) => a.id === id);
   }
+  /** Idempotent drop of a session image/link reference. */
+  removeAttachment(sessionId: string, attachmentId: string) {
+    const s = this.core.get(sessionId);
+    this.core.removeAttachment(sessionId, s.revision, attachmentId);
+    return this.get(sessionId)!;
+  }
 }

@@ -12,7 +12,9 @@
     "test": "npm run test -w @coupang/agent",
     "typecheck": "npm run typecheck -w @coupang/contract && npm run typecheck -w @coupang/agent && npm run typecheck -w @coupang/web && npm run typecheck -w @along/shopper",
     "sync:catalog": "node scripts/sync-catalog.mjs",
-    "dev:shopper": "npm run dev -w @along/shopper"
+    "dev:shopper": "npm run dev -w @along/shopper",
+    "test:e2e": "npm run test:e2e -w @along/shopper",
+    "test:canvas": "npm run test:canvas -w @along/shopper"
   },
   "engines": {
     "node": ">=22.18"

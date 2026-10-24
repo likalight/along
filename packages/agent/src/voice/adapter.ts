@@ -140,19 +140,25 @@ export class GptLiveVoiceAdapter implements VoiceAdapter {
     const cached = this.minted.get(sessionId);
     if (cached) return cached;
     try {
-      const res = await fetch("https://api.openai.com/v1/realtime/sessions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-          "Content-Type": "application/json",
-          "OpenAI-Beta": "realtime=v1",
+      // Realtime GA: ephemeral client secrets (beta /v1/realtime/sessions retired).
+      const res = await fetch(
+        "https://api.openai.com/v1/realtime/client_secrets",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            expires_after: { anchor: "created_at", seconds: 600 },
+            session: {
+              type: "realtime",
+              model: VOICE_ADAPTER.model,
+              audio: { output: { voice: "alloy" } },
+            },
+          }),
         },
-        body: JSON.stringify({
-          model: VOICE_ADAPTER.model,
-          // Client delegation: browser holds the WebRTC peer; server uses sideband.
-          voice: "alloy",
-        }),
-      });
+      );
       if (!res.ok) {
         const detail = await res.text().catch(() => "");
         return {
@@ -162,10 +168,13 @@ export class GptLiveVoiceAdapter implements VoiceAdapter {
         };
       }
       const body = (await res.json()) as {
+        value?: string;
+        expires_at?: number;
         client_secret?: { value?: string; expires_at?: number };
+        session?: { id?: string; model?: string };
         id?: string;
       };
-      const secret = body.client_secret?.value;
+      const secret = body.value ?? body.client_secret?.value;
       if (!secret) {
         return {
           mode: "not_connected",
@@ -173,17 +182,18 @@ export class GptLiveVoiceAdapter implements VoiceAdapter {
           note: "Live voice mint returned no client secret. Text mode remains available.",
         };
       }
+      const expiresUnix = body.expires_at ?? body.client_secret?.expires_at;
       const live: LiveMintResult & { mode: "live" } = {
         mode: "live",
-        model: VOICE_ADAPTER.model,
+        model: body.session?.model ?? VOICE_ADAPTER.model,
         transport: "webrtc",
         delegation: "client",
         duplex: true,
         clientSecret: secret,
-        expiresAt: body.client_secret?.expires_at
-          ? new Date(body.client_secret.expires_at * 1000).toISOString()
+        expiresAt: expiresUnix
+          ? new Date(expiresUnix * 1000).toISOString()
           : null,
-        sessionId: body.id ?? sessionId,
+        sessionId: body.session?.id ?? body.id ?? sessionId,
       };
       this.minted.set(sessionId, live);
       return live;

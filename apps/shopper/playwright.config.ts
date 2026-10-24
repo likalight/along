@@ -20,6 +20,11 @@ export default defineConfig({
     command: `npm run dev -- --port ${port}`,
     url: `http://127.0.0.1:${port}`,
     reuseExistingServer: !process.env.CI,
+    // Browser speech mocks need the labeled fallback — live mint would race the fakes.
+    env: {
+      ...process.env,
+      OPENAI_API_KEY: "",
+    },
   },
   reporter: "list",
 });

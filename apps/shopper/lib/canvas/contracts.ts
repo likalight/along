@@ -70,6 +70,8 @@ export type Offer = {
   unitPriceMinor: number | null;
   shippingMinor: number | null;
   otherFeesMinor: number | null;
+  /** Zero means no additional setup cost; null means required hardware is not yet priced. */
+  requiredSetupMinor: number | null;
   availability: "in_stock" | "unknown" | "unavailable";
   destination: string;
   deliveryWindow: { latestOffsetDays: number | null };
@@ -176,13 +178,17 @@ export const deliveredTotal = (offer: Offer): number | null => {
     offer.unitPriceMinor,
     offer.shippingMinor,
     offer.otherFeesMinor,
+    offer.requiredSetupMinor,
   ];
-  return parts.every(
-    (part): part is number =>
-      part !== null && Number.isSafeInteger(part) && part >= 0,
+  if (
+    !parts.every(
+      (part): part is number =>
+        part !== null && Number.isSafeInteger(part) && part >= 0,
+    )
   )
-    ? (parts as number[]).reduce((a, b) => a + b, 0)
-    : null;
+    return null;
+  const total = (parts as number[]).reduce((a, b) => a + b, 0);
+  return Number.isSafeInteger(total) ? total : null;
 };
 export const money = (minor: number | null, currency = "USD") =>
   minor === null ? "Not available" : `${currency} ${(minor / 100).toFixed(2)}`;

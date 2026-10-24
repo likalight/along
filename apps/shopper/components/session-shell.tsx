@@ -301,8 +301,9 @@ export function SessionShell() {
                 sessionId={s.sessionId}
                 onInterrupt={controller.interrupt}
                 onRemove={(a) => {
-                  if (s.attachmentIds.includes(a.id))
-                    void controller.send(`Remove reference ${a.id}`, "text");
+                  // Always tell the session — even if the share response has not
+                  // landed yet — so a late accept cannot leave a ghost attachment.
+                  void controller.send(`Remove reference ${a.id}`, "text");
                 }}
                 onUse={(a) =>
                   void controller.send(

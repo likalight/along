@@ -1,10 +1,10 @@
 # Product canvas — issue #4
 
-Implements the fixture-based product canvas from [issue #4](https://github.com/likalight/coupangchallenge/issues/4), against [contract v1](https://github.com/likalight/coupangchallenge/issues/2). The session shell from #3 supplies the Next.js application, dependency versions, microphone, composer, attachments, speech provider and transport. This work owns `components/canvas`, `lib/canvas`, `public/canvas`, the isolated `/canvas-preview` route, and `/api/canvas` rehearsal adapter. It adds no dependency or second gallery/WebGL system.
+Implements the fixture-based product canvas from [issue #4](https://github.com/likalight/along/issues/4), against [contract v1](https://github.com/likalight/along/issues/2). The session shell from #3 supplies the Next.js application, dependency versions, microphone, composer, attachments, speech provider and transport. This work owns `components/canvas`, `lib/canvas`, `public/canvas`, the isolated `/canvas-preview` route, and `/api/canvas` rehearsal adapter. It adds no dependency or second gallery/WebGL system.
 
 ## Try it
 
-Run `npm install`, then `npm run dev`. Open `/canvas-preview`. Its optional typed composer and category switches are rehearsal controls; the production microphone and transport stay with #3. A pale canvas and compact blue orb anchor the stage.
+Run `npm ci`, then `npm run dev`. Open `/canvas-preview`. Its optional typed composer and category switches are rehearsal controls; the production microphone and transport stay with #3. A pale canvas and compact blue orb anchor the stage.
 
 - Audio: `explore options` → `choose headset` (or `clip-on`, `desktop`) → `choose value`, `choose quality`, or `choose cost-effective` → up to three products. A USD 100 hard budget still applies to quality-first. Clip-on has two eligible seeds and explains the missing third; the out-of-stock DJI kit is excluded.
 - Bags: `explore options` → two close matches plus three discoveries → `I prefer the softer shape` → three closer alternatives. `Actually navy colour` narrows colour. Budget, reference and other preferences persist.
@@ -30,6 +30,7 @@ This bounded grammar is a deterministic rehearsal, not the live interpretation l
   turnId={currentTurnId}
   onIntent={({ text }) => controller.send(text, currentModality)}
   onMediaEvent={handleTrustedMediaLifecycle}
+  onPlaybackRequest={pauseAssistantBeforeVideo}
   mediaRequest={acceptedMediaRequest}
 />
 ```
@@ -38,7 +39,7 @@ Keep the shell's generation/current-turn cancellation guard. `acceptEvent(curren
 
 Pass the accepted `displayOrder` and `visibleRevision` with shopper input. Number labels refer to that order, not DOM position, medal, pointer hover or animation. Cards use product IDs as React keys. Focus is a blue outline and “In focus” text; gold/silver/bronze retain textual rank labels. Initial bag discoveries do not receive contextual medal ranks. Saved rationale and IDs last for the current session only.
 
-For voice-requested playback, supply `{requestId, evidenceId, action:'play'}` only after the backend accepts the evidence view. `video.started` fires before the player mounts: stop narration and suspend recognition/capture, so media audio cannot become a shopper command or approval. `video.stopped` carries playback/session/epoch/turn/revision identity, reason and an authored takeaway for normal completion/stop. Validate identity, then narrate the takeaway and resume capture under shell control. Navigation, new busy turns and unmount cancel the previous playback. Failures carry no fabricated takeaway. The component displays the takeaway; the parent owns speech. Never call these lifecycle handlers with transcripts from the video.
+For voice-requested playback, supply `{requestId, evidenceId, action:'play'}` only after the backend accepts the evidence view. `onPlaybackRequest` fires synchronously with phase `preparing` before the player mounts: stop narration and suspend recognition/capture at this boundary, so media audio cannot become a shopper command or approval. `video.started` fires only when the current player actually starts playing. A failed preparation reports phase `failed`; stopping before playback reports `cancelled`. Both clear preparation without inventing playback. `video.stopped` carries playback/session/epoch/turn/revision identity, reason and an authored takeaway for normal completion/stop. Validate identity, then narrate the takeaway and resume capture under shell control. Navigation, new busy turns and unmount cancel the previous playback. Failures carry no fabricated takeaway. The component displays the takeaway; the parent owns speech. For an accepted typed/voice Stop after cancellation advances revision, pass a takeaway only for the same evidence that actually played; failed or unplayed media has none. Never call these lifecycle handlers with transcripts from the video.
 
 In summary/receipt views, all positional motion remains off. Their order, approval and receipt UI belongs to #5/#7; this canvas does not implement checkout. Offer totals are display projections only: complete numeric fields are summed in minor units, unknown fields never become zero, and extra required hardware remains explicitly unpriced.
 
@@ -56,12 +57,12 @@ Bag/textile specifications, illustrations, seller records, fulfillment, destinat
 
 Live catalog/constraint/offer acceptance (#6/#7), review/video retrieval (#11/#12), speech-provider routing and real-device echo rehearsal remain integration work. This fixture route cannot authorize or perform purchases. Do not treat its client intent handling or authored ranking as authoritative production policy.
 
-The parallel catalog build (`codex/issue-6-catalog`, PR #16) uses category values `audio-accessories` / `everyday-bags` / `bedsheet-sets`, structured JSON specs, `referencePrice.amountMinor`, separate buyer metrics, timestamped delivery windows, explicit tax and setup hardware. Its synthetic bags, variants, prices and destination differ from this isolated canvas rehearsal, even where IDs coincide. Replace the entire fixture projection when connecting it; never join these two fixture sets by ID and silently mix identities. Render accepted tax, hardware and total breakdowns without double-counting hardware already included in `otherFeesMinor`.
+The merged shared catalog (`catalog/`, PR #16) uses category values `audio-accessories` / `everyday-bags` / `bedsheet-sets`, structured JSON specs, `referencePrice.amountMinor`, separate buyer metrics, timestamped delivery windows, explicit tax and setup hardware. Its synthetic bags, variants, prices and destination differ from this isolated canvas rehearsal, even where IDs coincide. Replace the entire fixture projection when connecting it; never join these two fixture sets by ID and silently mix identities. Render accepted tax, hardware and total breakdowns without double-counting hardware already included in `otherFeesMinor`.
 
-The parallel backend build (`codex/backend-concierge`) publishes `backend/INTEGRATION.md` and `src/integration-client.ts`. Use `/v1/integration` and its public string-valued stage, rather than the legacy `/v1` presentation view. It supplies accepted SSE snapshots and curated-ID media lifecycle endpoints. Catalog image paths resolve against the backend origin. Its server agent token stays server-side; session capabilities must not enter page URLs, model context or this fixture data. These observed interfaces inform the handoff; this PR does not claim they are connected.
+The merged backend (`backend/`, PR #15) publishes `backend/INTEGRATION.md` and `src/integration-client.ts`. Use `/v1/integration` and its public string-valued stage, rather than the legacy `/v1` presentation view. It supplies accepted SSE snapshots and curated-ID media lifecycle endpoints. Catalog image paths resolve against the backend origin. Its server agent token stays server-side; session capabilities must not enter page URLs, model context or this fixture data. These observed interfaces inform the handoff; this PR does not claim they are connected.
 
 ## Verification
 
-`npm run typecheck`; `npm test -- tests/canvas/engine.test.ts`; `npm exec playwright test -- --config playwright.canvas.config.ts`; `npm run build`.
+`npm run typecheck`; `npm test -- tests/canvas/engine.test.ts`; `npm run test:canvas`; `npm run build`.
 
 Browser checks cover distinct audio stages, preserved hard budgets/reference, bag narrowing, stable comparison coordinates, identity after remove/restore, session saves, nullable metrics, captioned playback and Stop, missing/failed media, deadline-conflicting same-variant offers, incomplete totals, keyboard use, mobile width and reduced motion. The unit suite also checks stale-session/epoch/turn/revision rejection and idempotency. These checks establish deterministic fixture behavior, not live speech quality or seller availability.

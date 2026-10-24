@@ -298,16 +298,30 @@ export class SessionController {
       };
       const abort = new AbortController();
       this.pending = abort;
-      const input = {
+      const input: {
+        sessionId: string;
+        epoch: number;
+        turnId: string;
+        revision: number;
+        eventId: string;
+        baseRevision: number;
+        modality: "text" | "voice" | "image" | "link";
+        text?: string;
+        attachmentId?: string;
+        visibleRevision: number;
+        visibleProductIds: string[];
+      } = {
         ...this.identity,
         eventId: crypto.randomUUID(),
         baseRevision: s.revision,
         modality: attachment?.kind ?? modality,
-        text,
-        attachmentId: attachment?.id,
         visibleRevision: s.revision,
         visibleProductIds: s.displayOrder,
       };
+      // Backend rejects empty strings; image/link shares omit text entirely.
+      const trimmed = text.trim();
+      if (trimmed) input.text = trimmed;
+      if (attachment?.id) input.attachmentId = attachment.id;
       const accepted = await this.transport.send(input, abort.signal);
       if (generation !== this.generation) return;
       if (
