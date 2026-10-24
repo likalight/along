@@ -25,6 +25,7 @@ async function post(
 }
 export const httpTransport: SessionTransport = {
   connect: (sessionId) => post("connect", undefined, { sessionId }),
+  discovery: (input, handoffId) => post("discovery", input, { handoffId }),
   send: (input, signal) => post("input", input, {}, signal),
   cancel: (input) => post("cancel", input),
   mode: (input, mode) => post("mode", input, { mode }),

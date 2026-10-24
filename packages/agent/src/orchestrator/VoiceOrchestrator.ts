@@ -3,7 +3,10 @@ import type {
   LifecycleEvent,
   SessionSnapshot,
   SpeakableResult,
+  DiscoveryReference,
+  DiscoveryImportIdentity,
 } from "@coupang/contract";
+import { isExplicitCatalogRequest, type DiscoveryImportResult } from "../discovery/reference.js";
 import { routeInput } from "../intent/router.js";
 import type { FixtureSessionStore } from "../session/FixtureSessionStore.js";
 import { SessionThread } from "../thread/SessionThread.js";
@@ -54,6 +57,22 @@ export class VoiceOrchestrator {
     return this.store.get(sessionId);
   }
 
+  async importDiscovery(sessionId: string, reference: DiscoveryReference, identity: DiscoveryImportIdentity): Promise<DiscoveryImportResult> {
+    const result = this.store.importDiscovery(sessionId, reference, identity);
+    if (result.duplicate) return result;
+    const active = this.turnsFor(sessionId).active;
+    if (active) this.turnsFor(sessionId).cancel(active.turnId, "discovery_handoff");
+    await this.voice.interrupt(sessionId, "discovery_handoff");
+    const current = this.store.get(sessionId);
+    if (!current || current.epoch !== result.snapshot.epoch || current.revision !== result.snapshot.revision)
+      return { ...result, duplicate: true, snapshot: current ?? result.snapshot };
+    const thread = this.thread(sessionId, current);
+    reduce(thread, { type: "discovery_reference", data: { handoffId: reference.handoffId, turnId: result.turnId } });
+    reduce(thread, { type: "assistant_transcript", data: { turnId: result.turnId, text: result.speakable } });
+    await this.voice.append(sessionId, "commentary", result.speakable, { turnId: result.turnId });
+    return result;
+  }
+
   async handleInput(input: InputEvent): Promise<TurnOutcome> {
     const snap = this.store.get(input.sessionId);
     if (!snap) {
@@ -64,6 +83,10 @@ export class VoiceOrchestrator {
     }
 
     this.store.ingestInput(input);
+    const returningToCatalog = !!snap.discoveryReference &&
+      (input.modality === "text" || input.modality === "voice") &&
+      isExplicitCatalogRequest(input.text ?? "") && !/^back to my catalog[.!]?$/i.test((input.text ?? "").trim());
+    if (returningToCatalog) this.store.clearDiscovery(input.sessionId);
     const turns = this.turnsFor(input.sessionId);
     // New typed/voice turn cancels in-flight speech + work
     const active = turns.active;
@@ -119,6 +142,8 @@ export class VoiceOrchestrator {
       store: this.store,
       cancel: turn.cancelToken.signal,
     });
+    if (returningToCatalog && result.speakable[0])
+      result.speakable[0].content = `Back to your catalog choices. ${result.speakable[0].content}`;
 
     const current = this.store.get(input.sessionId)!;
     // Own applies advance revision; only drop when this turn was cancelled (barge-in / newer input).

@@ -4,6 +4,8 @@ export { reduce } from "./thread/reduce.js";
 export { TurnMachine } from "./orchestrator/TurnMachine.js";
 export { agentLoop } from "./orchestrator/agentLoop.js";
 export { VoiceOrchestrator } from "./orchestrator/VoiceOrchestrator.js";
+export type { DiscoveryImportResult } from "./discovery/reference.js";
+export type { DiscoveryReference, DiscoveryImportIdentity } from "@coupang/contract";
 export { FixtureSessionStore } from "./session/FixtureSessionStore.js";
 export {
   FixtureVoiceAdapter,

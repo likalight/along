@@ -1,4 +1,5 @@
 import type { CanvasData, Presentation } from "../canvas/contracts";
+import type { DiscoveryReference } from "@coupang/contract";
 export type View =
   | "opening"
   | "understanding"
@@ -76,6 +77,8 @@ export type Summary = {
   status: "presenting" | "eligible" | "invalidated" | "confirmed";
 };
 export type Session = {
+  discoveryReference?: DiscoveryReference;
+  conversationMode?: "text" | "voice";
   canvas?: Presentation;
   catalog?: CanvasData;
   sessionId: string;
@@ -97,11 +100,7 @@ export type Session = {
   attachmentIds: string[];
   summaryId: string | null;
   approvalStatus:
-    | "not_prepared"
-    | "presenting"
-    | "eligible"
-    | "approved"
-    | "blocked";
+    "not_prepared" | "presenting" | "eligible" | "approved" | "blocked";
   heading: string;
   message: string;
   cards: StageCard[];
@@ -131,6 +130,10 @@ export type Lifecycle = Identity & {
 };
 export interface SessionTransport {
   connect(sessionId?: string): Promise<Session>;
+  discovery?(
+    identity: Identity,
+    handoffId: string,
+  ): Promise<{ snapshot: Session; turnId: string }>;
   send(input: Input, signal: AbortSignal): Promise<Accepted>;
   cancel(identity: Identity): Promise<Session>;
   mode(identity: Identity, mode: "text" | "voice"): Promise<Session>;

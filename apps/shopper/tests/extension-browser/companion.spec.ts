@@ -1,0 +1,239 @@
+import { test, expect, chromium } from "@playwright/test";
+import { fileURLToPath } from "node:url";
+import { cp, mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+
+test("real unpacked extension discovers automatically and continues the same conversation", async ({
+  baseURL,
+}, info) => {
+  const packaged = fileURLToPath(
+    new URL("../../../extension/dist/along", import.meta.url),
+  );
+  const extension = await mkdtemp(path.join(tmpdir(), "along-e2e-"));
+  await cp(packaged, extension, { recursive: true });
+  const manifestPath = path.join(extension, "manifest.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  expect(manifest.host_permissions).toBeUndefined();
+  // Headless Chromium cannot accept the native optional-permission dialog.
+  // Grant only this isolated test server in the test copy. All shipped JS,
+  // consent controls, script registration and backend authentication are real.
+  manifest.host_permissions = [
+    `${new URL(baseURL!).protocol}//${new URL(baseURL!).hostname}/*`,
+  ];
+  await writeFile(manifestPath, JSON.stringify(manifest));
+  // Chromium creates long nested storage paths; a temporary profile avoids
+  // Windows MAX_PATH failures in deep checkout/test-result directories.
+  const context = await chromium.launchPersistentContext("", {
+    channel: "chromium",
+    headless: true,
+    executablePath: process.env.CHROME_PATH,
+    args: [
+      `--disable-extensions-except=${extension}`,
+      `--load-extension=${extension}`,
+    ],
+    viewport: { width: 1280, height: 900 },
+  });
+  context.setDefaultTimeout(15000);
+  context.on("page", (p) =>
+    p.on("pageerror", (error) =>
+      console.error("Browser error:", error.message),
+    ),
+  );
+  try {
+    const worker =
+      context.serviceWorkers()[0] ??
+      (await context.waitForEvent("serviceworker", { timeout: 15000 }));
+    const id = new URL(worker.url()).host;
+    const page = await context.newPage();
+    await page.goto(baseURL!);
+    await page.getByRole("button", { name: "I’d rather type" }).click();
+    await page
+      .getByRole("textbox", { name: "Your message" })
+      .fill("a work and gym bag");
+    await page.getByRole("button", { name: "Send message" }).click();
+    await expect(page.getByRole("status").first()).not.toContainText(
+      "Thinking",
+    );
+    const sessionId = await page.evaluate(() =>
+      sessionStorage.getItem("along.sessionId"),
+    );
+    expect(sessionId).toBeTruthy();
+    const panel = await context.newPage();
+    await panel.goto(`chrome-extension://${id}/ui/panel.html?setup`);
+    await expect(panel.locator("#setup")).toBeVisible();
+    await panel.locator("#backend").fill(baseURL!);
+    await panel.locator("#consent").check();
+    await panel.locator("#demo").check();
+    await panel.locator("#connect").click();
+    await expect
+      .poll(
+        async () =>
+          (
+            await panel.evaluate(async () =>
+              (globalThis as any).chrome.permissions.getAll(),
+            )
+          ).origins,
+      )
+      .toContain("http://127.0.0.1/*");
+    await expect(
+      page.getByRole("button", { name: "Connect extension", exact: true }),
+    )
+      .toBeVisible({ timeout: 5000 })
+      .catch(async (error) => {
+        console.log("PANEL", await panel.locator("body").innerText());
+        console.log(
+          "STATE",
+          await panel.evaluate(async () =>
+            (globalThis as any).chrome.runtime.sendMessage({
+              type: "ALONG_STATE",
+            }),
+          ),
+        );
+        console.log(
+          "PAGES",
+          context.pages().map((p) => p.url()),
+        );
+        throw error;
+      });
+    await page
+      .getByRole("button", { name: "Connect extension", exact: true })
+      .click();
+    await expect(
+      page.getByText("Your Chrome companion is connected"),
+    ).toBeVisible();
+    await expect(panel.locator("#connection-label")).toHaveText(
+      "Your conversation is connected",
+    );
+    // A newer unrelated Along tab must never become the handoff destination.
+    const unrelated = await context.newPage();
+    await unrelated.goto(baseURL!);
+    await expect(
+      unrelated.getByRole("button", { name: "Start Chat" }),
+    ).toBeEnabled();
+    expect(
+      await unrelated.evaluate(() => sessionStorage.getItem("along.sessionId")),
+    ).not.toBe(sessionId);
+    await page
+      .getByRole("textbox", { name: "Your message" })
+      .fill("Keep my unfinished thought");
+    await panel.bringToFront();
+    const demoPromise = context.waitForEvent("page");
+    await panel.locator("#demo-site").click();
+    const demo = await demoPromise;
+    await demo.waitForLoadState();
+    await demo.bringToFront();
+    await expect(demo.locator("[data-along-companion]")).toBeVisible({
+      timeout: 30000,
+    });
+    await demo.screenshot({
+      path: info.outputPath("automatic-nudge.png"),
+      fullPage: true,
+    });
+    await panel.bringToFront();
+    await expect(panel.locator(".discuss").first()).toBeVisible();
+    await panel.locator("#settings-toggle").click();
+    await panel.setViewportSize({ width: 390, height: 850 });
+    await panel.screenshot({
+      path: info.outputPath("extension-panel.png"),
+      fullPage: true,
+    });
+    await panel.locator(".discuss").first().click();
+    await expect(
+      page.getByRole("button", { name: "Bring into conversation" }),
+    ).toBeVisible({ timeout: 10000 });
+    await expect(
+      page.getByRole("textbox", { name: "Your message" }),
+    ).toHaveValue("Keep my unfinished thought");
+    await expect(
+      page.getByRole("article", { name: "Discovery in this conversation" }),
+    ).toHaveCount(0);
+    await expect(
+      unrelated.getByRole("article", {
+        name: "Discovery in this conversation",
+      }),
+    ).toHaveCount(0);
+    await page.getByRole("textbox", { name: "Your message" }).fill("");
+    await expect(
+      page.getByRole("article", { name: "Discovery in this conversation" }),
+    ).toBeVisible({ timeout: 15000 });
+    expect(
+      await page.evaluate(() => sessionStorage.getItem("along.sessionId")),
+    ).toBe(sessionId);
+    await expect(
+      page.getByText("DEMO DISCOVERY", { exact: true }),
+    ).toBeVisible();
+    await page
+      .getByRole("button", { name: "Would my laptop fit?", exact: true })
+      .click();
+    await expect(page.getByRole("status").first()).not.toContainText(
+      "Thinking",
+    );
+    await expect(
+      page.getByText(/usable compartment measurements/).first(),
+    ).toBeVisible();
+    await page.screenshot({
+      path: info.outputPath("same-conversation.png"),
+      fullPage: true,
+    });
+    await page
+      .getByRole("textbox", { name: "Your message" })
+      .fill("show offers");
+    await page.getByRole("button", { name: "Send message" }).click();
+    await expect(page.getByRole("status").first()).not.toContainText(
+      "Thinking",
+    );
+    await expect(
+      page.getByRole("article", { name: "Discovery in this conversation" }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/cannot purchase it here/).first(),
+    ).toBeVisible();
+    await page
+      .getByRole("button", { name: "Back to my catalog", exact: true })
+      .click();
+    await expect(
+      page.getByRole("article", { name: "Discovery in this conversation" }),
+    ).toHaveCount(0);
+    expect(
+      await page.evaluate(() => sessionStorage.getItem("along.sessionId")),
+    ).toBe(sessionId);
+    await panel.bringToFront();
+    await panel.locator("#pause").click();
+    await demo.bringToFront();
+    await expect(demo.locator("[data-along-companion]")).toHaveCount(0, {
+      timeout: 15000,
+    });
+    await panel.bringToFront();
+    await panel.locator("#settings-toggle").click();
+    await panel.locator("#consent").uncheck();
+    await expect(panel.locator("#scan-state")).toContainText("Paused");
+    const state = await panel.evaluate(async () =>
+      (globalThis as any).chrome.runtime.sendMessage({ type: "ALONG_STATE" }),
+    );
+    expect(state.settings.enabledOrigins).toEqual([]);
+    expect(state.settings.visual).toBe(false);
+    await panel.locator("#disconnect").click();
+    await expect(
+      page.getByText("Your Chrome companion is connected"),
+    ).toHaveCount(0);
+    await page.bringToFront();
+    await page
+      .getByRole("button", { name: "Reconnect extension", exact: true })
+      .click();
+    await expect(
+      page.getByText("Your Chrome companion is connected"),
+    ).toBeVisible();
+    expect(
+      await page.evaluate(() => sessionStorage.getItem("along.sessionId")),
+    ).toBe(sessionId);
+  } finally {
+    await context.close();
+    if (
+      path.dirname(extension) !== path.resolve(tmpdir()) ||
+      !path.basename(extension).startsWith("along-e2e-")
+    )
+      throw new Error("Invalid temporary extension path");
+    await rm(extension, { recursive: true, force: true });
+  }
+});

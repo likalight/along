@@ -5,7 +5,10 @@ import {
   type PurchaseSummary,
   type SessionSnapshot,
   type SpeakableResult,
+  type DiscoveryReference,
+  type DiscoveryImportIdentity,
 } from "@coupang/contract";
+import type { DiscoveryImportResult } from "../discovery/reference.js";
 import {
   completeTotalMinor,
   EVIDENCE,
@@ -61,6 +64,11 @@ export class FixtureSessionStore {
   private summaries = new Map<string, PurchaseSummary>();
   private seenEventIds = new Set<string>();
   private receipts = new Map<string, { id: string; summaryId: string }>();
+
+  importDiscovery(_sessionId: string, _reference: DiscoveryReference, _identity: DiscoveryImportIdentity): DiscoveryImportResult {
+    throw new Error("Discovery handoff requires the authoritative session store.");
+  }
+  clearDiscovery(sessionId: string): SessionSnapshot | undefined { return this.get(sessionId); }
 
   create(opts?: {
     sessionId?: string;

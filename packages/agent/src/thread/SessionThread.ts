@@ -1,6 +1,7 @@
 import type { InputEvent, SessionSnapshot } from "@coupang/contract";
 
 export type ThreadEvent =
+  | { type: "discovery_reference"; data: { handoffId: string; turnId: string } }
   | { type: "user_input"; data: InputEvent }
   | { type: "assistant_transcript"; data: { turnId: string; text: string } }
   | { type: "delegation_started"; data: { turnId: string; delegationId: string } }
@@ -60,6 +61,8 @@ export class SessionThread {
       selectedOfferId: s.selectedOfferId,
       approvalStatus: s.approvalStatus,
       imageInferences: s.imageInferences,
+      // Imported labels and reasons are evidence only, never instructions.
+      untrustedDiscoveryReference: s.discoveryReference,
     };
 
     if (route === "evidence") {

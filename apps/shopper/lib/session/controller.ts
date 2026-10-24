@@ -31,6 +31,7 @@ export class SessionController {
   private pending: AbortController | null = null;
   private identity: Identity | null = null;
   private disposed = false;
+  private voiceActivated = false;
   private cancellation: Promise<unknown> = Promise.resolve();
   private mediaEvents: Promise<unknown> = Promise.resolve();
   private playback: Playback | null = null;
@@ -40,7 +41,10 @@ export class SessionController {
     private speech: SpeechAdapter,
   ) {}
   /** Swap speech implementation after mint (live vs labeled browser fallback). */
-  setSpeechAdapter(adapter: SpeechAdapter, kind: "live" | "browser" = "browser") {
+  setSpeechAdapter(
+    adapter: SpeechAdapter,
+    kind: "live" | "browser" = "browser",
+  ) {
     this.speech.dispose();
     this.speech = adapter;
     this.speechKind = kind;
@@ -70,12 +74,17 @@ export class SessionController {
     this.update({ snapshot });
     return true;
   }
-  async connect() {
+  async connect(sessionId?: string) {
     const generation = this.generation;
     try {
-      const snapshot = await this.transport.connect();
+      const snapshot = await this.transport.connect(sessionId);
       if (generation === this.generation && this.acceptSnapshot(snapshot))
-        this.update({ connected: true });
+        this.update({
+          connected: true,
+          ...(sessionId && snapshot.conversationMode
+            ? { mode: snapshot.conversationMode }
+            : {}),
+        });
     } catch (e) {
       if (generation === this.generation) this.fail(e);
     }
@@ -95,6 +104,51 @@ export class SessionController {
           turnId: crypto.randomUUID(),
           revision: s.revision,
         };
+  }
+  /** A user-selected extension reference joins this conversation, never as executable page text. */
+  async receiveDiscovery(handoffId: string): Promise<boolean> {
+    if (!this.state.snapshot || !this.transport.discovery) return false;
+    this.interrupt();
+    const generation = this.generation;
+    try {
+      await this.cancellation;
+      await this.mediaEvents;
+      const latest = await this.transport.connect(
+        this.state.snapshot.sessionId,
+      );
+      if (generation !== this.generation) return false;
+      if (!this.acceptSnapshot(latest))
+        throw new Error(
+          "The conversation changed. Reconnect and try the discovery again.",
+        );
+      this.update({ status: "thinking", error: null });
+      const result = await this.transport.discovery(
+        this.currentIdentity(),
+        handoffId,
+      );
+      if (generation !== this.generation) return false;
+      if (!this.acceptSnapshot(result.snapshot))
+        throw new Error(
+          "This discovery belongs to another conversation or has expired.",
+        );
+      this.identity = {
+        sessionId: result.snapshot.sessionId,
+        epoch: result.snapshot.epoch,
+        revision: result.snapshot.revision,
+        turnId: result.turnId,
+      };
+      this.update({ status: "ready", error: null });
+      if (this.state.mode === "voice" && this.voiceActivated)
+        this.narrate(result.snapshot);
+      return true;
+    } catch (error) {
+      if (generation === this.generation) {
+        if (error instanceof TransportError && error.snapshot)
+          this.acceptSnapshot(error.snapshot);
+        this.fail(error);
+      }
+      return false;
+    }
   }
   private matches(i: Playback) {
     const s = this.state.snapshot;
@@ -249,6 +303,7 @@ export class SessionController {
             this.update({ capturing: false, status: "paused" });
         },
       });
+      this.voiceActivated = true;
     } catch (e) {
       if (generation === this.generation) this.fail(e);
     }
@@ -350,7 +405,11 @@ export class SessionController {
             accepted.snapshot.revision < current.revision))
       )
         return;
-      this.update({ snapshot: accepted.snapshot, status: "ready", error: null });
+      this.update({
+        snapshot: accepted.snapshot,
+        status: "ready",
+        error: null,
+      });
       if (modality === "voice") this.narrate(accepted.snapshot);
       // Text turns that land on a summary must finish presentation ack before
       // the next confirm — otherwise interrupt→text→confirm races APPROVAL_NOT_READY.

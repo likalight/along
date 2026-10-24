@@ -1,4 +1,5 @@
 import type { InputEvent, SessionSnapshot } from "@coupang/contract";
+import { isDiscoveryFollowup } from "../discovery/reference.js";
 
 export type Route =
   | "strong_intent"
@@ -15,7 +16,9 @@ export type Route =
   | "approve_candidate"
   | "priority"
   | "solution_type"
-  | "compare";
+  | "compare"
+  | "discovery_followup"
+  | "discovery_return";
 
 const STOP = /\b(stop|never ?mind|not now|defer|cancel|quit)\b/i;
 const SAVE = /\b(save( this)?|pin this|bookmark)\b/i;
@@ -43,6 +46,8 @@ export function routeInput(
   }
 
   if (STOP.test(text)) return "stop_decline";
+  if (/^back to my catalog[.!]?$/i.test(text)) return "discovery_return";
+  if (snapshot.discoveryReference && isDiscoveryFollowup(text)) return "discovery_followup";
   if (SAVE.test(text)) return "save";
   if (APPROVE.test(text) && snapshot.summaryId) return "approve_candidate";
   if (input.modality === "text" && CORRECT.test(text) && snapshot.imageInferences.length) {

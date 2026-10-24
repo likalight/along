@@ -81,7 +81,13 @@ Try `looks good` before the final confirmation: it must not create a receipt. Th
 | A bag for work and gym | “I like this shape. I need room for work and gym clothes.” | Laptop fit, capacity, shoe storage, total price, and delivery. |
 | Bedsheets for a warm room | “Help me choose sheets for my bed.” | Actual mattress width, length and depth, composition, care, and included pieces. |
 
-Conversation routing is bounded and deterministic. Prepared illustrations and supported product links provide context; arbitrary website crawling and general image recognition are not implemented.
+Conversation routing is bounded and deterministic. Prepared illustrations and supported product links provide context. The optional Chrome companion adds bounded discovery from supported public pages; arbitrary website crawling is not implemented.
+
+### Discover while browsing
+
+The [Along Chrome companion](./docs/extension.md) can notice products on enabled Amazon, TikTok, Instagram and YouTube desktop pages, show a small nudge, and open similar candidates in a side panel. Choose **Discuss with Along** to continue your existing conversation; drafts, pauses and the purchase-approval boundary are preserved.
+
+Run `npm run build:extension`, then load `apps/extension/dist/along` through Chrome's **Load unpacked** control. Site access requires consent. **Demo mode is an explicit opt-in** with authored prices and Coupang search links. Live discovery stays unavailable until approved server-side Coupang Partners credentials are configured. Optional video-crop interpretation requires separate permission and a configured vision provider; it does not promise exact product identity. See the [setup, permissions and provider limitations](./docs/extension.md) before enabling it.
 
 ## What Along does
 
@@ -127,12 +133,14 @@ Defaults are sufficient for the text demo.
 
 | Variable | Used by | Purpose |
 | --- | --- | --- |
-| `OPENAI_API_KEY` | Next.js server / Compose | Optional: enables an attempt to mint an ephemeral Realtime client secret. It does not complete the provider audio transport. |
+| `OPENAI_API_KEY` | Next.js server / Compose | Optional: enables provider-secret minting and explicitly enabled discovery vision. It does not complete the provider audio transport. |
 | `ALONG_PORT` | Docker Compose | Published host port; defaults to `3000`. The container still listens on port 3000. |
-| `PLAYWRIGHT_PORT` | Browser tests | Isolated test-server port; defaults to `3000`. |
+| `PLAYWRIGHT_PORT` | Browser tests | Isolated test-server port; defaults to `3000` for session tests and `4324` for the extension. |
 | `CHROME_PATH` | Browser tests | Optional Chrome executable path instead of Playwright's installed Chromium. |
 
 For Compose, copy [`.env.example`](./.env.example) to `.env` to override defaults (`cp .env.example .env`, or `Copy-Item .env.example .env` in PowerShell). For native development, provide server variables through the process environment or `apps/shopper/.env.local`. Keep keys server-side and out of version control.
+
+Discovery is disabled by default. Its server flags, Coupang approval requirements and optional vision settings are documented in the [extension guide](./docs/extension.md#live-provider-configuration).
 
 ### Voice status
 
@@ -161,9 +169,11 @@ npm run typecheck
 npm test -w @concierge/backend
 npm test -w @coupang/agent
 npm test -w @along/shopper
+npm run test:extension
 npx playwright install chromium
 npm run test:e2e
 npm run test:canvas
+npm run test:extension:e2e
 ```
 
 Root `npm test` runs only agent tests. Let Playwright start its own server on a free port: its managed server clears `OPENAI_API_KEY` so speech mocks exercise the fallback, while a reused server can have different settings. On Linux CI, browser installation also uses `--with-deps`.
@@ -199,7 +209,7 @@ The full 50-record microphone research remains a separate archive. The active ca
 | Café/office fit scores | Authored hypotheses, separate from customer ratings and measured performance. |
 | Images and video | Illustrations are labelled proxy media; uncurated product videos remain missing. |
 
-All money is **USD in integer cents**. Reference item prices are separate from payable totals. Unknown laptop fit cannot satisfy a fit requirement, and unknown essential bedding details block checkout eligibility.
+Catalog money is **USD in integer cents**. Reference item prices are separate from payable totals. Unknown laptop fit cannot satisfy a fit requirement, and unknown essential bedding details block checkout eligibility. External live discovery prices, when configured, are KRW snapshots and are not complete catalog offers.
 
 The scenario clock is frozen at **24 October 2026, 10:00, Asia/Singapore**. Delivery dates are reproducible fixture inputs, not current shipping promises.
 
@@ -208,6 +218,7 @@ The scenario clock is frozen at **24 October 2026, 10:00, Asia/Singapore**. Deli
 | Path | Responsibility |
 | --- | --- |
 | [`apps/shopper/`](./apps/shopper/) | Shopper UI, session API, attachments and speech adapters. |
+| [`apps/extension/`](./apps/extension/) | Opt-in Chrome companion, automatic page observation and side panel. |
 | [`apps/web/`](./apps/web/) | Diagnostic harness for backend/agent integration. |
 | [`packages/agent/`](./packages/agent/) | Conversation routing, proposals, voice boundary and authoritative session adapter. |
 | [`packages/contract/`](./packages/contract/) | Shared schemas, types and generated catalog module. |
@@ -217,6 +228,7 @@ The scenario clock is frozen at **24 October 2026, 10:00, Asia/Singapore**. Deli
 | [`catalog/data/microphones-archive.json`](./catalog/data/microphones-archive.json) | Full archived microphone research. |
 | [`scripts/sync-catalog.mjs`](./scripts/sync-catalog.mjs) | Regenerates runtime adapters and copies illustration assets. |
 | [`docs/docker-demo.md`](./docs/docker-demo.md) | Container setup and device-access instructions. |
+| [`docs/extension.md`](./docs/extension.md) | Extension setup, permissions, provider gates and deployment boundaries. |
 
 ## Project status
 
@@ -228,10 +240,11 @@ Along is a hackathon prototype. This README describes the code on main; historic
 | Authoritative session backend | In-memory, session-scoped access with a two-hour TTL; restarting the process loses sessions. |
 | Catalog and provenance checks | Curated fixture data; no live retailer ingestion or inventory guarantees. |
 | Image and link references | Validated uploads, prepared illustrations and supported source URLs; no general vision or unrestricted fetching. |
+| Chrome discovery companion | Explicit fixture demo and gated provider adapters; heuristic desktop extraction, optional video crops, no verified live-provider rehearsal or exact identity guarantee. |
 | Browser speech and provider-secret minting | Browser-dependent speech; provider audio transport and trusted voice approval remain unfinished. |
 | Docker Compose demo | One application process; no database or shared multi-instance session storage. |
 
-Upcoming work includes the provider audio bridge and its live rehearsal, image understanding, durable sessions, and broader catalog ingestion. Real checkout, payment processing and mailbox integrations are outside this demo. Track work in [GitHub Issues](https://github.com/likalight/along/issues).
+Upcoming work includes the provider audio bridge and its live rehearsal, approved discovery-provider validation, durable sessions, and broader catalog ingestion. Real checkout, payment processing and mailbox integrations are outside this demo. Track work in [GitHub Issues](https://github.com/likalight/along/issues).
 
 ## Contributing
 

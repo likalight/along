@@ -20,9 +20,11 @@ jobs:
       - run: npm test --workspace @concierge/backend
       - run: npm test --workspace @coupang/agent
       - run: npm test --workspace @along/shopper
+      - run: npm run test:extension
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e -w @along/shopper
       - run: npm run test:canvas -w @along/shopper
+      - run: npm run test:extension:e2e
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

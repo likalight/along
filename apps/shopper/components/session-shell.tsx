@@ -30,6 +30,7 @@ import { createSpeechAdapter } from "@/lib/voice/create-speech-adapter";
 import { ProductCanvas } from "./canvas/ProductCanvas";
 import { VoiceOrb } from "./voice-orb";
 import { Attachments } from "./attachments";
+import { ExtensionCompanion, DiscoveryContext } from "./extension-companion";
 import type { Session, VoiceStatus } from "@/lib/session/contract";
 const statusLabels: Record<VoiceStatus, string> = {
   ready: "Ready when you are",
@@ -61,7 +62,13 @@ export function SessionShell() {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      await controller.connect();
+      const query = new URL(window.location.href).searchParams;
+      const resume =
+        query.get("discoverySession") ??
+        sessionStorage.getItem("along.sessionId");
+      await controller.connect(
+        resume && /^[A-Za-z0-9_-]{1,100}$/.test(resume) ? resume : undefined,
+      );
       const sessionId = controller.getSnapshot().snapshot?.sessionId;
       if (!sessionId || cancelled) return;
       const { adapter, kind, note } = await createSpeechAdapter(sessionId);
@@ -89,6 +96,9 @@ export function SessionShell() {
     };
   }, [controller]);
   useEffect(() => {
+    if (s?.sessionId) sessionStorage.setItem("along.sessionId", s.sessionId);
+  }, [s?.sessionId]);
+  useEffect(() => {
     // Announce new stages without pulling focus away from an in-progress message.
     if (s?.view && document.activeElement === document.body)
       stageRef.current?.focus({ preventScroll: true });
@@ -111,8 +121,20 @@ export function SessionShell() {
             <span /> A shopping conversation <i>·</i> Research catalog ·
             simulated offers
           </span>
-          <span className="private-note">Thoughtfully, together.</span>
+          <a
+            className="private-note"
+            href="/extension"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Chrome companion <ArrowUpRight size={12} />
+          </a>
         </header>
+        <ExtensionCompanion
+          controller={controller}
+          state={state}
+          hasDraft={Boolean(draft.trim())}
+        />
         <main className={opening ? "main opening" : "main active"}>
           <aside className="voice-anchor" aria-label="Voice session">
             <VoiceOrb
@@ -164,6 +186,7 @@ export function SessionShell() {
                         : `THE CONVERSATION / ${s?.view.replaceAll("_", " ")}`}
                 </p>
                 {(!s?.canvas ||
+                  s?.discoveryReference ||
                   ["opening", "summary", "receipt", "recovery"].includes(
                     s.view,
                   )) && (
@@ -173,6 +196,7 @@ export function SessionShell() {
                 )}
                 {s?.view !== "summary" &&
                   (!s?.canvas ||
+                    s?.discoveryReference ||
                     opening ||
                     s.view === "receipt" ||
                     s.view === "recovery") && (
@@ -380,6 +404,12 @@ function ContentStage({
   }, [s.view, s.summaryId, onSummaryDisplayed]);
   return (
     <>
+      {s.discoveryReference && !["summary", "receipt"].includes(s.view) && (
+        <DiscoveryContext
+          reference={s.discoveryReference}
+          onCommand={onCommand}
+        />
+      )}
       {s.needs.length > 0 && s.view !== "summary" && (
         <div className="preferences">
           <span>
@@ -396,6 +426,7 @@ function ContentStage({
       )}
       {s.canvas &&
         s.catalog &&
+        !s.discoveryReference &&
         !["opening", "summary", "receipt", "recovery"].includes(s.view) && (
           <ProductCanvas
             busy={busy}
@@ -526,8 +557,7 @@ function ContentStage({
             <p className="exact-summary-text">{s.summary.spokenText}</p>
           )}
           <p role="status">
-            {s.summary.status === "eligible" ||
-            s.approvalStatus === "eligible"
+            {s.summary.status === "eligible" || s.approvalStatus === "eligible"
               ? "Full summary displayed. Say or type “Confirm this simulated purchase” to approve this exact summary. There is no purchase button."
               : s.summary.status === "invalidated" ||
                   s.approvalStatus === "blocked" ||
@@ -558,7 +588,9 @@ function ContentStage({
               {s.receipt.acceptedOrder.productId} · USD{" "}
               {(s.receipt.acceptedOrder.totalMinor / 100).toFixed(2)}
             </p>
-            <small>Receipt {s.receipt.id} · duplicate confirms reuse this ID</small>
+            <small>
+              Receipt {s.receipt.id} · duplicate confirms reuse this ID
+            </small>
           </div>
         </div>
       )}

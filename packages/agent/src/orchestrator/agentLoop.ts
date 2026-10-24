@@ -33,6 +33,7 @@ import { type Route, resolveReference } from "../intent/router.js";
 import type { FixtureSessionStore } from "../session/FixtureSessionStore.js";
 import type { SessionThread } from "../thread/SessionThread.js";
 import { reduce } from "../thread/reduce.js";
+import { discoveryReply } from "../discovery/reference.js";
 
 export interface LoopResult {
   proposals: AgentProposal[];
@@ -103,6 +104,18 @@ export async function agentLoop(opts: {
   if (cancel.aborted) return { proposals, speakable, cancelled: true };
 
   switch (route) {
+    case "discovery_return": {
+      snapshot = store.clearDiscovery(input.sessionId) ?? snapshot;
+      speakable.push({ turnId: input.turnId, revision: snapshot.revision, channel: "commentary",
+        content: "Back to your catalog conversation. Your requirements, saved choices and comparison order are preserved." });
+      break;
+    }
+    case "discovery_followup": {
+      if (snapshot.discoveryReference)
+        speakable.push({ turnId: input.turnId, revision: snapshot.revision, channel: "commentary",
+          content: discoveryReply(snapshot.discoveryReference, snapshot, input.text ?? "") });
+      break;
+    }
     case "stop_decline": {
       push({
         ...baseProposal(input, "cancel"),
