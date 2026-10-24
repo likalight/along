@@ -1,4 +1,4 @@
-import { SessionStore } from "@concierge/backend/store";
+import { SessionStore, type InterpretedCheckoutApproval } from "@concierge/backend/store";
 import { alongProfile as agreedProfile } from "@concierge/backend/along-catalog";
 import { quoteOffer } from "@concierge/backend/quotes";
 import { acceptApproval, summaryView } from "@concierge/backend/integration";
@@ -634,7 +634,7 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
     this.core.lifecycle(id, raw);
     return this.get(id)!;
   }
-  confirmText(input: InputEvent) {
+  confirmText(input: InputEvent, interpretation?: InterpretedCheckoutApproval) {
     const s = this.core.get(input.sessionId);
     if (input.modality !== "text" || !s.summary)
       throw new Error("Current text summary required");
@@ -648,14 +648,14 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
       summaryRevision: s.summary.revision,
       modality: "text",
       explicitIntent: "confirm_simulated_purchase",
-    });
+    }, interpretation);
     return result;
   }
   /**
    * Voice purchase confirmation. Requires a prior ingestInput of the same voice turn
    * plus trusted final/non-echo shopper evidence. Model tools cannot call this.
    */
-  confirmVoice(input: InputEvent, evidence: VoiceConfirmEvidence) {
+  confirmVoice(input: InputEvent, evidence: VoiceConfirmEvidence, interpretation?: InterpretedCheckoutApproval) {
     const s = this.core.get(input.sessionId);
     if (input.modality !== "voice" || !s.summary)
       throw new Error("Current voice summary required");
@@ -680,7 +680,7 @@ export class AuthoritativeSessionStore extends FixtureSessionStore {
       modality: "voice",
       explicitIntent: "confirm_simulated_purchase",
       voiceEvidence: evidence,
-    });
+    }, interpretation);
   }
   override tryApprove(
     _input: Parameters<FixtureSessionStore["tryApprove"]>[0],

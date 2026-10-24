@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { SessionStore, isLiveDemoConfirmation, type LiveDemoCompletion } from "../src/store.ts";
+import { SessionStore, isLiveDemoConfirmation, type LiveDemoCompletion, type InterpretedCheckoutApproval } from "../src/store.ts";
 import { nonTechProfile } from "../src/catalog.ts";
 import { checkoutCopy } from "../src/checkout-copy.ts";
 
@@ -25,10 +25,81 @@ function review(displayed = true, classification: "proxy" | "real" = "proxy") {
   return { store, s, input };
 }
 const code = (value: string) => (error: unknown) => (error as {code?: string}).code === value;
+const interpretedApproval = (input: LiveDemoCompletion, requiresApprovalQuestion = false): InterpretedCheckoutApproval => ({
+  intent: "approve_order", transcript: input.transcript, summaryId: input.summaryId,
+  summaryRevision: input.summaryRevision, requiresApprovalQuestion,
+});
 const voiceInput = (store: SessionStore, s: ReturnType<SessionStore["get"]>, text: string) =>
   store.input(s.id, { sessionId: s.id, epoch: s.epoch, eventId: randomUUID(),
     turnId: randomUUID(), baseRevision: s.revision, modality: "voice", text,
     visibleRevision: s.revision, visibleProductIds: s.displayOrder });
+
+test("server-interpreted approval completes the reviewed order without rewriting shopper language", () => {
+  const { store, s, input: raw } = review();
+  const input = { ...raw, transcript: "I'm happy with those details; let's get this sent out to me." };
+  assert.throws(() => store.completeLiveDemo(s.id, input), code("AMBIGUOUS_APPROVAL"));
+  const interpretation = interpretedApproval(input);
+  const first = store.completeLiveDemo(s.id, input, interpretation);
+  assert.equal(first.session.stage, "receipt");
+  assert.equal(first.session.history.at(-1)?.text, input.transcript);
+  assert.deepEqual(first.receipt.quote, s.summary!.quote);
+  assert.equal(first.receipt.summaryId, s.summary!.id);
+  assert.equal(first.session.summary!.approvalNonce, null);
+  assert.equal(first.session.summary!.playback, "pending");
+  const again = store.completeLiveDemo(s.id, { ...input, expectedRevision: first.session.revision }, interpretation);
+  assert.equal(again.receipt.id, first.receipt.id);
+  assert.equal(again.session.revision, first.session.revision);
+  assert.throws(() => store.completeLiveDemo(s.id, input, { ...interpretation, requiresApprovalQuestion: true }), code("EVENT_CONFLICT"));
+});
+
+test("server interpretation is bound to the exact transcript and immutable review identity", () => {
+  for (const patch of [
+    { transcript: "A different shopper statement" }, { summaryId: "other-review" },
+    { summaryRevision: -1 }, { intent: "change_order" }, { requiresApprovalQuestion: "false" },
+  ]) {
+    const { store, s, input } = review();
+    assert.throws(() => store.completeLiveDemo(s.id, input,
+      { ...interpretedApproval(input), ...patch } as InterpretedCheckoutApproval));
+    assert.deepEqual(store.get(s.id), s);
+  }
+});
+
+test("contextual semantic assent still needs the current order approval question", () => {
+  const { store, s, input: raw } = review();
+  const input = { ...raw, transcript: "That's exactly what I had in mind." };
+  const interpretation = interpretedApproval(input, true);
+  assert.throws(() => store.completeLiveDemo(s.id, input, interpretation), code("AMBIGUOUS_APPROVAL"));
+  assert.throws(() => store.completeLiveDemo(s.id, { ...input, affirmationSummaryId: "old-review" }, interpretation), code("STALE_SUMMARY"));
+  assert.deepEqual(store.get(s.id), s);
+  const result = store.completeLiveDemo(s.id, { ...input, affirmationSummaryId: s.summary!.id }, interpretation);
+  assert.equal(result.receipt.summaryId, s.summary!.id);
+});
+
+test("raw JSON cannot smuggle server interpretation into Live completion", () => {
+  const { store, s, input } = review();
+  for (const extra of [
+    { interpretedApproval: interpretedApproval(input) }, { intent: "approve_order" },
+    { requiresApprovalQuestion: false }, { semanticApproval: true },
+  ]) {
+    const raw = JSON.parse(JSON.stringify({ ...input, ...extra }));
+    assert.throws(() => store.completeLiveDemo(s.id, raw), code("UNKNOWN_FIELD"));
+    assert.deepEqual(store.get(s.id), s);
+  }
+});
+
+test("semantic approval cannot bypass displayed review, current quote or proxy-offer guards", () => {
+  const undisplayed = review(false);
+  assert.throws(() => undisplayed.store.completeLiveDemo(undisplayed.s.id, undisplayed.input,
+    interpretedApproval(undisplayed.input)), code("STALE_SUMMARY"));
+  const real = review(true, "real");
+  assert.throws(() => real.store.completeLiveDemo(real.s.id, real.input,
+    interpretedApproval(real.input)), code("LIVE_DEMO_ONLY"));
+  const changed = review();
+  changed.store.profile.catalog.offers.find((offer) => offer.id === "commuter-tote-express")!.unitPrice += 100;
+  assert.throws(() => changed.store.completeLiveDemo(changed.s.id, changed.input,
+    interpretedApproval(changed.input)), code("STALE_QUOTE"));
+  for (const { store, s } of [undisplayed, real, changed]) assert.deepEqual(store.get(s.id), s);
+});
 
 test("Live rehearsal completes only a displayed proxy summary and returns one immutable receipt", () => {
   const { store, s, input } = review();

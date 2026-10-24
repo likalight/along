@@ -2,6 +2,7 @@ import { EventEmitter } from "node:events";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { AUDIO_SOLUTION_CHOICES } from "@/lib/canvas/solution-choices";
 import { ORDER_APPROVAL_QUESTION } from "@/lib/voice/live-approval-context";
+import type { CheckoutIntentDecision } from "@/lib/checkout/intent";
 const state = vi.hoisted(() => ({
   turn: "",
   revision: 0,
@@ -21,16 +22,23 @@ const state = vi.hoisted(() => ({
   complete: vi.fn(),
   post: vi.fn(),
   barge: vi.fn(),
+  intent: vi.fn(),
+}));
+vi.mock("@/lib/checkout/resolve-intent", () => ({
+  resolveCheckoutIntent: state.intent,
+  withCheckoutIntent: (request: Request) => request,
 }));
 vi.mock("@/lib/integration/runtime", () => ({
   getRuntime: () => ({
     store: {
       core: {
         get: () => ({
+          revision: state.revision,
           turn: { id: state.turn },
           summary: state.summary
             ? { ...state.summary, displayed: state.summaryDisplayed }
             : null,
+          receipt: state.receipt,
         }),
         completeLiveDemo: state.complete,
         enableLiveDemoCheckout: vi.fn(),
@@ -155,6 +163,16 @@ function reviewedOrder() {
     return { receipt: state.receipt };
   });
 }
+function nextIntent(
+  intent: CheckoutIntentDecision["intent"],
+  authorization: CheckoutIntentDecision["authorization"] = "explicit",
+) {
+  state.intent.mockImplementationOnce(async () => ({
+    intent,
+    authorization: intent === "approve_order" ? authorization : "none",
+    summaryId: intent === "approve_order" ? state.summary?.id : null,
+  }));
+}
 describe("GPT-Live task ownership", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -170,6 +188,11 @@ describe("GPT-Live task ownership", () => {
     state.complete.mockReset();
     state.post.mockReset();
     state.barge.mockReset();
+    state.intent.mockReset().mockResolvedValue({
+      intent: "continue_shopping",
+      authorization: "none",
+      summaryId: null,
+    });
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
@@ -404,6 +427,8 @@ describe("GPT-Live task ownership", () => {
   });
   it("clarifies an unbound assent once without a model turn or losing the displayed order", async () => {
     reviewedOrder();
+    nextIntent("clarify");
+    nextIntent("approve_order", "assent");
     const c = await connect("rejected-preflight");
     delegate(c.socket, "yes", "ambiguous-confirm", 100);
     await vi.advanceTimersByTimeAsync(50);
@@ -437,10 +462,15 @@ describe("GPT-Live task ownership", () => {
         transcript: "yes please",
         affirmationSummaryId: "summary-1",
       }),
+      expect.objectContaining({
+        intent: "approve_order",
+        requiresApprovalQuestion: true,
+      }),
     );
     expect(state.post).not.toHaveBeenCalled();
   });
   it("binds assent to the server's completed order-review invitation", async () => {
+    nextIntent("approve_order", "assent");
     state.post.mockImplementation(async (request: Request) => {
       state.turn = (await request.json()).input.turnId;
       state.view = "summary";
@@ -473,9 +503,14 @@ describe("GPT-Live task ownership", () => {
         summaryId: "new-summary",
         affirmationSummaryId: "new-summary",
       }),
+      expect.objectContaining({
+        intent: "approve_order",
+        requiresApprovalQuestion: true,
+      }),
     );
   });
   it("accepts an early approval without cancelling the displayed review's still-pending owner", async () => {
+    nextIntent("approve_order", "assent");
     let finish!: (response: Response) => void;
     state.post.mockImplementation(async (request: Request) => {
       state.turn = (await request.json()).input.turnId;
@@ -519,6 +554,10 @@ describe("GPT-Live task ownership", () => {
         affirmationSummaryId: "early-summary",
         transcript: "yes please",
       }),
+      expect.objectContaining({
+        intent: "approve_order",
+        requiresApprovalQuestion: true,
+      }),
     );
     finish(Response.json({ snapshot: { message: "OLD REVIEW RESPONSE" } }));
     await vi.advanceTimersByTimeAsync(1);
@@ -557,6 +596,7 @@ describe("GPT-Live task ownership", () => {
   });
   it("does not mistake yes to an unrelated assistant question for ordering", async () => {
     reviewedOrder();
+    nextIntent("clarify");
     const c = await connect("returns-question");
     transcript(c.socket, "output", ORDER_APPROVAL_QUESTION, 1, 20);
     transcript(
@@ -579,6 +619,7 @@ describe("GPT-Live task ownership", () => {
   });
   it("does not discard an intervening shopper question when a later yes is delegated", async () => {
     reviewedOrder();
+    nextIntent("question");
     state.post.mockResolvedValue(
       Response.json(
         { error: "Your order details are still here." },
@@ -603,6 +644,24 @@ describe("GPT-Live task ownership", () => {
       (await (state.post.mock.calls[0][0] as Request).clone().json()).input
         .text,
     ).toBe("Can you explain returns? yes please");
+    expect(state.intent).toHaveBeenCalledWith(
+      "intervening-shopper-question",
+      "Can you explain returns? yes please",
+      expect.objectContaining({
+        approvalPromptActive: false,
+        lastAssistantMessage:
+          "Would you like me to explain the return exclusions?",
+        recentTurns: [
+          { role: "assistant", text: ORDER_APPROVAL_QUESTION },
+          { role: "shopper", text: "Can you explain returns?" },
+          {
+            role: "assistant",
+            text: "Would you like me to explain the return exclusions?",
+          },
+          { role: "shopper", text: "yes please" },
+        ],
+      }),
+    );
   });
   it.each([
     ["It should arrive within four days.", 60],
@@ -611,6 +670,7 @@ describe("GPT-Live task ownership", () => {
     "orders after a delivery answer, including an interrupted answer: %s",
     async (answer, end) => {
       reviewedOrder();
+      nextIntent("approve_order");
       const c = await connect("delivery-then-order");
       transcript(c.socket, "input", "When will it arrive? ", 1, 20);
       transcript(c.socket, "output", answer, 30, end);
@@ -623,14 +683,33 @@ describe("GPT-Live task ownership", () => {
       await vi.advanceTimersByTimeAsync(50);
       expect(state.complete).toHaveBeenCalledWith(
         "delivery-then-order",
-        expect.objectContaining({ transcript: "I want to place the order" }),
+        expect.objectContaining({
+          transcript: "When will it arrive? I want to place the order",
+        }),
+        expect.objectContaining({
+          intent: "approve_order",
+          requiresApprovalQuestion: false,
+        }),
       );
       expect(state.post).not.toHaveBeenCalled();
       expect(state.view).toBe("receipt");
+      expect(state.intent).toHaveBeenCalledWith(
+        "delivery-then-order",
+        "When will it arrive? I want to place the order",
+        expect.objectContaining({
+          lastAssistantMessage: answer,
+          recentTurns: [
+            { role: "shopper", text: "When will it arrive?" },
+            { role: "assistant", text: answer },
+            { role: "shopper", text: "I want to place the order" },
+          ],
+        }),
+      );
     },
   );
   it("accepts explicit approval during the offer readout before the order question is spoken", async () => {
     reviewedOrder();
+    nextIntent("approve_order");
     const c = await connect("interrupt-offer");
     transcript(
       c.socket,
@@ -652,6 +731,7 @@ describe("GPT-Live task ownership", () => {
   });
   it("does not reuse approval context for a changed order summary", async () => {
     reviewedOrder();
+    nextIntent("clarify");
     const c = await connect("changed-summary");
     transcript(c.socket, "output", ORDER_APPROVAL_QUESTION, 1, 20);
     state.summary = { ...state.summary!, revision: 3 };
@@ -663,6 +743,7 @@ describe("GPT-Live task ownership", () => {
   });
   it("keeps approval bound to an unchanged displayed order across a conversational turn", async () => {
     reviewedOrder();
+    nextIntent("approve_order", "assent");
     const c = await connect("stale-review-turn");
     transcript(c.socket, "output", ORDER_APPROVAL_QUESTION, 1, 20);
     state.turn = "intervening-turn";
@@ -674,33 +755,41 @@ describe("GPT-Live task ownership", () => {
         summaryId: "summary-1",
         responseTurnId: "summary-turn",
       }),
+      expect.objectContaining({
+        intent: "approve_order",
+        requiresApprovalQuestion: true,
+      }),
     );
     expect(state.post).not.toHaveBeenCalled();
     expect(state.view).toBe("receipt");
   });
   it.each([
-    "Yes, but change it to two",
-    "No, don't buy it",
-    "Buy it if delivery is tomorrow",
-  ])("keeps a change or qualification out of checkout: %s", async (text) => {
-    reviewedOrder();
-    state.post.mockResolvedValue(
-      Response.json(
-        { error: "Please review the requested change." },
-        { status: 409 },
-      ),
-    );
-    const c = await connect(`qualified-${text}`);
-    transcript(c.socket, "output", ORDER_APPROVAL_QUESTION, 1, 20);
-    delegate(c.socket, text, "changed-request", 100);
-    await vi.advanceTimersByTimeAsync(50);
-    expect(state.complete).not.toHaveBeenCalled();
-    expect(state.post).toHaveBeenCalledTimes(1);
-    expect(
-      (await (state.post.mock.calls[0][0] as Request).clone().json()).input
-        .text,
-    ).toBe(text);
-  });
+    ["Yes, but change it to two", "change_order"],
+    ["No, don't buy it", "cancel_order"],
+    ["Buy it if delivery is tomorrow", "question"],
+  ] as const)(
+    "keeps a change or qualification out of checkout: %s",
+    async (text, intent) => {
+      reviewedOrder();
+      nextIntent(intent);
+      state.post.mockResolvedValue(
+        Response.json(
+          { error: "Please review the requested change." },
+          { status: 409 },
+        ),
+      );
+      const c = await connect(`qualified-${text}`);
+      transcript(c.socket, "output", ORDER_APPROVAL_QUESTION, 1, 20);
+      delegate(c.socket, text, "changed-request", 100);
+      await vi.advanceTimersByTimeAsync(50);
+      expect(state.complete).not.toHaveBeenCalled();
+      expect(state.post).toHaveBeenCalledTimes(1);
+      expect(
+        (await (state.post.mock.calls[0][0] as Request).clone().json()).input
+          .text,
+      ).toBe(text);
+    },
+  );
   it.each([
     ["y", "es please", "yes please", true],
     [
@@ -713,6 +802,7 @@ describe("GPT-Live task ownership", () => {
     "keeps fragmented approval intact: %s + %s",
     async (prefix, suffix, full, contextual) => {
       reviewedOrder();
+      nextIntent("approve_order", contextual ? "assent" : "explicit");
       const c = await connect(`fragmented-${prefix}`);
       transcript(c.socket, "output", ORDER_APPROVAL_QUESTION, 1, 20);
       transcript(c.socket, "input", prefix as string, 30, 50);
@@ -736,12 +826,18 @@ describe("GPT-Live task ownership", () => {
           transcript: full,
           ...(contextual ? { affirmationSummaryId: "summary-1" } : {}),
         }),
+        expect.objectContaining({
+          intent: "approve_order",
+          requiresApprovalQuestion: contextual,
+        }),
       );
       expect(state.post).not.toHaveBeenCalled();
     },
   );
   it("accepts an explicit natural purchase request without another approval question and never duplicates its order", async () => {
     reviewedOrder();
+    nextIntent("approve_order");
+    nextIntent("acknowledge_order");
     const c = await connect("natural-order");
     delegate(
       c.socket,
@@ -765,12 +861,13 @@ describe("GPT-Live task ownership", () => {
     );
     expect(state.post).not.toHaveBeenCalled();
     expect(state.view).toBe("receipt");
-    expect(c.socket.sent.join(" ")).toContain("already confirmed");
+    expect(c.socket.sent.join(" ")).toContain("all set");
   });
   it.each(["That's good", "yes", "thanks", "Thank you!"])(
     "keeps a post-purchase acknowledgment conversational: %s",
     async (text) => {
       reviewedOrder();
+      nextIntent("acknowledge_order");
       state.receipt = {
         id: "receipt-1",
         acceptedOrder: { deliveryWindow: "Within 2 days" },
@@ -785,10 +882,65 @@ describe("GPT-Live task ownership", () => {
         .map((raw) => JSON.parse(raw))
         .filter((event) => event.type === "session.commentary.append");
       expect(commentary).toHaveLength(1);
-      expect(commentary[0].content).toContain("Hope you enjoy it");
-      expect(commentary[0].content).not.toContain("confirmed");
+      expect(commentary[0].content).toMatch(/hope you enjoy it/i);
+      expect(commentary[0].content).not.toContain("Expected delivery");
     },
   );
+  it("holds an in-flight approval when a correction arrives before another delegation", async () => {
+    reviewedOrder();
+    let finish!: (decision: CheckoutIntentDecision) => void;
+    state.intent.mockImplementationOnce(
+      () =>
+        new Promise<CheckoutIntentDecision>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    nextIntent("cancel_order");
+    state.post.mockResolvedValue(
+      Response.json({ error: "Order held." }, { status: 409 }),
+    );
+    const c = await connect("correction-during-intent");
+    delegate(c.socket, "Please make the purchase. ", "original-approval", 100);
+    await vi.advanceTimersByTimeAsync(50);
+    expect(state.intent).toHaveBeenCalledTimes(1);
+    expect(gptLiveState("correction-during-intent", c.callId).pending).toBe(
+      true,
+    );
+    transcript(c.socket, "input", "Wait, don't buy it.", 110, 150);
+    finish({
+      intent: "approve_order",
+      authorization: "explicit",
+      summaryId: "summary-1",
+    });
+    await vi.advanceTimersByTimeAsync(1);
+    expect(state.complete).not.toHaveBeenCalled();
+    expect(state.post).not.toHaveBeenCalled();
+    expect(gptLiveState("correction-during-intent", c.callId).pending).toBe(
+      false,
+    );
+    c.socket.emit(
+      "message",
+      Buffer.from(
+        JSON.stringify({
+          type: "session.delegation.created",
+          offset_ms: 150,
+          delegation: { target: "client", id: "corrected-request" },
+        }),
+      ),
+    );
+    await vi.advanceTimersByTimeAsync(50);
+    expect(state.intent).toHaveBeenLastCalledWith(
+      "correction-during-intent",
+      "Please make the purchase. Wait, don't buy it.",
+      expect.any(Object),
+    );
+    expect(state.complete).not.toHaveBeenCalled();
+    expect(state.post).toHaveBeenCalledTimes(1);
+    expect(
+      (await (state.post.mock.calls[0][0] as Request).clone().json()).input
+        .text,
+    ).toBe("Please make the purchase. Wait, don't buy it.");
+  });
   it("does not speak an old failure after a newer typed turn takes ownership", async () => {
     let finish!: (response: Response) => void;
     state.post.mockImplementation(async (req: Request) => {
@@ -807,6 +959,7 @@ describe("GPT-Live task ownership", () => {
     expect(gptLiveState("stale-failure", c.callId).error).toBeUndefined();
   });
   it("routes spoken confirm to the displayed order and announces its receipt once", async () => {
+    nextIntent("approve_order");
     state.view = "summary";
     state.turn = "summary-turn";
     state.summary = {
@@ -838,6 +991,10 @@ describe("GPT-Live task ownership", () => {
         transcript: "Confirm.",
         delegationId: expect.stringContaining("checkout-one"),
       }),
+      expect.objectContaining({
+        intent: "approve_order",
+        transcript: "Confirm.",
+      }),
     );
     gptLiveState("voice-checkout", c.callId);
     gptLiveState("voice-checkout", c.callId);
@@ -854,6 +1011,7 @@ describe("GPT-Live task ownership", () => {
     expect(state.view).toBe("receipt");
   });
   it("keeps the order in view when live checkout is not ready", async () => {
+    nextIntent("approve_order");
     state.view = "summary";
     state.turn = "summary-turn";
     state.summary = {

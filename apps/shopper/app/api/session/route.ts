@@ -16,9 +16,10 @@ import { project, messages } from "@/lib/integration/projection";
 import type { Input } from "@/lib/session/contract";
 import { consumeVoiceEvidence } from "@/lib/voice/server";
 import {
-  classifyCheckoutReply,
-  isLiveDemoConfirmation,
-} from "@concierge/backend/store";
+  resolveCheckoutIntent,
+  takeCheckoutIntent,
+} from "@/lib/checkout/resolve-intent";
+import type { CheckoutIntentDecision } from "@/lib/checkout/intent";
 import { parsePreferences } from "@/lib/context/memory";
 export const runtime = "nodejs";
 const playbacks = new Map<
@@ -241,7 +242,6 @@ export async function POST(request: Request) {
       input.modality === "voice" && b.voiceEvidence
         ? await consumeVoiceEvidence(sessionId, b.voiceEvidence, text)
         : null;
-    const checkoutReply = classifyCheckoutReply(text);
     // A retained review is not the current referent after navigation. In
     // particular, "buy this" on another product must not approve the old order.
     const reviewInView = Boolean(c.summary && c.stage === "summary");
@@ -258,19 +258,58 @@ export async function POST(request: Request) {
       c.summary.responseTurnId === c.turn?.id &&
       input.modality === "text",
     );
+    const intentRevision = c.revision;
+    const directAction =
+      /^(?:(?:Focus|Save|Remove|Show offers for|Show reviews for|(?:Select|Choose) offer) [A-Z0-9-]+|Compare the first two|Back to shortlist|Restore shortlist|Show saved choices|Review summary|Prepare summary|Remove reference [A-Za-z0-9._:-]+)$/i.test(
+        text,
+      );
+    const checkoutIntent: CheckoutIntentDecision =
+      takeCheckoutIntent(request, sessionId, text) ??
+      (!directAction &&
+      text &&
+      ["text", "voice"].includes(input.modality) &&
+      (c.summary || c.selection || c.receipt)
+        ? await resolveCheckoutIntent(sessionId, text, {
+            approvalPromptActive: orderQuestionActive,
+          })
+        : {
+            intent: "continue_shopping",
+            authorization: "none",
+            summaryId: null,
+          });
+    if (store.core.get(sessionId).revision !== intentRevision)
+      throw new Error(
+        "The order changed while I was checking your request. The current details are still on screen.",
+      );
+    if (c.receipt && checkoutIntent.intent === "acknowledge_order") {
+      messages.set(
+        sessionId,
+        "You're all set. Your order is confirmed—hope you enjoy it!",
+      );
+      const snapshot = project(sessionId);
+      return NextResponse.json({
+        sessionId,
+        epoch: snapshot.epoch,
+        turnId: input.turnId,
+        eventId: input.eventId,
+        revision: snapshot.revision,
+        type: "session.updated",
+        snapshot,
+      });
+    }
     // A purchase request advances the current checkout stage. Before a review
     // exists it means "prepare this order", not an invalid approval attempt.
     const confirm =
-      reviewInView && isLiveDemoConfirmation(text, orderQuestionActive);
+      reviewInView &&
+      checkoutIntent.intent === "approve_order" &&
+      checkoutIntent.summaryId === c.summary?.id;
     const prepareCheckout =
-      checkoutReply === "approve" &&
+      checkoutIntent.intent === "prepare_order" &&
       !reviewInView &&
       Boolean(c.selection?.offerId) &&
       selectedProductId === focus;
     const confirmationAttempt =
-      confirm ||
-      (reviewInView &&
-        (checkoutReply === "assent" || /\bconfirm(?:ation)?\b/i.test(text)));
+      confirm || (reviewInView && checkoutIntent.intent === "clarify");
     if (confirmationAttempt) {
       // Validate before ingestInput: beginning an unready voice turn invalidates
       // its summary. A failed/ambiguous confirmation must keep the review visible.
@@ -394,7 +433,7 @@ export async function POST(request: Request) {
       // Confirmation is validated against stored shopper input, never model-produced text.
       store.ingestInput({
         ...input,
-        text: confirm ? "Confirm this simulated purchase" : text,
+        text,
       });
       beginActivity(sessionId, input.epoch, input.turnId);
       const apply = (action: any, payload: Record<string, unknown> = {}) => {
@@ -422,7 +461,14 @@ export async function POST(request: Request) {
       } else if (confirm) {
         const confirmInput = {
           ...input,
-          text: "Confirm this simulated purchase",
+          text,
+        };
+        const interpretation = {
+          intent: "approve_order" as const,
+          transcript: text,
+          summaryId: c.summary!.id,
+          summaryRevision: c.summary!.revision,
+          requiresApprovalQuestion: checkoutIntent.authorization === "assent",
         };
         if (input.modality === "voice") {
           const evidence = trustedVoice;
@@ -431,14 +477,9 @@ export async function POST(request: Request) {
               "That spoken approval could not be verified clearly enough. Please speak the confirmation again, or choose text mode and review the summary before confirming.",
             );
           }
-          store.confirmVoice(confirmInput, {
-            ...evidence,
-            // Canonical intent alias; finality and quality remain the actual
-            // server-observed provider evidence consumed against the raw text.
-            transcript: "Confirm this simulated purchase",
-          });
+          store.confirmVoice(confirmInput, evidence, interpretation);
         } else if (input.modality === "text") {
-          store.confirmText(confirmInput);
+          store.confirmText(confirmInput, interpretation);
         } else {
           throw new Error(
             "Only deliberate voice or text confirmation can approve a simulated purchase.",

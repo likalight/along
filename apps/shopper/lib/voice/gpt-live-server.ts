@@ -3,11 +3,12 @@ import { getRuntime } from "@/lib/integration/runtime";
 import { project } from "@/lib/integration/projection";
 import { readActivity } from "@/lib/integration/activity";
 import { AUDIO_SOLUTION_CHOICES } from "@/lib/canvas/solution-choices";
+import { completeLiveDemoCheckout } from "./live-demo-checkout";
 import {
-  classifyCheckoutReply,
-  completeLiveDemoCheckout,
-  isLiveDemoConfirmation,
-} from "./live-demo-checkout";
+  resolveCheckoutIntent,
+  withCheckoutIntent,
+} from "../checkout/resolve-intent";
+import type { CheckoutIntentDecision } from "../checkout/intent";
 import {
   asksForOrderApproval,
   LiveApprovalContext,
@@ -51,6 +52,7 @@ export class LiveTranscriptBuffer {
   private fragments: LiveFragment[] = [];
   private responses: LiveFragment[] = [];
   private consumed = -1;
+  version = 0;
   private seen = new Set<string>();
   add(event: Record<string, any>) {
     if (
@@ -63,6 +65,7 @@ export class LiveTranscriptBuffer {
     if (event.event_id) this.seen.add(event.event_id);
     if (this.seen.size > 2048)
       this.seen.delete(this.seen.values().next().value!);
+    this.version += 1;
     this.fragments.push({
       delta: event.delta,
       start_ms: event.start_ms,
@@ -78,8 +81,7 @@ export class LiveTranscriptBuffer {
       text: pieces
         .map((x) => x.delta)
         .join("")
-        .trim()
-        .slice(-4000),
+        .trim(),
       endMs: pieces.length ? Math.max(...pieces.map((x) => x.end_ms)) : -1,
     };
   }
@@ -102,58 +104,24 @@ export class LiveTranscriptBuffer {
     });
     this.responses = this.responses.slice(-512);
   }
-  /** Isolate a new request after a substantive assistant response. An answer
-   * to a question may itself be cut off mid-sentence. Keep the complete batch
-   * for shopping context; never use a pause or backchannel as a boundary. */
-  latestRequest(offset: number) {
-    const pieces = this.fragments
-      .filter((part) => part.end_ms > this.consumed && part.start_ms <= offset)
-      .sort((a, b) => a.start_ms - b.start_ms);
-    let start = 0;
-    for (let index = 1; index < pieces.length; index++) {
-      const previousEnd = Math.max(
-        ...pieces.slice(0, index).map((part) => part.end_ms),
-      );
-      const responseParts = this.responses
-        .filter(
-          (part) =>
-            part.start_ms >= previousEnd &&
-            part.start_ms < pieces[index].start_ms,
-        )
-        .sort((a, b) => a.start_ms - b.start_ms);
-      const response = responseParts
-        .map((part) => part.delta)
-        .join("")
-        .trim();
-      const previousText = pieces
-        .slice(start, index)
-        .map((part) => part.delta)
-        .join("")
-        .trim();
-      const answeredQuestion =
-        /^(?:when|what|how|where|why|can|could|would|will|is|are|does|do)\b/i.test(
-          previousText,
-        );
-      const completedResponse =
-        /[.!?]$/.test(response) &&
-        responseParts.every((part) => part.end_ms <= pieces[index].start_ms);
-      // A dangling condition must not disappear when the assistant talks over
-      // it. A new explicit command after a separately answered question can.
-      const openCondition =
-        /\b(?:if|unless|provided|as long as|only when)\b/i.test(previousText);
-      if (
-        !openCondition &&
-        (completedResponse || answeredQuestion) &&
-        response.split(/\s+/).length >= 4
-      )
-        start = index;
+  /** Preserve speaker order and whole clauses; meaning is resolved by the
+   * shared interpreter, never punctuation or a list of checkout phrases. */
+  dialogue(offset: number) {
+    const inputs = this.fragments.filter((part) => part.start_ms <= offset);
+    const lastInputStart = Math.max(...inputs.map((part) => part.start_ms));
+    const parts = [
+      ...inputs.map((part) => ({ ...part, role: "shopper" as const })),
+      ...this.responses
+        .filter((part) => part.start_ms < lastInputStart)
+        .map((part) => ({ ...part, role: "assistant" as const })),
+    ].sort((a, b) => a.start_ms - b.start_ms);
+    const turns: Array<{ role: "shopper" | "assistant"; text: string }> = [];
+    for (const part of parts) {
+      const previous = turns.at(-1);
+      if (previous?.role === part.role) previous.text += part.delta;
+      else turns.push({ role: part.role, text: part.delta });
     }
-    return pieces
-      .slice(start)
-      .map((part) => part.delta)
-      .join("")
-      .trim()
-      .slice(-4000);
+    return turns.map((turn) => ({ ...turn, text: turn.text.trim() }));
   }
 }
 
@@ -165,6 +133,7 @@ type Call = {
   cookie: string;
   transcripts: LiveTranscriptBuffer;
   approvalContext?: LiveApprovalContext;
+  lastSpokenReviewKey?: string;
   delegations: Set<string>;
   generation: number;
   delegationSequence: number;
@@ -211,7 +180,10 @@ function spokenUpdate(
     Number.isFinite(s.summary.totalMinor)
   ) {
     const reviewed = getRuntime().store.core.get(s.sessionId).summary;
-    if (reviewed?.id === s.summary.id && reviewed.revision === s.summary.revision)
+    if (
+      reviewed?.id === s.summary.id &&
+      reviewed.revision === s.summary.revision
+    )
       return compactLiveOrderReview(s.summary, reviewed.quote);
   }
   return s.message;
@@ -261,6 +233,17 @@ function approvalContext(call: Call) {
   // Calls can survive a development reload that adds this bookkeeping.
   return (call.approvalContext ??= new LiveApprovalContext());
 }
+function reviewKey(
+  summary: {
+    id: string;
+    revision: number;
+    responseTurnId?: string | null;
+  } | null,
+) {
+  return summary
+    ? JSON.stringify([summary.id, summary.revision, summary.responseTurnId])
+    : undefined;
+}
 function approvalSummary(call: Call, snapshot = project(call.sessionId)) {
   const summary = snapshot.summary;
   const stored = getRuntime().store.core.get(call.sessionId).summary;
@@ -294,19 +277,21 @@ async function dispatch(
   call: Call,
   action: string,
   input: Record<string, unknown>,
+  intent?: CheckoutIntentDecision,
 ) {
   const { POST } = await import("@/app/api/session/route");
-  const response = await POST(
-    new Request(`${call.origin}/api/session`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        cookie: call.cookie,
-        origin: call.origin,
-      },
-      body: JSON.stringify({ action, input }),
-    }),
-  );
+  const request = new Request(`${call.origin}/api/session`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      cookie: call.cookie,
+      origin: call.origin,
+    },
+    body: JSON.stringify({ action, input }),
+  });
+  if (intent && typeof input.text === "string")
+    withCheckoutIntent(request, call.sessionId, input.text, intent);
+  const response = await POST(request);
   const result = await response.json();
   if (!response.ok)
     throw new Error(
@@ -355,15 +340,15 @@ async function delegate(call: Call, id: string, offset: number) {
       unchangedSince = Date.now();
     preview = next;
   }
-  const latestRequest = call.transcripts.latestRequest(offset);
-  const text = call.transcripts.take(offset);
-  // Only an explicit, complete purchase request can stand on its own after
-  // a separately answered question. A bare assent retains its full context.
-  const checkoutText =
-    classifyCheckoutReply(latestRequest) === "approve" ? latestRequest : text;
+  const recentTurns = call.transcripts.dialogue(offset);
+  const lastAssistantMessage = recentTurns.findLast(
+    (turn) => turn.role === "assistant",
+  )?.text;
+  const text = call.transcripts.peek(offset).text;
+  const checkoutText = text;
+  const transcriptVersion = call.transcripts.version;
   const generation = ++call.generation;
   const { store, orch } = getRuntime();
-  const checkoutReply = classifyCheckoutReply(checkoutText);
   const before = project(call.sessionId);
   const review = approvalSummary(call, before);
   const currentSession = store.core.get(call.sessionId);
@@ -388,25 +373,78 @@ async function delegate(call: Call, id: string, offset: number) {
   const summaryInView = ["summary", "recovery"].includes(s.view) && s.summary;
   const currentSummary = approvalSummary(call, s);
   const approvalPromptActive = approvalContext(call).consume(currentSummary);
-  if (
-    s.receipt &&
-    (checkoutReply === "assent" ||
-      /^(?:thanks|thank you(?: very much)?|great(?:,? thanks)?|perfect(?:,? thanks)?)[.!]?$/i.test(
-        text.trim(),
-      ))
-  ) {
+  let intent: CheckoutIntentDecision;
+  try {
+    call.pending = true;
+    intent =
+      currentSession.summary ||
+      currentSession.selection ||
+      currentSession.receipt
+        ? await resolveCheckoutIntent(s.sessionId, checkoutText, {
+            approvalPromptActive,
+            assentContextCurrent:
+              approvalPromptActive ||
+              Boolean(
+                currentSummary &&
+                call.lastSpokenReviewKey === reviewKey(currentSummary),
+              ),
+            ...(lastAssistantMessage ? { lastAssistantMessage } : {}),
+            recentTurns,
+          })
+        : {
+            intent: "continue_shopping",
+            authorization: "none",
+            summaryId: null,
+          };
+  } catch (error) {
+    if (generation !== call.generation || call.closed) return;
     call.pending = false;
-    call.error = undefined;
+    call.error =
+      error instanceof Error
+        ? error.message
+        : "I couldn't check that request. Your order details are still here.";
+    append(call, "commentary", call.error, id);
+    appendContext(call, id);
+    return;
+  }
+  if (generation !== call.generation || call.closed) return;
+  if (call.transcripts.version !== transcriptVersion) {
+    // A newer correction owns the decision, even before the provider delegates
+    // it. Keep this input buffered with the correction for the next delegation.
+    call.pending = false;
     append(
       call,
       "commentary",
-      "Hope you enjoy it! I'm here if you need anything else.",
+      "I heard an update. I'll hold the order while we settle that.",
+      id,
+    );
+    return;
+  }
+  call.transcripts.take(offset);
+  if (store.core.get(s.sessionId).revision !== s.revision) {
+    call.pending = false;
+    append(
+      call,
+      "commentary",
+      "The order changed while I was checking. The current details are on screen.",
       id,
     );
     appendContext(call, id);
     return;
   }
-  if (checkoutReply === "assent" && summaryInView && !approvalPromptActive) {
+  if (s.receipt && intent.intent === "acknowledge_order") {
+    call.pending = false;
+    call.error = undefined;
+    append(
+      call,
+      "commentary",
+      "You're all set. Your order is confirmed—hope you enjoy it!",
+      id,
+    );
+    appendContext(call, id);
+    return;
+  }
+  if (intent.intent === "clarify" && summaryInView) {
     // Clarify the referent of a short reply without starting a new agent turn,
     // which would discard the order the shopper is already reviewing.
     call.pending = false;
@@ -423,9 +461,9 @@ async function delegate(call: Call, id: string, offset: number) {
   // This separate server-only path is limited to the displayed demo order and
   // can issue only its synthetic receipt, never a payment or merchant order.
   if (
-    (isLiveDemoConfirmation(checkoutText, approvalPromptActive) &&
-      summaryInView) ||
-    (s.receipt && checkoutReply === "approve")
+    intent.intent === "approve_order" &&
+    intent.summaryId === s.summary?.id &&
+    summaryInView
   ) {
     call.pending = false;
     try {
@@ -442,19 +480,28 @@ async function delegate(call: Call, id: string, offset: number) {
           throw new Error(
             "Please review the current order details before confirming.",
           );
-        const result = completeLiveDemoCheckout({
-          sessionId: s.sessionId,
-          epoch: s.epoch,
-          expectedRevision: s.revision,
-          summaryId: summary.id,
-          summaryRevision: summary.revision,
-          responseTurnId: summary.responseTurnId,
-          delegationId: `${call.callId}_${id}`,
-          transcript: checkoutText,
-          ...(checkoutReply === "assent"
-            ? { affirmationSummaryId: summary.id }
-            : {}),
-        });
+        const result = completeLiveDemoCheckout(
+          {
+            sessionId: s.sessionId,
+            epoch: s.epoch,
+            expectedRevision: s.revision,
+            summaryId: summary.id,
+            summaryRevision: summary.revision,
+            responseTurnId: summary.responseTurnId,
+            delegationId: `${call.callId}_${id}`,
+            transcript: checkoutText,
+            ...(intent.authorization === "assent"
+              ? { affirmationSummaryId: summary.id }
+              : {}),
+          },
+          {
+            intent: "approve_order",
+            transcript: checkoutText,
+            summaryId: summary.id,
+            summaryRevision: summary.revision,
+            requiresApprovalQuestion: intent.authorization === "assent",
+          },
+        );
         call.announcedReceiptId = result.receipt.id;
         append(call, "commentary", result.snapshot.message, id);
       }
@@ -480,17 +527,22 @@ async function delegate(call: Call, id: string, offset: number) {
     id,
   );
   try {
-    const result = await dispatch(call, "input", {
-      sessionId: s.sessionId,
-      epoch: s.epoch,
-      turnId,
-      eventId: crypto.randomUUID(),
-      baseRevision: s.revision,
-      modality: "voice",
-      text: checkoutReply === "approve" ? checkoutText : text,
-      visibleRevision: s.revision,
-      visibleProductIds: s.displayOrder,
-    });
+    const result = await dispatch(
+      call,
+      "input",
+      {
+        sessionId: s.sessionId,
+        epoch: s.epoch,
+        turnId,
+        eventId: crypto.randomUUID(),
+        baseRevision: s.revision,
+        modality: "voice",
+        text: checkoutText,
+        visibleRevision: s.revision,
+        visibleProductIds: s.displayOrder,
+      },
+      intent,
+    );
     // A correction, typed turn, or reconnect can supersede this result.
     if (
       generation !== call.generation ||
@@ -651,6 +703,7 @@ export async function connectGptLive(
       approvalContext(call).observeInput(event);
     }
     if (event.type === "session.output_transcript.delta") {
+      call.lastSpokenReviewKey = reviewKey(approvalSummary(call));
       call.transcripts.observeOutput(event);
       approvalContext(call).observeOutput(event, approvalSummary(call));
     }

@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "@/app/api/session/route";
 import { getRuntime } from "@/lib/integration/runtime";
+import type {
+  CheckoutIntentContext,
+  CheckoutIntentDecision,
+} from "@/lib/checkout/intent";
 
 function resetRuntime() {
   const runtime = globalThis as unknown as Record<string, unknown>;
@@ -74,6 +78,59 @@ const answer = (text: string) =>
     { status: 200 },
   );
 
+const continueShopping: CheckoutIntentDecision = {
+  intent: "continue_shopping",
+  authorization: "none",
+  summaryId: null,
+};
+const prepareOrder: CheckoutIntentDecision = {
+  intent: "prepare_order",
+  authorization: "none",
+  summaryId: null,
+};
+const approveReview = (
+  context: CheckoutIntentContext,
+): CheckoutIntentDecision => ({
+  intent: "approve_order",
+  authorization: "explicit",
+  summaryId: context.review?.id ?? null,
+});
+
+/** Keep intent interpretation separate from the shopping model's scripted turns. */
+function stubProviders(
+  shopping: (...args: any[]) => unknown,
+  interpret: (context: CheckoutIntentContext) => CheckoutIntentDecision = () =>
+    continueShopping,
+) {
+  const intentRequests: CheckoutIntentContext[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: unknown, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body));
+      if (body.text?.format?.name !== "checkout_intent")
+        return shopping(url, init);
+      expect(String(url)).toBe("https://api.openai.com/v1/responses");
+      const context: CheckoutIntentContext = JSON.parse(body.input[0].content);
+      intentRequests.push(context);
+      return Response.json({
+        status: "completed",
+        output: [
+          {
+            type: "message",
+            content: [
+              {
+                type: "output_text",
+                text: JSON.stringify(interpret(context)),
+              },
+            ],
+          },
+        ],
+      });
+    }),
+  );
+  return { intentRequests };
+}
+
 describe("open-ended agent HTTP integration", () => {
   beforeEach(() => {
     resetRuntime();
@@ -113,7 +170,7 @@ describe("open-ended agent HTTP integration", () => {
         environment === "production" ? "fixture" : "",
       );
       const provider = vi.fn(async () => answer("The live model answered."));
-      vi.stubGlobal("fetch", provider);
+      stubProviders(provider);
       const client = await session();
       const result = await client.send("a work and gym bag");
       expect(result.status).toBe(200);
@@ -171,7 +228,7 @@ describe("open-ended agent HTTP integration", () => {
         "Here is a clip-on microphone. Check that the receiver works with your device.",
       );
     });
-    vi.stubGlobal("fetch", provider);
+    stubProviders(provider);
     const client = await session();
     clipId = getRuntime()
       .store.listProducts("audio")
@@ -194,11 +251,15 @@ describe("open-ended agent HTTP integration", () => {
     expect(providerRequests).toBe(6);
   });
 
-  it("routes routine conversation to Luna low while exact purchase confirmation bypasses the model", async () => {
+  it("routes routine conversation to Luna low and maps checkout intent without another shopping turn", async () => {
     const provider = vi
       .fn()
       .mockImplementation(async () => answer("Let's find a useful bag."));
-    vi.stubGlobal("fetch", provider);
+    const { intentRequests } = stubProviders(provider, (context) =>
+      context.text === "Confirm this simulated purchase"
+        ? approveReview(context)
+        : continueShopping,
+    );
     const client = await session();
     const conversation = await client.send(
       "Help me choose something for university",
@@ -235,6 +296,11 @@ describe("open-ended agent HTTP integration", () => {
     expect(refreshed.status, refreshed.data.error).toBe(200);
     expect(refreshed.data.snapshot.view).toBe("receipt");
     expect(provider).toHaveBeenCalledTimes(1);
+    expect(intentRequests.at(-1)).toMatchObject({
+      text: "Confirm this simulated purchase",
+      stage: "review",
+      review: { id: m.id, displayed: true },
+    });
   });
 
   it("answers a follow-up about a selected offer without replacing it with the old purchase summary", async () => {
@@ -243,7 +309,7 @@ describe("open-ended agent HTTP integration", () => {
       .mockImplementation(async () =>
         answer("The larger bag gives you more space for gym clothes."),
       );
-    vi.stubGlobal("fetch", provider);
+    stubProviders(provider);
     const client = await session();
     const selected = await client.send("Select offer BAG-001-B");
     expect(selected.status).toBe(200);
@@ -269,7 +335,9 @@ describe("open-ended agent HTTP integration", () => {
 
   it("prepares a selected offer on a purchase request, then completes only after its review is shown", async () => {
     const provider = vi.fn();
-    vi.stubGlobal("fetch", provider);
+    const { intentRequests } = stubProviders(provider, (context) =>
+      context.stage === "review" ? approveReview(context) : prepareOrder,
+    );
     const client = await session();
     const { store } = getRuntime();
     const { revision: _revision, ...input } = client.input("I like this bag");
@@ -302,13 +370,18 @@ describe("open-ended agent HTTP integration", () => {
     expect(completed.status, completed.data.error).toBe(200);
     expect(completed.data.snapshot.view).toBe("receipt");
     expect(provider).not.toHaveBeenCalled();
+    expect(intentRequests.map((request) => request.review?.displayed)).toEqual([
+      undefined,
+      false,
+      true,
+    ]);
   });
 
   it("resolves the product or offer when a purchase request has no selection yet", async () => {
     const provider = vi.fn(async () =>
       answer("Which bag would you like to order?"),
     );
-    vi.stubGlobal("fetch", provider);
+    stubProviders(provider, () => prepareOrder);
     const client = await session();
     const result = await client.send("I want to place the order");
     expect(result.status).toBe(200);
@@ -325,7 +398,9 @@ describe("open-ended agent HTTP integration", () => {
       const provider = vi.fn(async () =>
         answer("Let's check the offer for this bag."),
       );
-      vi.stubGlobal("fetch", provider);
+      const { intentRequests } = stubProviders(provider, (context) =>
+        context.text === "Please buy this" ? prepareOrder : continueShopping,
+      );
       const client = await session();
       const send = (text: string) =>
         client.request({
@@ -364,12 +439,20 @@ describe("open-ended agent HTTP integration", () => {
         "Let's check the offer for this bag.",
       );
       expect(provider).toHaveBeenCalledOnce();
+      const purchase = intentRequests.find(
+        (request) => request.text === "Please buy this",
+      );
+      expect(purchase?.stage).toBe("selected");
+      expect(purchase?.review).toBeUndefined();
+      expect(store.core.get(current.id).receipt).toBeNull();
     },
   );
 
   it("prepares a fresh review when returning to the same selected product", async () => {
     const provider = vi.fn();
-    vi.stubGlobal("fetch", provider);
+    stubProviders(provider, (context) =>
+      context.text === "Please buy this" ? prepareOrder : continueShopping,
+    );
     const client = await session();
     await client.send("Select offer BAG-001-B");
     const { store } = getRuntime();
@@ -408,7 +491,7 @@ describe("open-ended agent HTTP integration", () => {
           release = resolve;
         }),
     );
-    vi.stubGlobal("fetch", provider);
+    stubProviders(provider);
     const client = await session();
     const input = client.input("Find me a cheaper bag");
     const pending = client.request({ action: "input", input });
@@ -466,7 +549,7 @@ describe("open-ended agent HTTP integration", () => {
           );
         }),
     );
-    vi.stubGlobal("fetch", provider);
+    stubProviders(provider);
     const client = await session();
     const input = client.input("Help me plan what to buy for university");
     const pending = client.request({ action: "input", input });
@@ -486,7 +569,7 @@ describe("open-ended agent HTTP integration", () => {
       .mockResolvedValue(
         new Response("private provider account diagnostic", { status: 503 }),
       );
-    vi.stubGlobal("fetch", provider);
+    stubProviders(provider);
     const client = await session();
     const result = await client.send("I need help choosing a bag");
     expect(result.status).toBe(409);

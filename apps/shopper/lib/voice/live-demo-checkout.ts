@@ -1,6 +1,7 @@
 import {
   classifyCheckoutReply,
   isLiveDemoConfirmation,
+  type InterpretedCheckoutApproval,
 } from "@concierge/backend/store";
 import { getRuntime } from "@/lib/integration/runtime";
 import { project } from "@/lib/integration/projection";
@@ -10,21 +11,24 @@ export { classifyCheckoutReply, isLiveDemoConfirmation };
 /** Only the authenticated server Live sideband calls this; it is not an HTTP
  * action or a model tool. Transcript fragments are never marked final/confident.
  * The backend independently limits completion to a displayed proxy-offer summary. */
-export function completeLiveDemoCheckout(input: {
-  sessionId: string;
-  epoch: number;
-  expectedRevision: number;
-  summaryId: string;
-  summaryRevision: number;
-  responseTurnId: string;
-  delegationId: string;
-  transcript: string;
-  affirmationSummaryId?: string;
-}) {
+export function completeLiveDemoCheckout(
+  input: {
+    sessionId: string;
+    epoch: number;
+    expectedRevision: number;
+    summaryId: string;
+    summaryRevision: number;
+    responseTurnId: string;
+    delegationId: string;
+    transcript: string;
+    affirmationSummaryId?: string;
+  },
+  interpretation?: InterpretedCheckoutApproval,
+) {
   const { sessionId, ...completion } = input;
   const { core } = getRuntime().store;
   try {
-    const result = core.completeLiveDemo(sessionId, completion);
+    const result = core.completeLiveDemo(sessionId, completion, interpretation);
     return { snapshot: project(sessionId), receipt: result.receipt };
   } catch (error) {
     // An acknowledgement can fail after the order was accepted. Inspect the

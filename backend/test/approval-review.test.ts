@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { SessionStore } from "../src/store.ts";
+import { SessionStore, type InterpretedCheckoutApproval } from "../src/store.ts";
+import { acceptApproval } from "../src/integration.ts";
 import { nonTechProfile } from "../src/catalog.ts";
 import { getCatalog } from "../../catalog/src/index.ts";
 import type { Session, InputEnvelope } from "../src/contracts.ts";
@@ -128,6 +129,74 @@ test("review: voice evidence cannot replace a different transcript or typed shop
   s = input(store, s, "Confirm this simulated purchase", "text");
   assert.equal(s.summary, null);
   assert.equal(s.turn!.approvalWindow, null);
+});
+
+test("review: semantic completion remains unavailable through raw typed approval fields", () => {
+  const store = fixture();
+  let s = ready(store, "text");
+  const transcript = "I'm happy with those details; let's get this sent out to me.";
+  s = input(store, s, transcript);
+  const raw = observation(s);
+  assert.throws(() => store.approve(s.id, raw, true), errorCode("AMBIGUOUS_APPROVAL"));
+  assert.throws(() => store.approve(s.id, { ...raw, interpretedApproval: {
+    intent: "approve_order", transcript, summaryId: s.summary!.id,
+    summaryRevision: s.summary!.revision, requiresApprovalQuestion: false,
+  } }, true), errorCode("UNKNOWN_FIELD"));
+  assert.deepEqual(store.get(s.id), s);
+});
+
+test("review: server interpretation maps typed and verified voice intent while retaining every authorization guard", () => {
+  for (const modality of ["text", "voice"] as const) {
+    const store = fixture();
+    let s = ready(store, modality);
+    const transcript = "I'm happy with those details; let's get this sent out to me.";
+    s = input(store, s, transcript, modality);
+    const raw = observation(s);
+    const interpretation: InterpretedCheckoutApproval = {
+      intent: "approve_order", transcript, summaryId: s.summary!.id,
+      summaryRevision: s.summary!.revision, requiresApprovalQuestion: true,
+    };
+    assert.throws(() => store.approve(s.id, raw, modality === "text"), errorCode("AMBIGUOUS_APPROVAL"));
+    for (const patch of [{ transcript: "different input" }, { summaryId: "different review" }, { summaryRevision: -1 }]) {
+      assert.throws(() => store.approve(s.id, raw, modality === "text", { ...interpretation, ...patch }));
+      assert.deepEqual(store.get(s.id), s);
+    }
+    assert.throws(() => store.approve(s.id, { ...raw, approvalNonce: "forged" }, modality === "text", interpretation), errorCode("APPROVAL_NOT_READY"));
+    if (modality === "voice") {
+      for (const patch of [{ final: false }, { confidence: .8 }, { source: "assistant" }, { echoDetected: true }]) {
+        assert.throws(() => store.approve(s.id, { ...raw, ...patch }, false, interpretation), errorCode("UNTRUSTED_APPROVAL"));
+        assert.deepEqual(store.get(s.id), s);
+      }
+    }
+    const result = store.approve(s.id, raw, modality === "text", interpretation);
+    assert.equal(result.session.stage, "receipt");
+    assert.equal(result.session.history.at(-1)?.text, transcript);
+    assert.deepEqual(result.receipt!.quote, s.summary!.quote);
+    assert.equal(store.approve(s.id, raw, modality === "text", interpretation).receipt!.id, result.receipt!.id);
+  }
+});
+
+test("review: integration approval binds server interpretation into its replay identity", () => {
+  for (const modality of ["text", "voice"] as const) {
+    const store = fixture();
+    let s = ready(store, modality);
+    const transcript = "Please handle the purchase for me.";
+    s = input(store, s, transcript, modality);
+    const interpretation: InterpretedCheckoutApproval = {
+      intent: "approve_order", transcript, summaryId: s.summary!.id,
+      summaryRevision: s.summary!.revision, requiresApprovalQuestion: false,
+    };
+    const raw = {
+      sessionId: s.id, epoch: s.epoch, eventId: randomUUID(), turnId: s.turn!.id,
+      baseRevision: s.revision, summaryId: s.summary!.id, summaryRevision: s.summary!.revision,
+      modality, explicitIntent: "confirm_simulated_purchase",
+      ...(modality === "voice" ? { voiceEvidence: { transcript, final: true, confidence: .99, source: "shopper", echoDetected: false } } : {}),
+    };
+    const result = acceptApproval(store, s.id, raw, interpretation);
+    assert.equal(result.session.history.at(-1)?.text, transcript);
+    assert.equal(acceptApproval(store, s.id, raw, interpretation).receipt!.id, result.receipt!.id);
+    assert.throws(() => acceptApproval(store, s.id, raw, { ...interpretation, requiresApprovalQuestion: true }), errorCode("EVENT_CONFLICT"));
+  }
 });
 
 test("review: canonical voice approval cannot use the legacy turn-without-input bypass", () => {
