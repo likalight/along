@@ -70,7 +70,9 @@ Errors after an accepted input may return the latest snapshot alongside the erro
 
 ## Verified versus pending
 
-Verified: optimized Next 16 builds for both apps; 50 backend acceptance checks and all three HTTP purchase rehearsals; 29 frontend checks; 16 agent-harness checks; combined HTTP rehearsal (`scripts/rehearse-integration.mjs`); actual built-in browser bag journey including changed constraints and receipt. The CLI backend demo emulates audio callbacks and explicitly labels that limitation.
+Verified: optimized Next 16 builds for both apps; 50 backend acceptance checks and all three HTTP purchase rehearsals; 36 frontend checks; 16 agent-harness checks; combined HTTP rehearsal (`scripts/rehearse-integration.mjs`); actual built-in browser bag journey including changed constraints and receipt. The CLI backend demo emulates audio callbacks and explicitly labels that limitation.
+
+Frontend handoff `e7abdbb`: ported session/controller stale-event guards, playback identity and start/completion checks, focus and capture-status corrections, WebGL fallback, and mobile sizing into `apps/shopper`. Preserved this integration's exact backend summary acknowledgement and cancellation-only-while-in-flight rule. The new controller passes its upstream regression cases and the production UI still reaches one USD 119 simulated receipt. Upstream attachment deletion/accepted-reference UX is not yet ported: its fixture store semantics differ from the authoritative backend's uploaded assets and need a separate mapping.
 
 Pending integration: actual live model/voice transport, audible summary completion and interruption callbacks, trusted final shopper speech events, uploaded-image vision processing, deployed persistence and multi-instance session routing. Current storage is in-process and expires after two hours; restarting loses sessions. Deterministic parsing is bounded rehearsal logic, not a general-purpose AI. Prepared images are labelled illustrations, never claimed as model recognition. No playable catalog video is available.
 

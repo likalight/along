@@ -33,6 +33,7 @@ export class SessionController {
   private disposed = false;
   private cancellation: Promise<unknown> = Promise.resolve();
   private mediaEvents: Promise<unknown> = Promise.resolve();
+  private playback: Playback | null = null;
   constructor(
     private transport: SessionTransport,
     private speech: SpeechAdapter,
@@ -49,37 +50,61 @@ export class SessionController {
     this.state = { ...this.state, ...patch };
     this.listeners.forEach((l) => l());
   }
+  private acceptSnapshot(snapshot: Session) {
+    const current = this.state.snapshot;
+    if (
+      current &&
+      (snapshot.sessionId !== current.sessionId ||
+        snapshot.epoch < current.epoch ||
+        (snapshot.epoch === current.epoch &&
+          snapshot.revision < current.revision))
+    )
+      return false;
+    this.update({ snapshot });
+    return true;
+  }
   async connect() {
     const generation = this.generation;
     try {
       const snapshot = await this.transport.connect();
-      if (generation === this.generation)
-        this.update({ snapshot, connected: true });
+      if (generation === this.generation && this.acceptSnapshot(snapshot))
+        this.update({ connected: true });
     } catch (e) {
-      this.fail(e);
+      if (generation === this.generation) this.fail(e);
     }
   }
   private currentIdentity(): Identity {
     const s = this.state.snapshot!;
-    return (
-      this.identity ?? {
-        sessionId: s.sessionId,
-        epoch: s.epoch,
-        turnId: crypto.randomUUID(),
-        revision: s.revision,
-      }
-    );
+    return this.identity
+      ? {
+          ...this.identity,
+          sessionId: s.sessionId,
+          epoch: s.epoch,
+          revision: s.revision,
+        }
+      : {
+          sessionId: s.sessionId,
+          epoch: s.epoch,
+          turnId: crypto.randomUUID(),
+          revision: s.revision,
+        };
   }
-  private matches(i: Identity) {
+  private matches(i: Playback) {
     const s = this.state.snapshot;
     return (
       !!s &&
       i.sessionId === s.sessionId &&
       i.epoch === s.epoch &&
-      i.turnId === this.identity?.turnId
+      i.turnId === this.identity?.turnId &&
+      i.playbackId === this.playback?.playbackId
     );
   }
   private fail(e: unknown) {
+    this.generation++;
+    this.pending?.abort();
+    this.pending = null;
+    this.playback = null;
+    this.speech.cancel();
     this.speech.stop();
     this.update({
       status: "error",
@@ -94,18 +119,37 @@ export class SessionController {
     const wasInFlight =
       this.state.status === "thinking" || this.state.status === "speaking";
     this.generation++;
+    const generation = this.generation;
     this.pending?.abort();
     this.pending = null;
     const identity = this.state.snapshot ? this.currentIdentity() : null;
     this.identity = null;
+    this.playback = null;
     this.speech.cancel();
     this.speech.stop();
     if (identity && wasInFlight)
       this.cancellation = this.cancellation
         .catch(() => {})
-        .then(() => this.transport.cancel(identity));
+        .then(async () => {
+          const interruptedMedia = this.mediaEvents;
+          await interruptedMedia.catch(() => {});
+          if (this.mediaEvents === interruptedMedia)
+            this.mediaEvents = Promise.resolve();
+          const current = this.state.snapshot;
+          const snapshot = await this.transport.cancel({
+            ...identity,
+            revision:
+              current?.sessionId === identity.sessionId &&
+              current.epoch === identity.epoch
+                ? current.revision
+                : identity.revision,
+          });
+          this.acceptSnapshot(snapshot);
+        });
     // Observe failures immediately, while preserving rejection for the next operation.
-    void this.cancellation.catch((e) => this.fail(e));
+    void this.cancellation.catch((e) => {
+      if (generation === this.generation) this.fail(e);
+    });
     this.update({ capturing: false, status: "paused", partial: "" });
   };
   draftChanged = () => {
@@ -121,14 +165,16 @@ export class SessionController {
       const latest = await this.transport.connect(
         this.state.snapshot!.sessionId,
       );
-      this.update({ snapshot: latest });
+      if (generation !== this.generation || !this.acceptSnapshot(latest))
+        return;
       const snapshot = await this.transport.mode(
         { ...this.currentIdentity(), revision: latest.revision },
         mode,
       );
       if (generation !== this.generation) return;
       this.identity = null;
-      this.update({ snapshot, mode, error: null, status: "ready" });
+      if (!this.acceptSnapshot(snapshot)) return;
+      this.update({ mode, error: null, status: "ready" });
       if (mode === "voice") await this.listen();
     } catch (e) {
       if (generation === this.generation) this.fail(e);
@@ -139,6 +185,21 @@ export class SessionController {
     if (this.state.mode !== "voice") {
       await this.chooseMode("voice");
       return;
+    }
+    if (
+      this.state.status === "speaking" ||
+      this.state.status === "thinking" ||
+      this.state.capturing
+    ) {
+      this.interrupt();
+      const interrupted = this.generation;
+      try {
+        await this.cancellation;
+      } catch (error) {
+        if (interrupted === this.generation) this.fail(error);
+        return;
+      }
+      if (interrupted !== this.generation) return;
     }
     this.speech.cancel();
     this.update({ error: null, capturing: false, status: "ready" });
@@ -154,8 +215,9 @@ export class SessionController {
         },
         bargeIn: () => {
           if (
-            this.state.status === "speaking" ||
-            this.state.status === "thinking"
+            generation === this.generation &&
+            (this.state.status === "speaking" ||
+              this.state.status === "thinking")
           )
             this.interrupt();
         },
@@ -186,18 +248,21 @@ export class SessionController {
     try {
       await this.cancellation;
       await this.mediaEvents;
+      if (generation !== this.generation) return;
       // Cancellation may race an already committed turn. Fetch current state; never replay it.
       const latest = await this.transport.connect(
         this.state.snapshot.sessionId,
       );
       if (generation !== this.generation) return;
+      if (!this.acceptSnapshot(latest)) return;
       if (this.state.mode !== modality) {
         const snapshot = await this.transport.mode(
           { ...this.currentIdentity(), revision: latest.revision },
           modality,
         );
         if (generation !== this.generation) return;
-        this.update({ snapshot, mode: modality });
+        if (!this.acceptSnapshot(snapshot)) return;
+        this.update({ mode: modality });
         if (snapshot.summary) {
           this.update({
             status: "ready",
@@ -206,7 +271,7 @@ export class SessionController {
           });
           return;
         }
-      } else this.update({ snapshot: latest });
+      }
       const s = this.state.snapshot!;
       this.identity = {
         sessionId: s.sessionId,
@@ -216,59 +281,86 @@ export class SessionController {
       };
       const abort = new AbortController();
       this.pending = abort;
-      const accepted = await this.transport.send(
-        {
-          ...this.identity,
-          eventId: crypto.randomUUID(),
-          baseRevision: s.revision,
-          modality: attachment?.kind ?? modality,
-          text,
-          attachmentId: attachment?.id,
-          visibleRevision: s.revision,
-          visibleProductIds: s.displayOrder,
-        },
-        abort.signal,
-      );
+      const input = {
+        ...this.identity,
+        eventId: crypto.randomUUID(),
+        baseRevision: s.revision,
+        modality: attachment?.kind ?? modality,
+        text,
+        attachmentId: attachment?.id,
+        visibleRevision: s.revision,
+        visibleProductIds: s.displayOrder,
+      };
+      const accepted = await this.transport.send(input, abort.signal);
+      if (generation !== this.generation) return;
       if (
-        generation !== this.generation ||
-        accepted.turnId !== this.identity.turnId ||
+        accepted.turnId !== this.identity?.turnId ||
+        accepted.eventId !== input.eventId ||
         accepted.sessionId !== s.sessionId ||
         accepted.epoch !== s.epoch ||
-        accepted.revision <= s.revision
+        accepted.revision <= s.revision ||
+        accepted.snapshot.sessionId !== accepted.sessionId ||
+        accepted.snapshot.epoch !== accepted.epoch ||
+        accepted.snapshot.revision !== accepted.revision
       )
-        return;
-      this.identity = { ...this.identity, revision: accepted.revision };
-      this.update({ snapshot: accepted.snapshot, status: "ready" });
+        throw new Error(
+          "The response did not match the current accepted turn. Reconnect to refresh the session.",
+        );
+      this.pending = null;
+      this.identity = { ...this.identity!, revision: accepted.revision };
+      if (!this.acceptSnapshot(accepted.snapshot)) return;
+      this.update({ status: "ready" });
       if (modality === "voice") this.narrate(accepted.snapshot);
     } catch (e) {
       if (generation !== this.generation) return;
       if (e instanceof TransportError && e.snapshot)
-        this.update({ snapshot: e.snapshot });
+        this.acceptSnapshot(e.snapshot);
       this.fail(e);
     }
   }
   private narrate(s: Session) {
+    const generation = this.generation;
     const identity: Playback = {
       ...this.currentIdentity(),
       playbackId: crypto.randomUUID(),
       summaryId: s.summaryId ?? undefined,
+      summaryRevision: s.summary?.revision,
     };
+    this.playback = identity;
     try {
       this.speech.speak(s.message, identity, (type, i) => {
-        if (!this.matches(i)) return;
+        if (generation !== this.generation || !this.matches(i)) return;
+        if (type === "input.barge_in") {
+          this.interrupt();
+          return;
+        }
         if (type === "audio.started")
           this.update({ status: "speaking", capturing: false });
         this.mediaEvents = this.mediaEvents
           .catch(() => {})
-          .then(() => this.transport.lifecycle({ ...i, type }))
+          .then(() => {
+            if (generation !== this.generation || !this.matches(i)) return null;
+            return this.transport.lifecycle({
+              ...i,
+              revision: this.state.snapshot!.revision,
+              type,
+            });
+          })
           .then((snapshot) => {
-            if (this.matches(i)) this.update({ snapshot });
+            if (snapshot && generation === this.generation && this.matches(i))
+              this.acceptSnapshot(snapshot);
           });
-        void this.mediaEvents.catch((e) => this.fail(e));
+        void this.mediaEvents.catch((e) => {
+          if (generation === this.generation) this.fail(e);
+        });
         if (type === "audio.completed") {
           void this.mediaEvents
             .then(() => {
-              if (this.matches(i)) void this.listen();
+              if (generation === this.generation && this.matches(i)) {
+                this.playback = null;
+                this.update({ status: "ready" });
+                void this.listen();
+              }
             })
             .catch(() => {});
         }
@@ -306,9 +398,11 @@ export class SessionController {
           generation === this.generation &&
           this.state.snapshot?.summaryId === s.summaryId
         )
-          this.update({ snapshot });
+          this.acceptSnapshot(snapshot);
       });
-    void this.mediaEvents.catch((e) => this.fail(e));
+    void this.mediaEvents.catch((e) => {
+      if (generation === this.generation) this.fail(e);
+    });
     await this.mediaEvents;
   }
   async reconnect() {
@@ -322,9 +416,11 @@ export class SessionController {
       );
       if (generation !== this.generation) return;
       this.cancellation = Promise.resolve();
-      this.update({ snapshot, status: "paused", connected: true });
+      this.mediaEvents = Promise.resolve();
+      if (this.acceptSnapshot(snapshot))
+        this.update({ status: "paused", connected: true });
     } catch (e) {
-      this.fail(e);
+      if (generation === this.generation) this.fail(e);
     }
   }
   dispose() {

@@ -115,16 +115,20 @@ export class BrowserSpeechAdapter implements SpeechAdapter {
       );
     }
     const playback = { identity, emit };
+    let started = false;
     this.playback = playback;
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = 1;
     utterance.onstart = () => {
-      if (this.playback === playback) emit("audio.started", identity);
+      if (this.playback === playback && !started) {
+        started = true;
+        emit("audio.started", identity);
+      }
     };
     utterance.onend = () => {
       if (this.playback === playback) {
         this.playback = null;
-        emit("audio.completed", identity);
+        emit(started ? "audio.completed" : "audio.interrupted", identity);
       }
     };
     utterance.onerror = () => {

@@ -1,5 +1,11 @@
 "use client";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import {
   AnimatePresence,
   MotionConfig,
@@ -45,6 +51,9 @@ export function SessionShell() {
   const [draft, setDraft] = useState("");
   const reduced = useReducedMotion();
   const stageRef = useRef<HTMLElement>(null);
+  const acknowledgeSummary = useCallback(() => {
+    void controller.presentSummary();
+  }, [controller]);
   const s = state.snapshot,
     opening = !s || s.view === "opening";
   useEffect(() => {
@@ -65,8 +74,10 @@ export function SessionShell() {
     };
   }, [controller]);
   useEffect(() => {
-    if (s?.revision) stageRef.current?.focus({ preventScroll: true });
-  }, [s?.revision]);
+    // Announce new stages without pulling focus away from an in-progress message.
+    if (s?.view && document.activeElement === document.body)
+      stageRef.current?.focus({ preventScroll: true });
+  }, [s?.view]);
   async function submit() {
     if (!draft.trim()) return;
     const text = draft;
@@ -96,7 +107,11 @@ export function SessionShell() {
             />
             <div className="voice-status" role="status" aria-live="polite">
               <span className={state.capturing ? "live-dot" : "status-dot"} />
-              {statusLabels[state.status]}
+              {state.capturing
+                ? statusLabels.listening
+                : state.status === "listening"
+                  ? "Ready · microphone off"
+                  : statusLabels[state.status]}
             </div>
             {!opening && (
               <p className="anchor-note">
@@ -133,7 +148,7 @@ export function SessionShell() {
                 </p>
                 {(!s?.canvas ||
                   ["opening", "summary", "receipt"].includes(s.view)) && (
-                  <h1>
+                  <h1 aria-live="polite" aria-atomic="true">
                     {s?.heading ?? "A little conversation.\nA better choice."}
                   </h1>
                 )}
@@ -154,12 +169,9 @@ export function SessionShell() {
                   <ContentStage
                     session={s}
                     busy={state.status === "thinking"}
-                    onSummaryDisplayed={() => void controller.presentSummary()}
+                    onSummaryDisplayed={acknowledgeSummary}
                     onCommand={(command) =>
-                      void controller.send(
-                        command,
-                        state.mode === "voice" ? "voice" : "text",
-                      )
+                      void controller.send(command, "text")
                     }
                   />
                 )}
@@ -203,6 +215,7 @@ export function SessionShell() {
               )}
               <button
                 className="text-button"
+                disabled={!s || state.status === "reconnecting"}
                 onClick={() => void controller.chooseMode("text")}
               >
                 <Keyboard size={17} />
@@ -253,14 +266,12 @@ export function SessionShell() {
             </p>
             {s && (
               <Attachments
+                key={`${s.sessionId}:${s.epoch}`}
                 sessionId={s.sessionId}
                 onInterrupt={controller.interrupt}
                 onRemove={(a) => {
                   if (s.attachmentIds.includes(a.id))
-                    void controller.send(
-                      `Remove reference ${a.id}`,
-                      state.mode === "voice" ? "voice" : "text",
-                    );
+                    void controller.send(`Remove reference ${a.id}`, "text");
                 }}
                 onUse={(a) =>
                   void controller.send(
