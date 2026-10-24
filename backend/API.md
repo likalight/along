@@ -92,3 +92,18 @@ Use actual final recognition confidence; if the provider doesn't supply a calibr
 ## Integration status
 
 These are implemented contracts, but team stack/voice-provider agreement is pending. The backend does not claim that speech confidence, echo detection, physical playback or frontend rendering can be verified solely from HTTP. The live integration must wire those signals faithfully and rehearse barge-in and network recovery before the demo.
+
+## Provider-neutral AI tool adapter
+
+The voice/AI server may import `createShoppingTools` from `src/agent-tools.ts`. Pass a server-configured `ConciergeClient` and the accepted snapshot returned by `/turns`. Register `tools.definitions` in your provider's tool format and route calls to `tools.execute(name, parsedArguments)`. The adapter supplies the server-issued turn ID and revision, respects cancellation/reset, and excludes approval nonces from model-visible state.
+
+```ts
+const client = new ConciergeClient(backendUrl, {
+  sessionId, accessToken, agentToken: process.env.AGENT_API_TOKEN,
+});
+const currentTurn = await client.snapshot(); // must already be the new active shopper turn
+const tools = createShoppingTools(client, currentTurn);
+const result = await tools.execute(toolCall.name, parsedArguments);
+```
+
+Available tools: `get_shopping_state`, `search_current_offers`, `propose_shopping_state`, `prepare_purchase_summary`. Schemas are ordinary provider-neutral JSON Schema; adapt to your SDK's schema subset. Do not blindly retry stale mutation tools; read current state and reconsider the shopper's request. Create a fresh adapter for every new shopper turn. Do not register `client.approve` as a tool. The trusted voice ingestion path alone receives the approval capability after display/playback completion.

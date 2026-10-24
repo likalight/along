@@ -114,8 +114,16 @@ export class ConciergeClient {
   async approve(observation: VoiceObservation) {
     return this.request(this.path("approval"), observation, true);
   }
-  async search(constraints: Constraints, quantity = 1) {
-    return this.request("/v1/catalog/search", { constraints, quantity });
+  async search(
+    constraints: Constraints,
+    quantity = 1,
+    excludedProductIds: string[] = [],
+  ) {
+    return this.request("/v1/catalog/search", {
+      constraints,
+      quantity,
+      excludedProductIds,
+    });
   }
   async catalog() {
     return this.request("/v1/catalog");

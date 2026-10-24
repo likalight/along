@@ -300,7 +300,11 @@ export class SessionStore {
     const accepted = this.commit(s);
     return {
       session: accepted,
-      offers: eligibleOffers(s.constraints, 1, s.excludedProductIds),
+      offers: eligibleOffers(
+        s.constraints,
+        s.selection?.quantity ?? 1,
+        s.excludedProductIds,
+      ),
     };
   }
   summarize(id: string, expected: number, turnId: string) {

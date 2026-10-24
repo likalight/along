@@ -253,3 +253,35 @@ test("expired sessions release data and cannot be resurrected", async () => {
   const { session } = store.create();
   assert.throws(() => store.get(session.id), /expired/i);
 });
+
+test("AI adapter uses accepted constraints and cannot expose approval capabilities or continue cancelled work", async (t) => {
+  const { createShoppingTools, modelSessionView } = await import(
+    "../src/agent-tools.ts"
+  );
+  const { client: c } = await harness(t);
+  let s = await c.create("urgent-bag");
+  s = await c.turn(s.revision);
+  const tools = createShoppingTools(c, s);
+  const result: any = await tools.execute("search_current_offers", {});
+  assert(
+    !result.eligible.some((q: any) => q.offer.id === "commuter-tote-value"),
+  );
+  await tools.execute("propose_shopping_state", {
+    selection: { offerId: "commuter-tote-express", quantity: 1 },
+  });
+  const prepared: any = await tools.execute("prepare_purchase_summary", {});
+  assert(!("approvalNonce" in prepared.session.summary));
+  assert(!("approvalWindow" in prepared.session.turn));
+  await assert.rejects(
+    tools.execute("approve_purchase", {}),
+    (e: any) => e.code === "UNKNOWN_TOOL",
+  );
+  await c.cancel(s.turn!.id);
+  await assert.rejects(
+    tools.execute("search_current_offers", {}),
+    (e: any) => e.code === "STALE_TURN",
+  );
+  const readyState = await ready(c);
+  const view = modelSessionView(readyState);
+  assert(!JSON.stringify(view).includes(readyState.summary!.approvalNonce!));
+});
