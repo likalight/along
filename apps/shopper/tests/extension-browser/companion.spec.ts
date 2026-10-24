@@ -86,7 +86,8 @@ test("Mac preferences and the installed Chrome extension share one shopping jour
     await page
       .getByRole("link", { name: "Start shopping with these preferences" })
       .click();
-    await page.locator("summary").filter({ hasText: "Your context" }).click();
+    await page.locator("summary").filter({ hasText: "Settings" }).click();
+    await page.getByRole("button", { name: "Show context & connections" }).click();
     await expect(
       page.getByRole("heading", { name: "Learning paused" }),
     ).toBeVisible();
@@ -342,7 +343,8 @@ test("Mac preferences and the installed Chrome extension share one shopping jour
     await expect(
       page.getByText("Your Chrome companion is connected"),
     ).toHaveCount(0);
-    await page.locator("summary").filter({ hasText: "Your context" }).click();
+    await page.locator("summary").filter({ hasText: "Settings" }).click();
+    await page.getByRole("button", { name: "Show context & connections" }).click();
     await expect(
       page.getByText("Priority: lightweight", { exact: true }),
     ).toHaveCount(2);

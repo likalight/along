@@ -327,6 +327,11 @@ export class SessionController {
     this.speech.stop();
     this.update({ capturing: false, status: "paused" });
   };
+  /** External video never shares audio capture or narration with the shopper. */
+  pauseForExternalVideo = () => {
+    this.speech.cancel();
+    this.pauseListening();
+  };
   /** Release microphone and provider resources when the mounted UI goes away. */
   closeVoice = () => {
     this.voicePauseGeneration++;

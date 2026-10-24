@@ -86,6 +86,7 @@ export type Summary = {
 };
 export type NarrationSegment = { text: string; productId: string | null };
 export type Session = {
+  productVideoRequest?: import("@coupang/contract").ProductVideoRequest;
   discoveryReference?: DiscoveryReference;
   discoveryAssessment?: DiscoveryAssessment;
   conversationMode?: "text" | "voice";

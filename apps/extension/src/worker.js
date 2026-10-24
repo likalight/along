@@ -73,6 +73,7 @@ async function syncScriptsNow() {
   const config = await settings();
   const desired = [];
   if (await chrome.permissions.contains({ origins: [hostPattern(config.backendOrigin)] })) desired.push({ id: 'along-pair-bridge', matches: [hostPattern(config.backendOrigin)], js: ['src/bridge.js'], runAt: 'document_idle', persistAcrossSessions: true });
+  if (await chrome.permissions.contains({ origins: ['https://www.youtube.com/*'] })) desired.push({ id: 'along-video-return', matches: ['https://www.youtube.com/*'], js: ['src/video-return.js'], runAt: 'document_idle', persistAcrossSessions: true });
   const matches = [];
   for (const origin of config.enabledOrigins) {
     if (await chrome.permissions.contains({ origins: [hostPattern(origin)] })) matches.push(origin === config.backendOrigin ? `${hostPattern(origin).slice(0, -1)}extension-demo*` : hostPattern(origin));
@@ -196,7 +197,8 @@ async function screenshot(sender, observation, mediaReference, config, connectio
 async function discover(message, sender) {
   const sourceUrl = pageSource(sender);
   const config = await settings();
-  if (!sourceUrl || discoveryBusy) return { skipped: true };
+  const { videoVisit } = await chrome.storage.session.get('videoVisit');
+  if (!sourceUrl || discoveryBusy || videoVisit?.videoTabId === sender.tab.id) return { skipped: true };
   const observation = normalizeObservation(message.observation, sourceUrl);
   if (!observation) return { skipped: true };
   const media = mediaReference(message.media);
@@ -260,6 +262,44 @@ async function handoff(message) {
   if (url.origin !== config.backendOrigin || url.pathname !== '/' || result.sessionId !== connection.sessionId) throw new Error('Along returned an unexpected conversation destination.');
   return openAlong({ discoverySession: result.sessionId });
 }
+// Only the curated demo review can be opened. The page never supplies arbitrary URLs.
+const VIDEO_URL = 'https://www.youtube.com/shorts/WCsWHqMdPJI';
+const VIDEO_ID = 'rode-wireless-pro-review';
+async function videoVisit(message, sender) {
+  const config = await settings(), connection = await auth(), source = pageSource(sender);
+  if (message.type === 'ALONG_VIDEO_OPEN') {
+    if (!source || new URL(source).origin !== config.backendOrigin || new URL(source).pathname !== '/' ||
+        !connection || connection.appTabId !== sender.tab.id || connection.sessionId !== message.sessionId ||
+        connection.epoch !== message.epoch || message.videoId !== VIDEO_ID) throw new Error('Connect this Along conversation before opening its video.');
+    if (!(await chrome.permissions.contains({ origins: ['https://www.youtube.com/*'] })))
+      throw new Error('Open Along extension settings and enable the YouTube video return button.');
+    const { videoVisit: old } = await chrome.storage.session.get('videoVisit');
+    if (old) {
+      try { await chrome.tabs.remove(old.videoTabId); } catch { /* Already closed. */ }
+    }
+    // Create inactive first so the return-script handshake cannot race its visit record.
+    const tab = await chrome.tabs.create({ url: 'about:blank', active: false });
+    await chrome.storage.session.set({ videoVisit: { videoTabId: tab.id, appTabId: sender.tab.id,
+      sessionId: connection.sessionId, epoch: connection.epoch, url: VIDEO_URL } });
+    await chrome.tabs.update(tab.id, { url: VIDEO_URL, active: true });
+    return { ok: true };
+  }
+  const { videoVisit: visit } = await chrome.storage.session.get('videoVisit');
+  if (!visit || visit.videoTabId !== sender.tab?.id || source !== VIDEO_URL ||
+      !connection || connection.sessionId !== visit.sessionId || connection.epoch !== visit.epoch)
+    return { ok: false };
+  if (message.type === 'ALONG_VIDEO_CHECK') return { ok: true };
+  const app = await chrome.tabs.get(visit.appTabId);
+  if (new URL(app.url).origin !== config.backendOrigin) throw new Error('Your Along tab has moved. Return to it manually.');
+  const check = await chrome.tabs.sendMessage(visit.appTabId, { type: 'ALONG_SESSION_CHECK', sessionId: visit.sessionId }, { frameId: 0 });
+  if (!check?.same) throw new Error('Your Along conversation changed. Return to it manually.');
+  await chrome.tabs.update(visit.appTabId, { active: true });
+  await chrome.windows.update(app.windowId, { focused: true });
+  await chrome.tabs.sendMessage(visit.appTabId, { type: 'ALONG_VIDEO_RETURNED', sessionId: visit.sessionId }, { frameId: 0 });
+  await chrome.storage.session.remove('videoVisit');
+  await chrome.tabs.remove(visit.videoTabId);
+  return { ok: true };
+}
 chrome.runtime.onMessage.addListener((message, sender, reply) => {
   if (!message || typeof message.type !== 'string' || message.type === 'ALONG_UPDATED') return false;
   // Opening the panel must happen while the original content-script click is still a user gesture.
@@ -271,6 +311,7 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
   }
   (async () => {
     await ready;
+    if (['ALONG_VIDEO_OPEN', 'ALONG_VIDEO_CHECK', 'ALONG_VIDEO_BACK'].includes(message.type)) return videoVisit(message, sender);
     if (message.type === 'ALONG_PAIR_CODE') return claimPair(message, sender);
     if (message.type === 'ALONG_PAIR_STATUS') {
       const config = await settings(), source = pageSource(sender);
@@ -293,6 +334,7 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
       }
       case 'ALONG_SETTINGS': return { settings: await saveSettings(message.patch || {}) };
       case 'ALONG_CONNECT': return serializeSettings(async () => { await syncScripts(); return openAlong({ alongExtension: chrome.runtime.id }); });
+      case 'ALONG_VIDEO_PERMISSION': await syncScripts(); return { ok: true };
       case 'ALONG_REFRESH': await refreshStatus(true); return { ok: true };
       case 'ALONG_HANDOFF': return handoff(message);
       case 'ALONG_CLEAR': await chrome.storage.session.remove(['results', 'notice']); await notify(); return { ok: true };

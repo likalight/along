@@ -57,3 +57,28 @@ Do the pairing and permissions before the seven-minute presentation. Keep only t
 - Native companion observed running and paused; no new personal activity was collected for this integration check.
 
 The voice startup fix preserves discovery context in separate initial messages. The [Live API reference](https://developers.openai.com/api/reference/resources/live/methods/create) permits one text part per initial message. The merged discovery payload violated that boundary and returned HTTP 400; the regression fixture now rejects the same invalid shape.
+
+## Voice-first microphone presentation (25 October)
+
+Start at `/` with **Start talking**. Context is hidden until Settings → Show context & connections. Do not claim Mac recording is running because learning is enabled: native recording is separately controlled by Along Context. The context panel has a learning toggle, provenance, and an expandable explanation of capture → authenticated local server → AI extraction → local memory → shopping session. Supported automatic memory currently covers bag colour/style/weight/capacity, not every possible preference.
+
+Suggested shopper journey:
+
+1. “I want a microphone to dictate prompts to AI agents in crowded places. I move around, so a clip-on would be useful.”
+2. Answer the actual follow-up. For the planned product: “Show me the RØDE Wireless PRO. My budget is 400 US dollars.” Do not confuse it with Wireless ME, GO II or Micro.
+3. “Show me photos of that one.” The catalog already has a product photo for `MIC-062`.
+4. “Show me a video of it.” The model calls `show_product_video` for the exact visible product. The app pauses capture and narration, then the paired extension opens the curated YouTube Short.
+5. Click **Back to Along** on YouTube. The extension focuses the original app tab and closes only the video tab it created. Choices and unfinished text remain. Tap **Talk to Along** to resume voice deliberately.
+6. “I'd like that one. My computer has USB-C.” Review the complete simulated offer, then give explicit approval. No real payment occurs.
+
+Preflight in the Chrome extension settings: connect the same local Along address and enable **YouTube return button**. This is separate from discovery consent, requires only YouTube host permission, and does not enable browsing observation or screenshots. The review tab is excluded from automatic discovery so it cannot replace the product with a new external reference. Opening requires a current paired session; the page cannot provide an arbitrary destination URL.
+
+Curated link: https://www.youtube.com/shorts/WCsWHqMdPJI — “Rode Wireless Pro - Review & Audio Test”, DansTubeTV. The page title and product match were checked. This is an external creator review, not measured proof of dictation quality in crowded areas. Playback depends on YouTube, connectivity and its own user controls; no copied video is distributed.
+
+Fallback: the in-app **Watch review in Chrome** button invokes the same extension path. Without the extension, **Open video directly** opens a separate tab and says so; this is not represented as a successful extension handoff. If a presenter closes the video manually, switch to the existing Along tab and resume there.
+
+Verification for this presentation flow:
+
+- Live AI (typed input through the production shopping harness) displayed the Wireless PRO photo, requested the exact curated video, prepared a USD 298.06 simulated order and produced a receipt after explicit approval. No real payment was taken. The existing GPT-Live transport remains integrated; this pass does not claim a full spoken rehearsal.
+- Installed-extension browser checks passed for both Mac-memory/discovery checkout and the new video round trip. The video test intercepts YouTube with a local test surface to verify real extension navigation, the return control, preserved session/draft, and paused microphone. It does not verify YouTube playback.
+- Video return permission does not enable discovery observation, screenshots, or microphone access. The test verifies those settings remain off.

@@ -126,3 +126,8 @@ chrome.runtime.onMessage.addListener(message => { if (message.type === 'ALONG_UP
 refresh().catch(error);
 send('ALONG_REFRESH').then(refresh).catch(() => {});
 setInterval(() => { if (document.visibilityState === 'visible') refresh().catch(() => {}); }, 30000);
+
+$('video-permission').addEventListener('click', async () => {
+  try { await permission('https://www.youtube.com/*'); await send('ALONG_VIDEO_PERMISSION'); $('video-permission').textContent = 'YouTube return button ready'; }
+  catch (err) { error(err); }
+});

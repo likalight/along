@@ -1,3 +1,4 @@
+import { PRODUCT_VIDEOS } from "@coupang/contract";
 import { z } from "zod";
 import { normalizeHostConnection } from "@concierge/backend/along-catalog";
 import type {
@@ -186,6 +187,11 @@ const definitions = {
         json: { type: "integer", minimum: 1, maximum: 5 },
       }),
     },
+  },
+  show_product_video: {
+    description:
+      "When the shopper asks to watch a product video, request its curated external review in Chrome. Only MIC-062 (RØDE Wireless PRO) currently has a video. Requires a visible product; no purchase or new conversation. The browser will pause the microphone and offer Back to Along. This only queues a request; opening is not confirmed. Say you are asking Chrome to open it, never that it opened or is playing.",
+    fields: product,
   },
   focus: { description: "Focus a currently visible product.", fields: product },
   show_evidence: {
@@ -388,6 +394,25 @@ export function executeShoppingTool(opts: {
       throw new Error("Unknown platform evidence ID");
     if (args.offerId && !getOffer(args.offerId))
       throw new Error("Unknown platform offer ID");
+    if (name === "show_product_video") {
+      const video = PRODUCT_VIDEOS.find((v) => v.productId === args.productId);
+      if (!video)
+        throw new Error(
+          "No curated video for this exact product. Do not substitute another model's video.",
+        );
+      if (!snapshot.displayOrder.includes(args.productId))
+        throw new Error("Show the requested product before its video.");
+      return finish({
+        ok: true,
+        snapshot,
+        data: {
+          productVideoId: video.id,
+          ...video,
+          instruction:
+            "REQUEST QUEUED, not opened or playing. The browser has not confirmed the extension is available. Tell the shopper: I will ask Chrome to open the Wireless PRO review. If the extension needs connecting, Along will show the next step. Use Back to Along when finished. Do not say I opened it. Along pauses its microphone before the handoff.",
+        },
+      });
+    }
     if (name === "prepare_summary" && args.productId) {
       if (args.offerId && getOffer(args.offerId)?.productId !== args.productId)
         throw new Error("The offer does not belong to the requested product.");

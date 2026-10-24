@@ -45,6 +45,7 @@ export function ContextOverview({
   chrome: "unavailable" | "available" | "connected";
   onNewConversation: () => void;
 }) {
+  const [busy, setBusy] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [status, setStatus] = useState("Checking Mac connection…");
   useEffect(() => {
@@ -90,11 +91,33 @@ export function ContextOverview({
       window.removeEventListener("focus", refresh);
     };
   }, []);
+  async function toggleLearning() {
+    if (!profile || busy) return;
+    setBusy(true);
+    try {
+      const response = await fetch("/api/context", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: profile.enabled ? "pause" : "resume" }),
+      });
+      const data = await response.json();
+      if (!response.ok)
+        throw new Error(data.error || "Could not change learning.");
+      setProfile(data);
+      setStatus(data.enabled ? "Learning enabled" : "Learning paused");
+    } catch (error) {
+      setStatus(
+        error instanceof Error ? error.message : "Connection unavailable",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
   const active = session?.preferences ?? [];
   const hasNew = profile?.memories.some((m) => !includesMemory(active, m));
   const reference = session?.discoveryReference;
   return (
-    <details className={styles.root}>
+    <details className={styles.root} open>
       <summary>
         Your context{" "}
         <span>
@@ -118,6 +141,23 @@ export function ContextOverview({
           <section>
             <span className={styles.eyebrow}>FROM YOUR MAC</span>
             <h3>{status}</h3>
+            {profile && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void toggleLearning()}
+              >
+                {busy
+                  ? "Updating…"
+                  : profile.enabled
+                    ? "Pause learning"
+                    : "Enable learning"}
+              </button>
+            )}
+            <small>
+              This controls AI learning. Start or stop Mac recording in Along
+              Context.
+            </small>
             {profile?.memories.length ? (
               <ul>
                 {profile.memories.map((m) => (
@@ -213,6 +253,39 @@ export function ContextOverview({
             </small>
           </section>
         </div>
+        <details>
+          <summary>How the context reaches Along</summary>
+          <ol>
+            <li>
+              Along Context reads supported foreground app text after macOS
+              permission and recording are enabled. It does not capture
+              everything on the Mac.
+            </li>
+            <li>
+              The local companion sends relevant activity to this computer’s
+              authenticated Along server. The configured AI extracts supported
+              preferences; API credentials stay on the server.
+            </li>
+            <li>
+              Preferences are stored locally with their source and time. This
+              prototype supports bag colour, style and weight/capacity
+              preferences. Current shopping instructions take priority.
+            </li>
+            <li>
+              Chrome connects to one conversation. Discovery requires separate
+              site consent. Product videos use a return button; the microphone
+              pauses while you watch.
+            </li>
+            <li>
+              The shopping server checks the catalog, offers and your explicit
+              approval before issuing a simulated receipt.
+            </li>
+          </ol>
+          <p>
+            Open “Manage remembered preferences” to correct or delete memories.
+            A new conversation uses the latest saved preferences.
+          </p>
+        </details>
         <footer>
           <p>
             {hasNew

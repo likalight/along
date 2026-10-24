@@ -694,3 +694,18 @@ test("unresolved microphone guidance does not block a shopper switching to bags"
   assert.equal(shown.snapshot.view, "shortlist");
   assert.deepEqual(shown.snapshot.displayOrder, [bag.id]);
 });
+
+// Media must not silently switch the shopper's model or grant purchasing authority.
+test("Wireless PRO review uses the exact visible product and leaves checkout untouched", () => {
+  const h = setup();
+  assert.equal(h.run("show_product_video", { productId: "MIC-062" }).ok, false);
+  assert.equal(h.run("shortlist", { entries: [{ productId: "MIC-062", fitReason: "Wearable", compromise: "Crowded-room performance unverified" }] }).ok, true);
+  const before = h.store.get(h.input.sessionId)!;
+  const result = h.run("show_product_video", { productId: "MIC-062" });
+  assert.equal(result.ok, true);
+  assert.equal((result.data as any).url, "https://www.youtube.com/shorts/WCsWHqMdPJI");
+  assert.equal(result.snapshot.revision, before.revision);
+  assert.equal(result.snapshot.selectedOfferId, before.selectedOfferId);
+  assert.equal(h.run("show_product_video", { productId: "MIC-040" }).ok, false);
+  assert.equal(h.store.core.get(h.input.sessionId).receipt, null);
+});

@@ -6,6 +6,6 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "test": "node --test test/*.test.mjs",
-    "check": "node --check src/worker.js && node --check src/content.js && node --check src/bridge.js && node --check ui/panel.js"
+    "check": "node --check src/worker.js && node --check src/content.js && node --check src/bridge.js && node --check src/video-return.js && node --check ui/panel.js"
   }
 }

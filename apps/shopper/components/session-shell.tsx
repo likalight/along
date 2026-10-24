@@ -34,6 +34,7 @@ import {
   customerNotes,
   customerSellerLabel,
 } from "@/lib/canvas/customer-copy";
+import { ProductVideoHandoff } from "./product-video-handoff";
 import { ContextOverview } from "./context-overview";
 import { VoiceOrb } from "./voice-orb";
 import { Attachments } from "./attachments";
@@ -60,6 +61,7 @@ export function SessionShell() {
   const [chrome, setChrome] = useState<
     "unavailable" | "available" | "connected"
   >("unavailable");
+  const [showContext, setShowContext] = useState(false);
   const [draft, setDraft] = useState("");
   const [voiceNote, setVoiceNote] = useState<string | null>(null);
   const [voiceReady, setVoiceReady] = useState(false);
@@ -166,28 +168,29 @@ export function SessionShell() {
             <span className="brand-mark">a</span>along
             <span className="brand-dot">.</span>
           </a>
-          <a
-            className="private-note"
-            href="/setup"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Connect Along <ArrowUpRight size={12} />
-          </a>
         </header>
         <p className="catalog-notice" role="note">
           Demo catalog · simulated offers and orders
         </p>
-        <ContextOverview
-          session={s}
-          chrome={chrome}
-          onNewConversation={newConversation}
-        />
-        <ExtensionCompanion
-          onConnectionChange={setChrome}
+        <div hidden={!showContext}>
+          {showContext && (
+            <ContextOverview
+              session={s}
+              chrome={chrome}
+              onNewConversation={newConversation}
+            />
+          )}
+          <ExtensionCompanion
+            onConnectionChange={setChrome}
+            controller={controller}
+            state={state}
+            hasDraft={Boolean(draft.trim())}
+          />
+        </div>
+        <ProductVideoHandoff
           controller={controller}
           state={state}
-          hasDraft={Boolean(draft.trim())}
+          connected={chrome === "connected"}
         />
         <main
           className={`${opening ? "main opening" : "main active"} ${orbGreeting ? "orb-greeting" : ""}`}
@@ -272,13 +275,6 @@ export function SessionShell() {
                     </>
                   )}
                 </div>
-                {opening && (
-                  <p>
-                    <a href="/context">
-                      Personal context · manage Mac preferences
-                    </a>
-                  </p>
-                )}
                 {s && (
                   <ContentStage
                     narrationProductId={state.narrationProductId}
@@ -392,6 +388,24 @@ export function SessionShell() {
               <details className="conversation-options">
                 <summary>Settings</summary>
                 <div className="options-panel">
+                  <button
+                    type="button"
+                    className="text-button"
+                    aria-pressed={showContext}
+                    onClick={(event) => {
+                      setShowContext((value) => !value);
+                      event.currentTarget
+                        .closest("details")
+                        ?.removeAttribute("open");
+                    }}
+                  >
+                    {showContext
+                      ? "Hide context"
+                      : "Show context & connections"}
+                  </button>
+                  <a href="/setup" target="_blank" rel="noopener noreferrer">
+                    Companion setup ↗
+                  </a>
                   {voiceReady && controller.speechKind === "live" && (
                     <label className="voice-choice">
                       Voice

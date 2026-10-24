@@ -1,3 +1,4 @@
+import { PRODUCT_VIDEOS, type ProductVideoRequest } from "@coupang/contract";
 import type {
   InputEvent,
   LifecycleEvent,
@@ -75,6 +76,37 @@ export class VoiceOrchestrator {
     reduce(thread, { type: "assistant_transcript", data: { turnId: result.turnId, text: result.speakable } });
     await this.voice.append(sessionId, "commentary", result.speakable, { turnId: result.turnId });
     return result;
+  }
+
+  getProductVideoRequest(
+    sessionId: string,
+    turnId?: string,
+  ): ProductVideoRequest | undefined {
+    if (!turnId) return;
+    const events = this.threads.get(sessionId)?.events ?? [];
+    if (
+      !events.some(
+        (e) => e.type === "delegation_completed" && e.data.turnId === turnId,
+      )
+    )
+      return;
+    for (const event of [...events].reverse()) {
+      if (
+        event.type !== "tool_result" ||
+        event.data.turnId !== turnId ||
+        !event.data.ok
+      )
+        continue;
+      try {
+        const result = JSON.parse(event.data.summary);
+        const video = PRODUCT_VIDEOS.find(
+          (v) => v.id === result.productVideoId,
+        );
+        if (video) return { ...video, requestId: turnId };
+      } catch {
+        /* Ordinary tool summaries are not media commands. */
+      }
+    }
   }
 
   getConversation(
