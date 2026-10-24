@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { writeFile } from "node:fs/promises";
-const url = "http://127.0.0.1:4331/api/session";
+const base = new URL(
+  process.env.ALONG_CONTEXT_BASE_URL ?? "http://127.0.0.1:4331",
+);
+assert(
+  ["127.0.0.1", "localhost", "[::1]"].includes(base.hostname),
+  "Run this synthetic check against a local server only.",
+);
+const url = new URL("/api/session", base);
+
 const date = new Date().toISOString();
 const memories = [
   {
@@ -27,7 +35,7 @@ const request = async (body, cookie) => {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      origin: "http://127.0.0.1:4331",
+      origin: base.origin,
       ...(cookie ? { cookie } : {}),
     },
     body: JSON.stringify(body),
@@ -58,10 +66,39 @@ const result = await request(
   },
   cookie,
 );
-assert.equal(result.r.status, 200);
+assert.equal(result.r.status, 200, result.data.error);
 assert(result.data.snapshot.shortlistIds.length > 0);
 assert(result.data.snapshot.preferences.some((p) => p.includes("olive")));
 assert(!result.data.snapshot.receipt);
+const corrected = await request(
+  {
+    action: "input",
+    input: {
+      sessionId: s.sessionId,
+      epoch: result.data.snapshot.epoch,
+      turnId: crypto.randomUUID(),
+      eventId: crypto.randomUUID(),
+      baseRevision: result.data.snapshot.revision,
+      modality: "text",
+      text: "I prefer a black tote instead",
+      visibleProductIds: result.data.snapshot.shortlistIds,
+      visibleRevision: result.data.snapshot.revision,
+    },
+  },
+  cookie,
+);
+assert.equal(corrected.r.status, 200, corrected.data.error);
+assert(corrected.data.snapshot.preferences.some((p) => p.includes("black")));
+assert(corrected.data.snapshot.preferences.some((p) => p.includes("tote")));
+assert(!corrected.data.snapshot.preferences.some((p) => p.includes("olive")));
+const reconnect = await request(
+  { action: "connect", sessionId: s.sessionId, reviewedContext: memories },
+  cookie,
+);
+assert(
+  reconnect.data.preferences.some((p) => p.includes("black")),
+  "Reconnection must not overwrite current instructions with imported memory",
+);
 const fresh = await request({ action: "connect" });
 assert.deepEqual(fresh.data.preferences, []);
 const bad = await request({
@@ -103,6 +140,8 @@ await writeFile(
 console.log(
   JSON.stringify({
     import: "passed",
+    currentInstructionsOverrideMemory: true,
+    reconnectDoesNotReseed: true,
     bagShortlist: result.data.snapshot.shortlistIds,
     noPurchase: true,
     sessionIsolation: "passed",

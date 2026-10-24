@@ -17,8 +17,10 @@ For the matching Along browser app, from the repository root:
 ```sh
 npm run build -w @concierge/backend
 npm run build -w @coupang/agent
-npm run dev -w @along/shopper -- --port 4331
+ALONG_AGENT_MODE=fixture npm run dev -w @along/shopper -- --port 4331
 ```
+
+The command above runs the existing offline development harness for reproducible verification. Production uses the team’s model connection; it does not silently fall back to fixtures.
 
 Open http://127.0.0.1:4331/context in the built-in browser. The native Open Along import button opens this URL in the system default browser; browser-local preferences are not shared between browsers.
 
@@ -60,3 +62,7 @@ Forget in the browser removes future imports; existing sessions retain their cur
 ## Remaining work
 
 Automatic extraction (using the AI teammate's connection), app-specific browser/communication capture, reliable source deletion propagation, authenticated cross-device memory, encrypted storage and distribution/notarization. Do not label this version “records everything” or “ChatGPT history connected.”
+
+## Integration verification
+
+With that development server running, use `node scripts/context/smoke.mjs` from the repository root. Override the local origin with `ALONG_CONTEXT_BASE_URL` when needed. It checks session isolation, invalid/expired imports, correction precedence and reconnect behaviour against the actual HTTP API. See [team handoff](../../docs/mac-context/INTEGRATION.md) for scope and contracts.
