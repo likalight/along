@@ -1,4 +1,13 @@
 import { test, expect, type Page } from "@playwright/test";
+const runtimeErrors = new WeakMap<Page, string[]>();
+test.beforeEach(({ page }) => {
+  const errors: string[] = [];
+  runtimeErrors.set(page, errors);
+  page.on("pageerror", (error) => errors.push(error.message));
+});
+test.afterEach(({ page }) => {
+  expect(runtimeErrors.get(page), "No canvas runtime errors").toEqual([]);
+});
 async function say(page: Page, text: string) {
   const input = page.getByRole("textbox", { name: "Your shopping request" });
   await expect(input).toBeEnabled();
@@ -248,4 +257,96 @@ test("mobile reduced motion uses a readable strip and full-width focus sheet", a
     path: "test-results/canvas-mobile.png",
     fullPage: true,
   });
+});
+
+test("restricted bag counts and middle references follow the visible accepted order", async ({
+  page,
+}) => {
+  await start(page, "Work + gym bag");
+  await say(page, "Explore options");
+  await say(page, "Focus the middle");
+  await expect(page.locator('[data-product-id="BAG-003"]')).toContainText(
+    "In focus",
+  );
+  await say(page, "Under $60");
+  await say(page, "Explore options");
+  await expect(page.locator("[data-product-id]")).toHaveCount(1);
+  await expect(page.locator('[data-product-id="BAG-006"]')).toBeVisible();
+  await expect(
+    page.getByText(/Fewer|Only one|1 close match/i).first(),
+  ).toBeVisible();
+});
+
+test("deep-pocket sheets expose the same exact variant on product and offers", async ({
+  page,
+}) => {
+  await start(page, "Warm-room sheets");
+  await say(page, "Mattress depth 40 cm");
+  await say(page, "Explore options");
+  await expect(page.locator("[data-product-id]")).toHaveCount(1);
+  await expect(page.locator('[data-product-id="BED-005"]')).toContainText("40");
+  await say(page, "Offers for the first");
+  await expect(page.getByText(/40 cm pocket/).first()).toBeVisible();
+  await expect(page.getByText(/30 cm pocket/)).toHaveCount(0);
+});
+
+test("unpriced required audio setup remains an incomplete total", async ({
+  page,
+}) => {
+  await start(page);
+  await say(page, "Explore options");
+  await say(page, "Choose desktop");
+  await say(page, "Choose value");
+  await say(page, "Offers for the first");
+  await expect(
+    page.getByText("Total incomplete", { exact: true }).first(),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/Not available required setup/).first(),
+  ).toBeVisible();
+  await say(page, "Choose faster offer");
+  await expect(
+    page.getByRole("button", { name: "Selected for comparison" }),
+  ).toHaveCount(0);
+});
+
+test("typed video stop provides a takeaway without restarting playback", async ({
+  page,
+}) => {
+  await start(page);
+  await say(page, "Explore options");
+  await say(page, "Choose headset");
+  await say(page, "Choose value");
+  await say(page, "Reviews for the first");
+  await say(page, "Play the first video");
+  await expect(
+    page.getByText("Assistant narration paused · curated video playing"),
+  ).toBeVisible();
+  await say(page, "Stop video");
+  await expect(page.locator("video")).toHaveCount(0);
+  await expect(page.getByText("The takeaway", { exact: true })).toBeVisible();
+});
+
+test("switching categories during video cannot carry old playback status", async ({
+  page,
+}) => {
+  await start(page);
+  await say(page, "Explore options");
+  await say(page, "Choose headset");
+  await say(page, "Choose value");
+  await say(page, "Reviews for the first");
+  await say(page, "Play the first video");
+  await expect(
+    page.getByText("Assistant narration paused · curated video playing"),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Work + gym bag", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Let’s get the essentials right." }),
+  ).toBeVisible();
+  await expect(page.locator("video")).toHaveCount(0);
+  await expect(page.locator("footer").getByRole("status")).toHaveText(
+    "Say it in the voice shell, or type it here.",
+  );
 });

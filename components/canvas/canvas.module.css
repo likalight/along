@@ -40,7 +40,8 @@
   cursor: wait;
 }
 .canvas button:focus-visible,
-.canvas a:focus-visible {
+.canvas a:focus-visible,
+.canvas [tabindex="0"]:focus-visible {
   outline: 3px solid #5084d7;
   outline-offset: 4px;
 }
@@ -272,6 +273,8 @@
 .card:hover,
 .card:focus-within {
   animation-play-state: paused !important;
+  transform: none !important;
+  opacity: 1 !important;
 }
 .focused {
   outline: 3px solid #4380d0;
@@ -481,6 +484,7 @@
 .metrics dd {
   margin: 0;
   font-size: 11px;
+  overflow-wrap: anywhere;
 }
 .metrics {
   display: grid;
@@ -744,6 +748,10 @@
   }
 }
 @media (max-width: 700px) {
+  .canvas button {
+    min-height: 44px;
+    min-width: 44px;
+  }
   .canvas {
     padding: 24px 18px 30px;
   }
@@ -762,9 +770,15 @@
   .chips > span {
     font-size: 9px;
     padding: 5px 9px;
+    overflow-wrap: anywhere;
+    max-width: 100%;
   }
   .context {
     margin-bottom: 26px;
+    min-width: 0;
+  }
+  .chips {
+    min-width: 0;
   }
   .choices {
     grid-template-columns: 1fr;
@@ -904,6 +918,11 @@
 }
 
 .products[data-stable="true"] .card {
+  transform: none !important;
+  opacity: 1 !important;
+}
+.canvas[data-stable="true"] .card,
+.canvas[data-stable="true"] .choice {
   transform: none !important;
   opacity: 1 !important;
 }

@@ -22,11 +22,20 @@ import {
 } from "@/lib/canvas/contracts";
 import styles from "./canvas.module.css";
 
+export type PlaybackRequest = Pick<
+  MediaEvent,
+  "sessionId" | "epoch" | "turnId" | "revision"
+> & {
+  evidenceId: string;
+  phase: "preparing" | "failed";
+};
 export type ProductCanvasProps = {
   snapshot: Snapshot;
   data: CanvasData;
   onIntent: (intent: ShopperIntent) => void;
   onMediaEvent: (event: MediaEvent) => void;
+  /** Pause assistant capture/narration before mounting a requested player. No playback is implied. */
+  onPlaybackRequest?: (request: PlaybackRequest) => void;
   /** Shell sets while resolving spatial/ordinal language; suppress all positional transitions. */
   interpretingSpatialReference?: boolean;
   busy?: boolean;
@@ -34,6 +43,7 @@ export type ProductCanvasProps = {
     requestId: string;
     evidenceId: string;
     action: "play" | "stop";
+    takeaway?: string;
   } | null;
   turnId?: string;
 };
@@ -121,6 +131,7 @@ export function ProductCanvas({
   data,
   onIntent,
   onMediaEvent,
+  onPlaybackRequest,
   interpretingSpatialReference = false,
   busy = false,
   mediaRequest,
@@ -129,17 +140,22 @@ export function ProductCanvas({
   const reduced = useReducedMotion();
   const [videoId, setVideoId] = useState<string | null>(null);
   const [videoError, setVideoError] = useState(false);
+  const [videoRequest, setVideoRequest] = useState(0);
   const [takeaway, setTakeaway] = useState("");
   const activePlayback = useRef<{
+    sessionId: string;
+    epoch: number;
     id: string;
     evidenceId: string;
     revision: number;
     turnId: string;
   } | null>(null);
+  const videoElement = useRef<HTMLVideoElement>(null);
   const callbacks = useRef(onMediaEvent);
   callbacks.current = onMediaEvent;
   const lastRequest = useRef("");
   const products = s.displayOrder.flatMap((id) => {
+    if (s.view === "comparison" && !s.comparisonIds.includes(id)) return [];
     const p = data.products.find((p) => p.id === id);
     return p ? [p] : [];
   });
@@ -163,8 +179,8 @@ export function ProductCanvas({
     activePlayback.current = null;
     const ev = data.evidence.find((e) => e.id === active.evidenceId);
     callbacks.current({
-      sessionId: s.sessionId,
-      epoch: s.epoch,
+      sessionId: active.sessionId,
+      epoch: active.epoch,
       turnId: active.turnId,
       revision: active.revision,
       playbackId: active.id,
@@ -174,10 +190,13 @@ export function ProductCanvas({
     });
   };
   const stop = (reason: MediaEvent["reason"]) => {
+    const played = activePlayback.current;
     emitStop(reason);
+    videoElement.current?.pause();
     setVideoId(null);
     const ev = data.evidence.find((e) => e.id === videoId);
-    if (reason !== "failed" && ev?.media) setTakeaway(ev.media.takeaway);
+    if (played && reason !== "failed" && ev?.media)
+      setTakeaway(ev.media.takeaway);
   };
   const play = (id: string) => {
     const ev = data.evidence.find(
@@ -186,19 +205,48 @@ export function ProductCanvas({
         e.subjectType === "product" &&
         e.subjectId === s.focusedProductId,
     );
-    if (!ev?.media) return;
+    if (
+      !ev?.media ||
+      busy ||
+      s.view !== "evidence" ||
+      !s.evidenceIds.includes(id)
+    )
+      return;
     emitStop("stopped");
+    if (ev.media.url)
+      onPlaybackRequest?.({
+        sessionId: s.sessionId,
+        epoch: s.epoch,
+        turnId,
+        revision: s.revision,
+        evidenceId: id,
+        phase: "preparing",
+      });
     setVideoError(false);
     setTakeaway("");
     setVideoId(id);
-    if (ev.media.url) {
+    setVideoRequest((request) => request + 1);
+  };
+  const started = (element: HTMLVideoElement) => {
+    if (
+      element !== videoElement.current ||
+      busy ||
+      !videoId ||
+      s.view !== "evidence" ||
+      !s.evidenceIds.includes(videoId)
+    )
+      return;
+    if (!activePlayback.current) {
       const playback = {
+        sessionId: s.sessionId,
+        epoch: s.epoch,
         id: crypto.randomUUID(),
-        evidenceId: id,
+        evidenceId: videoId,
         revision: s.revision,
         turnId,
       };
       activePlayback.current = playback;
+      setTakeaway("");
       callbacks.current({
         sessionId: s.sessionId,
         epoch: s.epoch,
@@ -219,8 +267,8 @@ export function ProductCanvas({
       if (active) {
         activePlayback.current = null;
         callbacks.current({
-          sessionId: s.sessionId,
-          epoch: s.epoch,
+          sessionId: active.sessionId,
+          epoch: active.epoch,
           turnId: active.turnId,
           revision: active.revision,
           playbackId: active.id,
@@ -239,8 +287,10 @@ export function ProductCanvas({
   useEffect(() => {
     if (!mediaRequest || lastRequest.current === mediaRequest.requestId) return;
     lastRequest.current = mediaRequest.requestId;
-    if (mediaRequest.action === "stop") stop("stopped");
-    else if (
+    if (mediaRequest.action === "stop") {
+      stop("stopped");
+      if (mediaRequest.takeaway) setTakeaway(mediaRequest.takeaway);
+    } else if (
       s.view === "evidence" &&
       s.evidenceIds.includes(mediaRequest.evidenceId)
     )
@@ -271,7 +321,7 @@ export function ProductCanvas({
         }
         animate={{ opacity: 1, y: 0, rotateY: 0, rotateZ: 0 }}
         transition={{
-          duration: reduced ? 0 : 0.48,
+          duration: stable ? 0 : 0.48,
           delay: stable ? 0 : index * 0.09,
           ease: [0.22, 1, 0.36, 1],
         }}
@@ -292,7 +342,11 @@ export function ProductCanvas({
         </div>
         <div className={styles.productImage}>
           <img src={p.image.url} alt={p.image.alt} loading="lazy" />
-          <span>Illustration · proxy</span>
+          <span>
+            {p.image.classification === "proxy"
+              ? "Illustration · proxy"
+              : `${p.image.classification} image`}
+          </span>
         </div>
         <div className={styles.cardBody}>
           <span className={styles.eyebrow}>
@@ -410,8 +464,12 @@ export function ProductCanvas({
           </div>
         </dl>
         <p className={styles.scope}>
-          {reviews?.classification} · {reviews?.reviewScope}. Captured 24 Oct
-          2026. These customer metrics do not measure café dictation accuracy.
+          {reviews
+            ? `${reviews.classification} · ${reviews.reviewScope ?? "Review scope unavailable"}. Checked ${reviews.checkedOn}.`
+            : "Review source and scope are unavailable."}
+          {p.category === "audio"
+            ? " These customer metrics do not measure café dictation accuracy."
+            : " Customer metrics are not a guarantee of product performance."}
         </p>
         <p>{reviews?.claim ?? "Review synthesis not available."}</p>
         <p className={styles.unavailable}>
@@ -438,6 +496,7 @@ export function ProductCanvas({
       className={styles.canvas}
       aria-label="Shopping product canvas"
       aria-busy={busy}
+      data-stable={stable}
     >
       <nav className={styles.progress} aria-label="Shopping stages">
         {steps.map((name, index) => (
@@ -483,8 +542,8 @@ export function ProductCanvas({
                 {key === "budgetMinor"
                   ? `Under ${money(Number(value))}`
                   : key === "deadlineDays"
-                    ? `Arrive within ${value} day`
-                    : value}
+                    ? `Arrive within ${value} ${value === "1" ? "day" : "days"}`
+                    : `${key === "depth" ? "Mattress depth" : key === "dimensions" ? "Bed size" : key === "connection" ? "Connection" : key}: ${value}`}
               </span>
             ))}
           {s.preferences.map((pref) => (
@@ -529,7 +588,7 @@ export function ProductCanvas({
                 initial={stable ? false : { opacity: 0, y: 20, rotateY: -10 }}
                 animate={{ opacity: 1, y: 0, rotateY: 0 }}
                 transition={{
-                  duration: reduced ? 0 : 0.4,
+                  duration: stable ? 0 : 0.4,
                   delay: stable ? 0 : index * 0.1,
                 }}
               >
@@ -616,7 +675,12 @@ export function ProductCanvas({
           )}
           {s.view === "shortlist" && focused && details(focused)}
           {s.view === "comparison" && products.length > 0 && (
-            <div className={styles.tableScroll}>
+            <div
+              className={styles.tableScroll}
+              role="region"
+              aria-label="Scrollable product comparison"
+              tabIndex={0}
+            >
               <table className={styles.comparison}>
                 <caption>
                   Trade-offs for your current shortlist. Rank reflects this
@@ -624,9 +688,9 @@ export function ProductCanvas({
                 </caption>
                 <thead>
                   <tr>
-                    <th>What matters</th>
+                    <th scope="col">What matters</th>
                     {products.map((p) => (
-                      <th key={p.id}>
+                      <th key={p.id} scope="col">
                         Option {s.displayOrder.indexOf(p.id) + 1}
                         <br />
                         {p.brand} {p.model}
@@ -645,7 +709,7 @@ export function ProductCanvas({
                     "Written reviews",
                   ].map((label) => (
                     <tr key={label}>
-                      <th>{label}</th>
+                      <th scope="row">{label}</th>
                       {products.map((p) => {
                         const r = data.evidence.find(
                           (e) => e.id === `${p.id}-reviews`,
@@ -689,6 +753,17 @@ export function ProductCanvas({
                   Evidence, with its limits
                 </span>
                 <h2>What supports this choice?</h2>
+                {!data.evidence.some(
+                  (ev) =>
+                    s.evidenceIds.includes(ev.id) &&
+                    ev.subjectType === "product" &&
+                    ev.subjectId === focused.id &&
+                    ev.media,
+                ) && (
+                  <p className={styles.unavailable}>
+                    No playable media is available for this product.
+                  </p>
+                )}
                 {data.evidence
                   .filter(
                     (ev) =>
@@ -708,6 +783,7 @@ export function ProductCanvas({
                         {ev.media?.creator ??
                           "Research seed / attributed source"}{" "}
                         · checked {ev.checkedOn}
+                        {ev.media && ` · Topic: ${ev.media.title}`}
                       </p>
                       {ev.sourceUrl && (
                         <a href={ev.sourceUrl} target="_blank" rel="noreferrer">
@@ -748,14 +824,41 @@ export function ProductCanvas({
                     </div>
                     {activeEvidence.media.url && !videoError ? (
                       <video
-                        key={`${videoId}-${mediaRequest?.requestId ?? "click"}`}
+                        ref={videoElement}
+                        key={`${videoId}-${videoRequest}`}
                         autoPlay
                         controls
                         playsInline
-                        onEnded={() => stop("ended")}
-                        onError={() => {
+                        onPlaying={(event) => started(event.currentTarget)}
+                        onPause={(event) => {
+                          if (
+                            event.currentTarget !== videoElement.current ||
+                            event.currentTarget.ended
+                          )
+                            return;
+                          const played = activePlayback.current;
+                          emitStop("stopped");
+                          if (played && activeEvidence?.media)
+                            setTakeaway(activeEvidence.media.takeaway);
+                        }}
+                        onEnded={(event) => {
+                          if (event.currentTarget === videoElement.current)
+                            stop("ended");
+                        }}
+                        onError={(event) => {
+                          if (event.currentTarget !== videoElement.current)
+                            return;
                           emitStop("failed");
                           setVideoError(true);
+                          if (videoId)
+                            onPlaybackRequest?.({
+                              sessionId: s.sessionId,
+                              epoch: s.epoch,
+                              turnId,
+                              revision: s.revision,
+                              evidenceId: videoId,
+                              phase: "failed",
+                            });
                         }}
                         aria-label={activeEvidence.media.title}
                       >
@@ -781,8 +884,15 @@ export function ProductCanvas({
                       </p>
                     )}
                     <p className={styles.scope}>
-                      {activeEvidence.media.creator} · proxy · captions
-                      available. Assistant narration pauses during playback.
+                      {activeEvidence.media.creator} ·{" "}
+                      {activeEvidence.classification} · checked{" "}
+                      {activeEvidence.checkedOn}.
+                      {activeEvidence.media.url &&
+                      activeEvidence.media.captionsUrl
+                        ? " English captions available."
+                        : " Captions unavailable."}
+                      {activeEvidence.media.url &&
+                        " Assistant narration pauses during playback."}
                     </p>
                   </div>
                 )}
@@ -809,7 +919,7 @@ export function ProductCanvas({
                   <h2>
                     {focused.brand} {focused.model}
                   </h2>
-                  <p>{focused.variantId} · destination DEMO-DESTINATION</p>
+                  <p>{focused.variantId}</p>
                 </div>
                 <span className={styles.proxy}>
                   All fulfillment is synthetic
@@ -850,6 +960,15 @@ export function ProductCanvas({
                           {money(o.unitPriceMinor, o.currency)} item +{" "}
                           {money(o.shippingMinor, o.currency)} shipping +{" "}
                           {money(o.otherFeesMinor, o.currency)} fees
+                          {" + "}
+                          {money(o.requiredSetupMinor, o.currency)} required
+                          setup
+                        </p>
+                        <p>Destination: {o.destination}</p>
+                        <p>
+                          {o.availability === "in_stock"
+                            ? "Synthetic stock fixture"
+                            : "Availability unverified"}
                         </p>
                         <p>
                           Demo estimate:{" "}
@@ -883,7 +1002,8 @@ export function ProductCanvas({
                           .filter(
                             (e) =>
                               o.evidenceIds.includes(e.id) &&
-                              e.subjectType === "seller",
+                              e.subjectType === "seller" &&
+                              e.subjectId === o.sellerId,
                           )
                           .map((e) => (
                             <p className={styles.sellerEvidence} key={e.id}>
@@ -891,15 +1011,28 @@ export function ProductCanvas({
                                 Seller evidence · {e.classification}
                               </strong>{" "}
                               {e.claim}
+                              <span className={styles.scope}>
+                                {" "}
+                                {e.sourceType} · checked {e.checkedOn}
+                              </span>
+                              {e.sourceUrl && (
+                                <a
+                                  href={e.sourceUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  Seller source <ArrowUpRight size={13} />
+                                </a>
+                              )}
                             </p>
                           ))}
                         <button
-                          disabled={busy || total === null}
-                          onClick={() =>
-                            intent(
-                              `Choose ${o.id.endsWith("fast") ? "faster" : "cheaper"} offer`,
-                            )
+                          disabled={
+                            busy ||
+                            total === null ||
+                            o.availability !== "in_stock"
                           }
+                          onClick={() => intent(`Choose offer ${o.id}`)}
                         >
                           {o.id === s.selectedOfferId
                             ? "Selected for comparison"

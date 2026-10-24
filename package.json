@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "test:canvas": "playwright test --config playwright.canvas.config.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
