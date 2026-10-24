@@ -23,20 +23,26 @@ Keep this terminal running. Open `http://127.0.0.1:4339/setup` in desktop Chrome
 
 Restarting the server invalidates in-memory shopping sessions. Use **New conversation** and reconnect Chrome afterward. Saved Mac preferences remain; automatic learning starts paused. A new Chrome tab may have a different conversation; the extension’s handoff returns to the tab that was explicitly paired.
 
-## Seven-minute story
+## Seven-minute story — voice first
+
+The microphone journey below is the current presentation. Mac context and browsing discovery are optional Q&A demonstrations, not onboarding steps for the judges.
 
 | Time | Show | Say / do |
 | --- | --- | --- |
-| 0:00–0:35 | Along’s main screen | “Shopping inspiration happens everywhere. Along carries that context into a decision.” |
-| 0:35–1:20 | Your context | Show the lightweight preference learned from the labelled TextEdit note. Explain its source and that it can be corrected or removed. |
-| 1:20–2:15 | Chrome inspiration | Open the rehearsed product page. For a reliable controlled demo, explicitly enable demo mode and use `/extension-demo`; call it a prepared example. Let the extension detect it. |
-| 2:15–3:30 | Discuss with Along | Return to the same conversation. Say “I need a work and gym bag under USD 150.” Show browsing inspiration and saved preferences together. |
-| 3:30–4:40 | Check my requirements | Ask what fits and what remains unknown. Change one constraint and show the decision respond. |
-| 4:40–5:35 | Review and decide | For the prepared product, choose **Explore this demo product**, ask for offers, choose one, inspect the complete order and explicitly confirm. Point to the simulated receipt. No payment is taken. |
-| 5:35–6:20 | Control | Show Mac pause, extension site consent and source provenance. External discoveries do not authorize orders. |
-| 6:20–7:00 | Close / questions | “One conversation, context from your life, a decision you control.” |
+| 0:00–0:40 | Fresh Along screen | Start talking: “I need a discreet clip-on microphone for dictating to AI agents in crowded places.” |
+| 0:40–1:40 | Voice and product choices | Answer the actual follow-up, state a USD 400 budget and USB-C laptop, then explore RØDE Wireless PRO (`MIC-062`). |
+| 1:40–2:20 | Product photo | Ask for photos. Explain that catalog facts and unknown performance claims stay distinct. |
+| 2:20–3:20 | Chrome review | Ask for the video. The extension opens the curated Short with **Back to Along**. |
+| 3:20–4:00 | Same conversation | Return, resume voice, and change the budget to USD 320. Check that the current constraint is reflected. |
+| 4:00–5:15 | Spoken order summary | Ask to review the order. Hear the item and complete simulated total before approving. |
+| 5:15–6:00 | Simulated receipt | Explicitly approve the current order; show one receipt. No payment is taken. |
+| 6:00–7:00 | Questions | If asked, reveal Settings → Show context & connections and explain source provenance, recording controls and infrastructure. |
 
-Do the pairing and permissions before the seven-minute presentation. Keep only the shopping and inspiration tabs in front of the judges; setup is not the story.
+Pairing and permissions are preflight. Leave the microphone off until the presenter presses **Start talking**. Do not claim the model has verified crowded-room dictation quality or active noise cancellation from the seeded catalog.
+
+### Reset for an independent rehearsal
+
+Open `http://127.0.0.1:4339/?fresh=1` in the existing presentation tab. This creates a new conversation with no cart/order/history, while saved Mac preferences and installed companion permissions remain. Under Settings, show context & connections, choose **Reconnect extension**, verify Chrome connected, then hide the context panel again. Do not restart the server during the rehearsal. The latest fresh-session check showed an empty brief except USD, learning paused, Chrome connected, and the voice-first “What are you looking for?” screen.
 
 ## Verification boundaries
 
@@ -53,7 +59,7 @@ Do the pairing and permissions before the seven-minute presentation. Keep only t
 - Browser shopping/voice-adapter flows: 14 passed; product canvas: 13 passed; combined Mac-memory + installed-extension journey: 1 passed.
 - The actual Chrome session reached “Listening · microphone on” and received microphone transcription after fixing the Live startup payload. Microphone was paused and a clean session opened afterward. A complete audible shopping conversation still needs the presenter’s rehearsal.
 - The production app answered a live model-backed work/gym bag request with catalog-grounded options.
-- The Chrome extension is verified in a temporary test profile, not yet installed in the presenter’s personal Chrome profile. The automation tool blocks the extension-manager URL; manual Load unpacked is required.
+- The Chrome extension is now installed in the presenter’s personal Chrome profile. Real YouTube playback and return to the original conversation were verified; see the personal Chrome rehearsal below.
 - Native companion observed running and paused; no new personal activity was collected for this integration check.
 
 The voice startup fix preserves discovery context in separate initial messages. The [Live API reference](https://developers.openai.com/api/reference/resources/live/methods/create) permits one text part per initial message. The merged discovery payload violated that boundary and returned HTTP 400; the regression fixture now rejects the same invalid shape.
@@ -90,3 +96,9 @@ Personal Chrome rehearsal, 25 October:
 - Back closed only the review tab and returned to the original app tab. The Wireless PRO, brief, conversation history and unfinished draft were unchanged; the microphone stayed paused.
 - Talk to Along resumed to “Listening · microphone on”; capture was then paused. Typed checkout continued in that same conversation and produced simulated receipt 38D0A9C5 for USD 298.06 after explicit approval. No real payment occurred.
 - This verifies personal-profile navigation, real video playback, return/session continuity, live voice resumption and simulated checkout. It does not claim an entire purchase spoken aloud by the presenter.
+
+## Remaining acceptance check
+
+The current production rehearsal verified cancellation before a pending typed request completed: the app reported “Stopped. No purchase was made.” A subsequent microphone session transcribed room speech, but did not establish a spoken shopping journey. It was paused, and a fresh independent demo session was prepared at the presenter’s request.
+
+Still required before claiming the full voice journey complete: an observed revised constraint applied in the live conversation; the presenter hearing the complete spoken purchase summary; explicit spoken approval bound to that current summary; and exactly one simulated receipt from that approval. Existing typed checkout evidence and provider fixtures do not substitute for this human rehearsal.
