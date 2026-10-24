@@ -104,6 +104,7 @@ export class VoiceOrchestrator {
     });
 
     const thread = this.thread(input.sessionId, basedOn);
+    thread.snapshot = basedOn;
     reduce(thread, { type: "user_input", data: input });
     reduce(thread, {
       type: "delegation_started",

@@ -254,6 +254,22 @@ export class SessionStore {
     this.record(id);
     this.liveDemoCheckoutSessions.add(id);
   }
+  initializeReviewedPreferences(id: string, preferences: { key: string; value: string }[]) {
+    const s = this.get(id);
+    requireThat(s.revision === 0 && !s.history.length && !s.turn && !s.receipt && !s.preferences.length,
+      "CONTEXT_ALREADY_INITIALIZED", "Reviewed context can only initialize an unused session.");
+    const allowed: Record<string, string[]> = {
+      color: ["black", "navy", "olive", "khaki", "slate"],
+      shape: ["backpack", "tote", "sling", "duffel"],
+    };
+    requireThat(Array.isArray(preferences) && preferences.length <= 2 &&
+      new Set(preferences.map((p) => p?.key)).size === preferences.length &&
+      preferences.every((p) => p && Object.hasOwn(allowed, p.key) && allowed[p.key]?.includes(p.value)),
+      "INVALID_CONTEXT", "Unsupported reviewed context.");
+    if (!preferences.length) return s;
+    s.preferences = preferences.map((p) => JSON.stringify([p.key, p.value]));
+    return this.commit(s);
+  }
   private commit(next: Session) {
     const r = this.record(next.id);
     next.revision = r.state.revision + 1;
