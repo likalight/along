@@ -65,7 +65,18 @@ The active fixture contains **24 products**: 12 audio configurations, six bags, 
 
 ## Getting started
 
-The shared catalog and session backend are ready to inspect and test. The shopper interface and live voice integration are still being assembled; there is no complete hosted demo to launch yet.
+The shared catalog, session backend, and fixture-based shopper shell are ready to inspect and test. Wiring the shell to the backend and live voice provider remains separate integration work; there is no complete hosted demo yet.
+
+### Run the session shell
+
+From the repository root:
+
+```sh
+npm ci
+npm run dev
+```
+
+Open [the local shell](http://127.0.0.1:3000). It supports voice/text journeys, photo/link references, interruption, and simulated confirmation against an explicitly labelled server fixture. See the [session shell guide](./docs/session-shell.md) for commands and integration limits.
 
 ### Run the catalog checks
 
@@ -163,7 +174,7 @@ Along is an early hackathon project, not a production marketplace.
 | Product direction and integration contract | Agreed in [issue #2](https://github.com/likalight/along/issues/2). |
 | Catalog, provenance, scenarios, and validation | Implemented in [PR #16](https://github.com/likalight/along/pull/16) and integrated through [PR #15](https://github.com/likalight/along/pull/15). |
 | Session backend and simulated approval | Implemented with voice/text approval, multimodal state, and CI in [PR #15](https://github.com/likalight/along/pull/15). See the [acceptance matrix](./backend/ACCEPTANCE.md). |
-| Shopper interface and live voice integration | Tracked in the [issue tracker](https://github.com/likalight/along/issues); not included in the catalog package. |
+| Shopper session shell | Implemented with deterministic fixtures in [PR #19](https://github.com/likalight/along/pull/19); see the [shell guide](./docs/session-shell.md). Live integration remains pending. |
 | End-to-end demo rehearsal | Pending; the target is a seven-minute presentation. |
 
 The agreed frontend direction is **Next.js App Router + TypeScript**, **Motion for React**, and an **ElevenLabs UI Orb**. The orb is a visual component; it does not establish the selected speech/model provider or a paid service commitment.
