@@ -296,7 +296,10 @@ export function ProductCanvas({
         </div>
         <div className={styles.cardBody}>
           <span className={styles.eyebrow}>
-            {annotation?.role ?? "Saved choice"}
+            {annotation?.role ??
+              (s.savedItems.some((item) => item.id === p.id)
+                ? "Saved choice"
+                : "Shortlisted choice")}
           </span>
           <p className={styles.brand}>{p.brand}</p>
           <h3>{p.model}</h3>
@@ -917,10 +920,7 @@ export function ProductCanvas({
                           }
                           onClick={() => intent(`Select offer ${o.id}`)}
                         >
-                          {o.id === s.selectedOfferId
-                            ? "Selected for comparison"
-                            : "Consider this offer"}{" "}
-                          <ArrowUpRight size={14} />
+                          Review this offer <ArrowUpRight size={14} />
                         </button>
                       </div>
                     </article>

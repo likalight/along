@@ -153,7 +153,7 @@ export async function POST(request: Request) {
       /^(Focus|Save|Remove|Show offers for|Show reviews for|Select offer) ([A-Z0-9-]+)$/i,
     );
     const simple =
-      /^(Compare the first two|Back to shortlist|Show saved choices|Review summary|Prepare summary)$/i.test(
+      /^(Compare the first two|Back to shortlist|Restore shortlist|Show saved choices|Review summary|Prepare summary)$/i.test(
         text,
       );
     const confirm = /^confirm (?:this )?simulated purchase[.!]?$/i.test(text);
@@ -218,7 +218,25 @@ export async function POST(request: Request) {
         }
       } else if (/^compare/i.test(text))
         apply("compare", { productIds: c.shortlist.slice(0, 2) });
-      else if (/^show saved/i.test(text)) propose({ stage: "saved_choice" });
+      else if (/^restore shortlist$/i.test(text)) {
+        const candidates = [
+          ...new Set([...c.displayOrder, ...c.excludedProductIds]),
+        ];
+        // Undo explicit removals, but never undo a revised budget, fit or deadline.
+        propose({ excludedProductIds: [] });
+        const restored = candidates
+          .filter((pid) =>
+            store.quotes(sessionId, pid).some((quote) => quote.eligible),
+          )
+          .slice(0, 3);
+        propose({ shortlist: restored, stage: "shortlist", comparisonIds: [] });
+        messages.set(
+          sessionId,
+          restored.length
+            ? "Restored available choices that still meet your current requirements."
+            : "Removals are undone, but none of those choices meets your current requirements.",
+        );
+      } else if (/^show saved/i.test(text)) propose({ stage: "saved_choice" });
       else if (/^back/i.test(text)) propose({ stage: "shortlist" });
       else apply("prepare_summary");
     } else {
