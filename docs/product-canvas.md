@@ -56,6 +56,10 @@ Bag/textile specifications, illustrations, seller records, fulfillment, destinat
 
 Live catalog/constraint/offer acceptance (#6/#7), review/video retrieval (#11/#12), speech-provider routing and real-device echo rehearsal remain integration work. This fixture route cannot authorize or perform purchases. Do not treat its client intent handling or authored ranking as authoritative production policy.
 
+The parallel catalog build (`codex/issue-6-catalog`, PR #16) uses category values `audio-accessories` / `everyday-bags` / `bedsheet-sets`, structured JSON specs, `referencePrice.amountMinor`, separate buyer metrics, timestamped delivery windows, explicit tax and setup hardware. Its synthetic bags, variants, prices and destination differ from this isolated canvas rehearsal, even where IDs coincide. Replace the entire fixture projection when connecting it; never join these two fixture sets by ID and silently mix identities. Render accepted tax, hardware and total breakdowns without double-counting hardware already included in `otherFeesMinor`.
+
+The parallel backend build (`codex/backend-concierge`) publishes `backend/INTEGRATION.md` and `src/integration-client.ts`. Use `/v1/integration` and its public string-valued stage, rather than the legacy `/v1` presentation view. It supplies accepted SSE snapshots and curated-ID media lifecycle endpoints. Catalog image paths resolve against the backend origin. Its server agent token stays server-side; session capabilities must not enter page URLs, model context or this fixture data. These observed interfaces inform the handoff; this PR does not claim they are connected.
+
 ## Verification
 
 `npm run typecheck`; `npm test -- tests/canvas/engine.test.ts`; `npm exec playwright test -- --config playwright.canvas.config.ts`; `npm run build`.
