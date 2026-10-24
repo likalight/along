@@ -1,17 +1,21 @@
 <div align="center">
 
-# Along
+<img src="./assets/readme/along-banner.png" alt="Along — A little conversation. A better choice. A blue orb beside headphones, a navy tote, and folded linens." width="100%" />
 
 ### Find your next purchase. Talk it through.
 
 A voice-first shopping concierge that carries your context from the first idea to the final decision.
 
-[![Stage: Hackathon prototype](https://img.shields.io/badge/stage-hackathon_prototype-2563eb)](https://github.com/likalight/along/issues/1)
-[![Catalog acceptance](https://github.com/likalight/along/actions/workflows/catalog.yml/badge.svg)](https://github.com/likalight/along/actions/workflows/catalog.yml)
-[![Backend acceptance](https://github.com/likalight/along/actions/workflows/backend.yml/badge.svg)](https://github.com/likalight/along/actions/workflows/backend.yml)
-[![Purchases: Simulated](https://img.shields.io/badge/purchases-simulated-64748b)](#human-approval-by-design)
+[![Integration CI](https://github.com/likalight/along/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/likalight/along/actions/workflows/ci.yml)
+[![Catalog acceptance](https://github.com/likalight/along/actions/workflows/catalog.yml/badge.svg?branch=main)](https://github.com/likalight/along/actions/workflows/catalog.yml)
+[![Backend acceptance](https://github.com/likalight/along/actions/workflows/backend.yml/badge.svg?branch=main)](https://github.com/likalight/along/actions/workflows/backend.yml)
 
-[Getting started](#getting-started) · [How it works](#how-it-works) · [Demo scenarios](#demo-scenarios) · [Contributing](#contributing)
+[![Node.js: 22.18+](https://img.shields.io/badge/Node.js-22.18%2B-417E38?style=flat-square&logo=nodedotjs&logoColor=white)](./package.json)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)](./tsconfig.base.json)
+[![Stage: Hackathon prototype](https://img.shields.io/badge/stage-hackathon_prototype-2563eb?style=flat-square)](#project-status)
+[![Purchases: Simulated](https://img.shields.io/badge/purchases-simulated-64748b?style=flat-square)](#human-approval-by-design)
+
+[Get started](#getting-started) · [How it works](#how-it-works) · [Scenarios](#demo-scenarios) · [Roadmap](https://github.com/likalight/along/issues) · [Contribute](#contributing)
 
 </div>
 
