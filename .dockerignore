@@ -38,6 +38,5 @@ backend/test
 backend/ACCEPTANCE.md
 backend/API.md
 backend/INTEGRATION.md
-catalog/sources
 catalog/test
-catalog/microphones-archive.json
+catalog/data/microphones-archive.json
